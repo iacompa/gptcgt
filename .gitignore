@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.gptcgt/
+.env
+*.db
+node_modules/
+.next/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/

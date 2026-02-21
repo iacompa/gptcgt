@@ -1,0 +1,47 @@
+/* Ember Theme — Warm, dark fire colors */
+/* Background */
+Screen { background: #181111; }
+.panel { background: #221818; }
+.panel-active { background: #2F2121; }
+
+/* Borders */
+.border { border: solid #4A3434; }
+
+/* Text */
+.text-primary { color: #FDF4F4; }
+.text-secondary { color: #BFA5A5; }
+.text-code { color: #EED2D2; }
+
+/* Accents */
+.accent { color: #F97316; }
+.success { color: #84CC16; }
+.warning { color: #EAB308; }
+.error { color: #EF4444; }
+
+/* Agent Colors */
+.agent-claude { color: #D946EF; }
+.agent-gemini { color: #3B82F6; }
+.agent-gpt { color: #10B981; }
+.agent-grok { color: #EC4899; }
+.agent-deepseek { color: #F59E0B; }
+
+/* Diff Colors */
+.diff-added { background: #3F6212; color: #84CC16; }
+.diff-removed { background: #7F1D1D; color: #EF4444; }
+.diff-context { color: #BFA5A5; }
+
+/* Layout */
+#app-grid { layout: horizontal; height: 100%; }
+#left-panel { width: 20%; min-width: 15; }
+#center-panel { width: 50%; min-width: 30; }
+#right-panel { width: 30%; min-width: 20; }
+
+/* Status Bar */
+#status-bar { dock: bottom; height: 1; background: #221818; color: #FDF4F4; }
+
+/* Activity Feed */
+.activity-entry { padding: 0 1; }
+.activity-timestamp { color: #BFA5A5; }
+.activity-orchestrator { color: #F97316; }
+.activity-header { background: #2F2121; padding: 1; text-style: bold; }
+.active-agent-chip { padding: 0 1; }

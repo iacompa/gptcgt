@@ -1,0 +1,47 @@
+/* Midnight Theme — Default Dark */
+/* Background */
+Screen { background: #0D1117; }
+.panel { background: #161B22; }
+.panel-active { background: #1C2333; }
+
+/* Borders */
+.border { border: solid #30363D; }
+
+/* Text */
+.text-primary { color: #E6EDF3; }
+.text-secondary { color: #8B949E; }
+.text-code { color: #C9D1D9; }
+
+/* Accents */
+.accent { color: #58A6FF; }
+.success { color: #3FB950; }
+.warning { color: #D29922; }
+.error { color: #F85149; }
+
+/* Agent Colors */
+.agent-claude { color: #A78BFA; }
+.agent-gemini { color: #60A5FA; }
+.agent-gpt { color: #34D399; }
+.agent-grok { color: #F472B6; }
+.agent-deepseek { color: #FB923C; }
+
+/* Diff Colors */
+.diff-added { background: #1A3A1A; color: #3FB950; }
+.diff-removed { background: #3A1A1A; color: #F85149; }
+.diff-context { color: #8B949E; }
+
+/* Layout */
+#app-grid { layout: horizontal; height: 100%; }
+#left-panel { width: 20%; min-width: 15; }
+#center-panel { width: 50%; min-width: 30; }
+#right-panel { width: 30%; min-width: 20; }
+
+/* Status Bar */
+#status-bar { dock: bottom; height: 1; background: #161B22; color: #E6EDF3; }
+
+/* Activity Feed */
+.activity-entry { padding: 0 1; }
+.activity-timestamp { color: #8B949E; }
+.activity-orchestrator { color: #58A6FF; }
+.activity-header { background: #1C2333; padding: 1; text-style: bold; }
+.active-agent-chip { padding: 0 1; }
