@@ -12,6 +12,13 @@ from src.tui.panels.file_tree import FileTreePanel
 from src.tui.panels.activity_feed import ActivityFeedPanel
 from src.tui.panels.chat import ChatPanel
 from src.tui.overlays.session_browser import SessionBrowser
+from src.core.quality_tiers import QualityTierManager, QualityTier
+from src.billing.cost_breakdown import CostBreakdownTracker
+from src.billing.overage import OverageManager
+from src.core.task_tracker import TaskTracker
+from src.tui.widgets.status_bar import EnhancedStatusBar
+from src.tui.widgets.task_panel import TaskPanel
+from src.tui.overlays.tier_selector import TierSelectorOverlay
 
 class CodeViewerPanelPlaceholder(Static):
     """Placeholder for CodeViewerPanel."""
@@ -33,6 +40,7 @@ class GptcgtApp(App[None]):
         Binding("ctrl+t", "toggle_theme", "Toggle Theme"),
         Binding("ctrl+p", "fuzzy_search", "Fuzzy Search"),
         Binding("ctrl+h", "session_history", "Session History"),
+        Binding("ctrl+q", "tier_selector", "Tier Selector"),
         Binding("tab", "app.focus_next", "Focus Next", show=False),
         Binding("shift+tab", "app.focus_previous", "Focus Previous", show=False),
     ]
@@ -50,29 +58,48 @@ class GptcgtApp(App[None]):
         self.chat_store.load_active_session()
 
         with Horizontal(id="app-grid"):
-            yield FileTreePanel(id="left-panel")
+            with Vertical(id="left-panel-container", classes="left-col"):
+                yield TaskPanel(id="task-panel")
+                yield FileTreePanel(id="left-panel")
             yield ChatPanel(self.chat_store, id="center-panel")
             yield ActivityFeedPanel(id="right-panel")
         
-        # Add session indicator label
-        self.session_indicator = Static("Session: 0 messages │ 0.0K tokens | Started --:--", id="session-indicator")
-        
-        status_bar = Horizontal(id="status-bar")
-        with status_bar:
-            yield Static("Press Ctrl+B to toggle tree, Ctrl+T for theme, Ctrl+Shift+Z for zen, Ctrl+H for history")
-            yield self.session_indicator
+        # Enhanced status bar handles session/cost info internally via reactives
+        self.status_bar = EnhancedStatusBar(id="status-bar")
+        yield self.status_bar
 
     def on_mount(self) -> None:
         """Initialize workspace and chat history on mount."""
-        self._update_session_indicator()
+        self.tier_manager = QualityTierManager()
+        self.cost_tracker = CostBreakdownTracker()
+        self.overage_manager = OverageManager()
+        self.task_tracker = TaskTracker()
+        
+        # Link UI components to managers
+        task_panel = self.query_one("#task-panel", TaskPanel)
+        task_panel.tracker = self.task_tracker
+        
+        self._update_status_bar()
 
-    def _update_session_indicator(self) -> None:
-        if not hasattr(self, 'session_indicator'): return
-        msgs = self.chat_store._cache
-        if not msgs: return
-        start_time = msgs[0].timestamp.strftime("%H:%M %p")
-        text = f"Session: {len(msgs)} messages │ Started {start_time}"
-        self.session_indicator.update(text)
+    def _update_status_bar(self) -> None:
+        """Sync manager states to the Enhanced StatusBar."""
+        if not hasattr(self, 'status_bar'): return
+        
+        tier_cfg = self.tier_manager.config
+        self.status_bar.tier_icon = tier_cfg.icon
+        self.status_bar.tier_name = tier_cfg.display_name
+        self.status_bar.tier_color = tier_cfg.color
+        
+        today = self.cost_tracker.get_today_spend()
+        self.status_bar.today_cost = today.total_cost
+        self.status_bar.month_cost = self.cost_tracker.get_monthly_spend()
+        
+        overage = self.overage_manager.state
+        self.status_bar.is_overage = overage.is_in_overage
+        self.status_bar.credits_remaining = overage.remaining_credits
+        self.status_bar.plan_credits = overage.plan_credits
+        if overage.plan_credits > 0:
+            self.status_bar.budget_pct = min(1.0, overage.used_credits / overage.plan_credits)
 
     def on_file_selected(self, message: FileSelected) -> None:
         """Handle file selection."""
@@ -147,6 +174,15 @@ class GptcgtApp(App[None]):
                 self._update_session_indicator()
 
         self.push_screen(SessionBrowser(self.chat_store), check_session_switch)
+
+    def action_tier_selector(self) -> None:
+        """Push the TierSelector modal."""
+        def check_tier_switch(new_tier: QualityTier | None) -> None:
+            if new_tier:
+                self.tier_manager.set_tier(new_tier)
+                self._update_status_bar()
+
+        self.push_screen(TierSelectorOverlay(self.tier_manager.active_tier), check_tier_switch)
 
 def main() -> None:
     """Entry point for the application."""
