@@ -75,12 +75,50 @@ class SecurityAlert(Message):
         self.details = details
         self.filepath = filepath
 
+
+from src.core.task_tracker import Task, TaskStatus
+from src.core.quality_tiers import QualityTier
+
+class TaskCreated(Message):
+    """A new task has been created by the tracker."""
+    def __init__(self, task: Task) -> None:
+        super().__init__()
+        self.task = task
+
+class SubTaskUpdated(Message):
+    """A subtask within a task has changed status."""
+    def __init__(self, task_id: str, subtask_id: str, new_status: TaskStatus) -> None:
+        super().__init__()
+        self.task_id = task_id
+        self.subtask_id = subtask_id
+        self.new_status = new_status
+
+class TaskCompleted(Message):
+    """A top-level task has fully completed."""
+    def __init__(self, task: Task) -> None:
+        super().__init__()
+        self.task = task
+
+class QualityTierChanged(Message):
+    """The user has changed the active quality tier."""
+    def __init__(self, new_tier: QualityTier) -> None:
+        super().__init__()
+        self.new_tier = new_tier
+
 class CostUpdated(Message):
     """Real-time cost tracking update."""
-    def __init__(self, task_cost: float, daily_total: float) -> None:
+    def __init__(self, task_cost: float, daily_total: float, monthly_total: float = 0.0) -> None:
         super().__init__()
         self.task_cost = task_cost
         self.daily_total = daily_total
+        self.monthly_total = monthly_total
+
+class OverageWarning(Message):
+    """Warning that user is approaching or exceeding credit limits."""
+    def __init__(self, warning_level: str, message: str) -> None:
+        super().__init__()
+        self.warning_level = warning_level
+        self.message = message
 
 class OrchestratorNarration(Message):
     """The orchestrator is narrating what it's doing / deciding."""
