@@ -121,7 +121,6 @@ class ChatMessage(Static):
         width: auto;
         max-width: 78%;
         border: blank;
-        border-radius: 8;
     }
     .msg-user > .msg-header {
         content-align: right middle;
