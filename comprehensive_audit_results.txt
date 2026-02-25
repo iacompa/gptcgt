@@ -1,0 +1,34 @@
+=== COMPREHENSIVE CODEBASE AUDIT REPORTS ===
+
+Total Files Scanned: 458
+Total Lines of Code: 39769
+Total Classes: 255 (Missing Docstrings: 86)
+Total Functions: 1022 (Missing Docstrings: 630)
+
+=== BARE EXCEPTS FOUND (SECURITY SCORING) ===
+
+=== COMPLEX FUNCTIONS (>10 Branches) ===
+ - src/core/chat_pipeline.py::process_message (Score: 40)
+ - src/tui/app.py::on_menu_action (Score: 29)
+ - src/core/orchestrator.py::process_task (Score: 24)
+ - src/core/arbiter.py::evaluate (Score: 24)
+ - src/core/phase_tracker.py::parse_markdown (Score: 17)
+ - src/core/project_context.py::_detect_framework (Score: 17)
+ - src/core/router.py::route_task (Score: 16)
+ - src/tools/filesystem.py::grep_search (Score: 15)
+ - src/core/parallel_dispatcher.py::dispatch (Score: 15)
+ - src/core/system_prompt.py::build (Score: 14)
+ - src/core/project_context.py::_detect_language (Score: 14)
+ - src/tui/app.py::on_quick_action (Score: 14)
+ - src/agents/litellm_client.py::stream (Score: 14)
+ - src/core/parallel_dispatcher.py::_run_single_agent (Score: 13)
+ - src/tools/tree_sitter_utils.py::_extract_python (Score: 12)
+ - src/core/arbiter.py::_produce_verdict (Score: 12)
+ - src/tui/widgets/menu.py::on_key (Score: 12)
+ - src/tools/repo_map.py::find_relevant_files (Score: 11)
+ - src/tools/lsp.py::verify_patch_references (Score: 11)
+ - src/tools/sandbox.py::_verify_with_sandbox (Score: 11)
+ - src/core/logger.py::filter (Score: 11)
+ - src/tui/app.py::on_ready (Score: 11)
+
+=== TODO / FIXME DEBT ===

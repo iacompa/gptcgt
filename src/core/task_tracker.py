@@ -1,7 +1,14 @@
-from enum import Enum
+from __future__ import annotations
+
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-import uuid
+from enum import Enum
+
+from src.core.logger import get_logger
+
+logger = get_logger("core.tasks")
+
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -10,6 +17,7 @@ class TaskStatus(Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
     WAITING = "waiting"
+
 
 @dataclass
 class SubTask:
@@ -25,6 +33,7 @@ class SubTask:
     tokens_used: int = 0
     files_affected: list[str] = field(default_factory=list)
     error_message: str | None = None
+
 
 @dataclass
 class Task:
@@ -42,7 +51,9 @@ class Task:
     def progress_pct(self) -> float:
         if not self.subtasks:
             return 0.0
-        done = sum(1 for s in self.subtasks if s.status in (TaskStatus.COMPLETED, TaskStatus.SKIPPED))
+        done = sum(
+            1 for s in self.subtasks if s.status in (TaskStatus.COMPLETED, TaskStatus.SKIPPED)
+        )
         return (done / len(self.subtasks)) * 100.0
 
     @property
@@ -51,6 +62,7 @@ class Task:
             if s.status == TaskStatus.IN_PROGRESS:
                 return s
         return None
+
 
 SUBTASK_TEMPLATES: dict[str, list[dict]] = {
     "scout": [
@@ -92,6 +104,7 @@ SUBTASK_TEMPLATES: dict[str, list[dict]] = {
     ],
 }
 
+
 class TaskTracker:
     def __init__(self) -> None:
         self._tasks: list[Task] = []
@@ -104,9 +117,16 @@ class TaskTracker:
             task.subtasks.append(SubTask(title=st["title"], description=st["description"]))
         self._tasks.insert(0, task)
         self._active_task = task
+        logger.info(f"Task created: {title}")
         return task
 
-    def start_subtask(self, task_id: str, subtask_id: str, agent_id: str | None = None, agent_color: str | None = None) -> None:
+    def start_subtask(
+        self,
+        task_id: str,
+        subtask_id: str,
+        agent_id: str | None = None,
+        agent_color: str | None = None,
+    ) -> None:
         task = self._get_task(task_id)
         if task:
             st = self._get_subtask(task, subtask_id)
@@ -116,7 +136,14 @@ class TaskTracker:
                 st.agent_id = agent_id
                 st.agent_color = agent_color
 
-    def complete_subtask(self, task_id: str, subtask_id: str, cost: float = 0.0, tokens: int = 0, files: list[str] | None = None) -> None:
+    def complete_subtask(
+        self,
+        task_id: str,
+        subtask_id: str,
+        cost: float = 0.0,
+        tokens: int = 0,
+        files: list[str] | None = None,
+    ) -> None:
         task = self._get_task(task_id)
         if task:
             st = self._get_subtask(task, subtask_id)
@@ -150,6 +177,7 @@ class TaskTracker:
         if task:
             task.status = TaskStatus.COMPLETED
             task.completed_at = datetime.now()
+            logger.info(f"Task completed: {task.title}")
             if self._active_task and self._active_task.id == task_id:
                 self._active_task = None
 
