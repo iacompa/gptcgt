@@ -1,0 +1,307 @@
+{
+  "version": "2026-02-21",
+  "models": [
+    {
+      "id": "anthropic/claude-opus-4-20250514",
+      "name": "Claude Opus 4",
+      "provider": "anthropic",
+      "input_cost_per_mtok": 15.0,
+      "output_cost_per_mtok": 75.0,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 32000,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "max"
+      ],
+      "display_color": "#A855F7",
+      "display_emoji": "🟣"
+    },
+    {
+      "id": "anthropic/claude-sonnet-4-20250514",
+      "name": "Claude Sonnet 4",
+      "provider": "anthropic",
+      "input_cost_per_mtok": 3.0,
+      "output_cost_per_mtok": 15.0,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 16000,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#A855F7",
+      "display_emoji": "🟣"
+    },
+    {
+      "id": "anthropic/claude-haiku-3-5-20241022",
+      "name": "Claude Haiku 3.5",
+      "provider": "anthropic",
+      "input_cost_per_mtok": 0.80,
+      "output_cost_per_mtok": 4.0,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#A855F7",
+      "display_emoji": "🟣"
+    },
+    {
+      "id": "openai/gpt-4o",
+      "name": "GPT-4o",
+      "provider": "openai",
+      "input_cost_per_mtok": 2.50,
+      "output_cost_per_mtok": 10.0,
+      "max_context_tokens": 128000,
+      "max_output_tokens": 16384,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#10B981",
+      "display_emoji": "🟢"
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "name": "GPT-4o Mini",
+      "provider": "openai",
+      "input_cost_per_mtok": 0.15,
+      "output_cost_per_mtok": 0.60,
+      "max_context_tokens": 128000,
+      "max_output_tokens": 16384,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#10B981",
+      "display_emoji": "🟢"
+    },
+    {
+      "id": "openai/o3",
+      "name": "o3",
+      "provider": "openai",
+      "input_cost_per_mtok": 10.0,
+      "output_cost_per_mtok": 40.0,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 100000,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "max"
+      ],
+      "display_color": "#10B981",
+      "display_emoji": "🟢"
+    },
+    {
+      "id": "openai/o3-mini",
+      "name": "o3 Mini",
+      "provider": "openai",
+      "input_cost_per_mtok": 1.10,
+      "output_cost_per_mtok": 4.40,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 100000,
+      "supports_streaming": true,
+      "supports_images": false,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard"
+      ],
+      "display_color": "#10B981",
+      "display_emoji": "🟢"
+    },
+    {
+      "id": "google/gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro",
+      "provider": "google",
+      "input_cost_per_mtok": 1.25,
+      "output_cost_per_mtok": 10.0,
+      "max_context_tokens": 1000000,
+      "max_output_tokens": 65536,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#3B82F6",
+      "display_emoji": "🔵"
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash",
+      "provider": "google",
+      "input_cost_per_mtok": 0.15,
+      "output_cost_per_mtok": 0.60,
+      "max_context_tokens": 1000000,
+      "max_output_tokens": 65536,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#3B82F6",
+      "display_emoji": "🔵"
+    },
+    {
+      "id": "deepseek/deepseek-chat",
+      "name": "DeepSeek V3",
+      "provider": "deepseek",
+      "input_cost_per_mtok": 0.27,
+      "output_cost_per_mtok": 1.10,
+      "max_context_tokens": 128000,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": false,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#F97316",
+      "display_emoji": "🟠"
+    },
+    {
+      "id": "deepseek/deepseek-reasoner",
+      "name": "DeepSeek R1",
+      "provider": "deepseek",
+      "input_cost_per_mtok": 0.55,
+      "output_cost_per_mtok": 2.19,
+      "max_context_tokens": 128000,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": false,
+      "supports_tool_use": false,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#F97316",
+      "display_emoji": "🟠"
+    },
+    {
+      "id": "xai/grok-3",
+      "name": "Grok 3",
+      "provider": "xai",
+      "input_cost_per_mtok": 3.0,
+      "output_cost_per_mtok": 15.0,
+      "max_context_tokens": 131072,
+      "max_output_tokens": 16384,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#9CA3AF",
+      "display_emoji": "⚪"
+    },
+    {
+      "id": "xai/grok-3-mini",
+      "name": "Grok 3 Mini",
+      "provider": "xai",
+      "input_cost_per_mtok": 0.30,
+      "output_cost_per_mtok": 0.50,
+      "max_context_tokens": 131072,
+      "max_output_tokens": 16384,
+      "supports_streaming": true,
+      "supports_images": false,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#9CA3AF",
+      "display_emoji": "⚪"
+    },
+    {
+      "id": "openrouter/anthropic/claude-3.5-sonnet",
+      "name": "OR: Claude 3.5 Sonnet",
+      "provider": "openrouter",
+      "input_cost_per_mtok": 3.0,
+      "output_cost_per_mtok": 15.0,
+      "max_context_tokens": 200000,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#FF5500",
+      "display_emoji": "🌐"
+    },
+    {
+      "id": "openrouter/openai/gpt-4o",
+      "name": "OR: GPT-4o",
+      "provider": "openrouter",
+      "input_cost_per_mtok": 2.50,
+      "output_cost_per_mtok": 10.0,
+      "max_context_tokens": 128000,
+      "max_output_tokens": 16384,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard",
+        "max"
+      ],
+      "display_color": "#FF5500",
+      "display_emoji": "🌐"
+    },
+    {
+      "id": "openrouter/google/gemini-2.5-flash",
+      "name": "OR: Gemini 2.5 Flash",
+      "provider": "openrouter",
+      "input_cost_per_mtok": 0.075,
+      "output_cost_per_mtok": 0.30,
+      "max_context_tokens": 1000000,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": true,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "light",
+        "standard"
+      ],
+      "display_color": "#FF5500",
+      "display_emoji": "🌐"
+    },
+    {
+      "id": "openrouter/meta-llama/llama-3-70b-instruct",
+      "name": "OR: Llama 3 70B",
+      "provider": "openrouter",
+      "input_cost_per_mtok": 0.80,
+      "output_cost_per_mtok": 0.80,
+      "max_context_tokens": 8192,
+      "max_output_tokens": 8192,
+      "supports_streaming": true,
+      "supports_images": false,
+      "supports_tool_use": true,
+      "quality_tiers": [
+        "standard"
+      ],
+      "display_color": "#FF5500",
+      "display_emoji": "🌐"
+    }
+  ]
+}

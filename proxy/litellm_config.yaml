@@ -1,0 +1,17 @@
+model_list:
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+  - model_name: claude-3-5-sonnet-20241022
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20241022
+  - model_name: deepseek-coder
+    litellm_params:
+      model: deepseek/deepseek-coder
+
+general_settings:
+  master_key: sk-gptcgt-internal-litellm-master  # Only the internal proxy knows this
+  disable_tracker: true

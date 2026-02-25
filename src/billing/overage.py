@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+
 
 @dataclass
 class OverageState:
@@ -11,6 +14,7 @@ class OverageState:
     overage_enabled: bool
     auto_downgrade: bool
 
+
 class OverageManager:
     def __init__(self) -> None:
         # Defaults for now
@@ -22,50 +26,45 @@ class OverageManager:
             overage_credits=0,
             overage_cost=0.0,
             overage_enabled=False,
-            auto_downgrade=True
+            auto_downgrade=True,
         )
 
     def check_can_proceed(self, credits_needed: int) -> dict:
         remaining = self.state.remaining_credits
-        
+
         if remaining >= credits_needed:
-            return {
-                "can_proceed": True,
-                "reason": "ok",
-                "action": "proceed",
-                "message": ""
-            }
-            
+            return {"can_proceed": True, "reason": "ok", "action": "proceed", "message": ""}
+
         if remaining < credits_needed and remaining > 0:
             return {
                 "can_proceed": self.state.overage_enabled,
                 "reason": "low_credits",
                 "action": "warn" if self.state.overage_enabled else "block",
-                "message": f"You have {remaining} credits left. This task needs {credits_needed}. Enable overage in Settings to continue."
+                "message": f"You have {remaining} credits left. This task needs {credits_needed}. Enable overage in Settings to continue.",  # noqa: E501
             }
-            
+
         # remaining <= 0 case
         if self.state.overage_enabled:
             return {
                 "can_proceed": True,
                 "reason": "overage_active",
                 "action": "proceed",
-                "message": "Using overage credits."
+                "message": "Using overage credits.",
             }
-            
+
         if self.state.auto_downgrade:
             return {
                 "can_proceed": True,
                 "reason": "overage_disabled",
                 "action": "downgrade",
-                "message": "Credits exhausted. Auto-switched to Light tier / Scout mode."
+                "message": "Credits exhausted. Auto-switched to Light tier / Scout mode.",
             }
-            
+
         return {
             "can_proceed": False,
             "reason": "no_credits",
             "action": "block",
-            "message": "Monthly credits exhausted. Enable overage billing in Settings or wait for renewal."
+            "message": "Monthly credits exhausted. Enable overage billing in Settings or wait for renewal.",  # noqa: E501
         }
 
     def record_overage_usage(self, credits: int) -> None:
@@ -79,9 +78,11 @@ class OverageManager:
     def get_overage_warning_message(self) -> str | None:
         pct_used = self.state.used_credits / max(1, self.state.plan_credits)
         if pct_used >= 1.0:
-            return "Monthly credits exhausted" + (" (Overage Active)" if self.state.overage_enabled else " (Blocked)")
+            return "Monthly credits exhausted" + (
+                " (Overage Active)" if self.state.overage_enabled else " (Blocked)"
+            )
         if pct_used >= 0.95:
-            return f"⚠️ {self.state.remaining_credits} credits remaining. Consider enabling overage billing."
+            return f"⚠️ {self.state.remaining_credits} credits remaining. Consider enabling overage billing."  # noqa: E501
         if pct_used >= 0.80:
-            return f"You've used {self.state.used_credits} of {self.state.plan_credits} credits this month."
+            return f"You've used {self.state.used_credits} of {self.state.plan_credits} credits this month."  # noqa: E501
         return None

@@ -1,0 +1,1462 @@
+{
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/phase6-canvas-part1-prompt.md": {
+    "loc": 2134,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/phase5-business-infrastructure-plan.md": {
+    "loc": 1028,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/PROMPT_orchestrator_narration.md": {
+    "loc": 202,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt-pricing.md": {
+    "loc": 498,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/phase6-canvas-part2-prompt.md": {
+    "loc": 2426,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt.md": {
+    "loc": 959,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/CLAUDE.md": {
+    "loc": 1201,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/LICENSE": {
+    "loc": 21,
+    "type": "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/LICENSE"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/.pre-commit-config.yaml": {
+    "loc": 10,
+    "type": "yaml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/pyproject.toml": {
+    "loc": 82,
+    "type": "toml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/audit_manifest.json": {
+    "loc": 1310,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/README.md": {
+    "loc": 65,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/.gitignore": {
+    "loc": 15,
+    "type": "gitignore"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/run_audit_analysis.py": {
+    "loc": 95,
+    "complexity": 21,
+    "functions": 5,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 12
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/CONTRIBUTING.md": {
+    "loc": 34,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/canvas_part2.md": {
+    "loc": 1,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/PHASE9_GEMINI_PROMPT.md": {
+    "loc": 738,
+    "type": "md"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/config.py": {
+    "loc": 30,
+    "complexity": 6,
+    "functions": 0,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/Dockerfile": {
+    "loc": 20,
+    "type": "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/Dockerfile"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/database.py": {
+    "loc": 48,
+    "complexity": 6,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/metering.py": {
+    "loc": 93,
+    "complexity": 14,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 21
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/content_filter.py": {
+    "loc": 55,
+    "complexity": 11,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 8
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/fly.toml": {
+    "loc": 18,
+    "type": "toml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/main.py": {
+    "loc": 171,
+    "complexity": 23,
+    "functions": 5,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 28
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/proxy/litellm_config.yaml": {
+    "loc": 17,
+    "type": "yaml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/.env.local.example": {
+    "loc": 10,
+    "type": "example"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/next.config.js": {
+    "loc": 6,
+    "type": "js"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/next-env.d.ts": {
+    "loc": 5,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/tailwind.config.ts": {
+    "loc": 19,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/package-lock.json": {
+    "loc": 6744,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/package.json": {
+    "loc": 36,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/tsconfig.json": {
+    "loc": 39,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/postcss.config.js": {
+    "loc": 6,
+    "type": "js"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/.eslintrc.json": {
+    "loc": 3,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/layout.tsx": {
+    "loc": 54,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/page.tsx": {
+    "loc": 32,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/globals.css": {
+    "loc": 13,
+    "type": "css"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/auth/page.tsx": {
+    "loc": 33,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/auth/callback/route.ts": {
+    "loc": 4,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/layout.tsx": {
+    "loc": 42,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/page.tsx": {
+    "loc": 27,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/costs/page.tsx": {
+    "loc": 24,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/custom-models/page.tsx": {
+    "loc": 23,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/modes/page.tsx": {
+    "loc": 25,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/config/page.tsx": {
+    "loc": 41,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/faq/page.tsx": {
+    "loc": 23,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/keys/page.tsx": {
+    "loc": 25,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/docs/commands/page.tsx": {
+    "loc": 38,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/layout.tsx": {
+    "loc": 29,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/page.tsx": {
+    "loc": 80,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/usage/page.tsx": {
+    "loc": 145,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/team/page.tsx": {
+    "loc": 128,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/keys/page.tsx": {
+    "loc": 161,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/account/page.tsx": {
+    "loc": 115,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/dashboard/billing/page.tsx": {
+    "loc": 131,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/api/auth/signout/route.ts": {
+    "loc": 8,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/api/usage/route.ts": {
+    "loc": 28,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/legal/layout.tsx": {
+    "loc": 11,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/legal/privacy/page.tsx": {
+    "loc": 41,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/legal/terms/page.tsx": {
+    "loc": 43,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/legal/aup/page.tsx": {
+    "loc": 37,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/app/pricing/page.tsx": {
+    "loc": 106,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/components/nav.tsx": {
+    "loc": 59,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/components/usage-chart.tsx": {
+    "loc": 39,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/components/footer.tsx": {
+    "loc": 18,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/components/credit-meter.tsx": {
+    "loc": 41,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/components/pricing-table.tsx": {
+    "loc": 61,
+    "type": "tsx"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/lib/api-server.ts": {
+    "loc": 33,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/lib/api.ts": {
+    "loc": 55,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/web/lib/auth.ts": {
+    "loc": 47,
+    "type": "ts"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_task_tracker.py": {
+    "loc": 45,
+    "complexity": 1,
+    "functions": 4,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_code_viewer.py": {
+    "loc": 26,
+    "complexity": 1,
+    "functions": 2,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 5
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_context_menus.py": {
+    "loc": 56,
+    "complexity": 3,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_crash_recovery.py": {
+    "loc": 71,
+    "complexity": 1,
+    "functions": 7,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 11
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_model_registry.py": {
+    "loc": 48,
+    "complexity": 4,
+    "functions": 4,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 8
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_overage.py": {
+    "loc": 56,
+    "complexity": 1,
+    "functions": 5,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_toast.py": {
+    "loc": 50,
+    "complexity": 4,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 8
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_chat_pipeline.py": {
+    "loc": 70,
+    "complexity": 1,
+    "functions": 7,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 11
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_menu_bar.py": {
+    "loc": 105,
+    "complexity": 7,
+    "functions": 5,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 18
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_chat_panel.py": {
+    "loc": 26,
+    "complexity": 1,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 5
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_workspace.py": {
+    "loc": 112,
+    "complexity": 9,
+    "functions": 14,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 9
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_chat_store.py": {
+    "loc": 195,
+    "complexity": 3,
+    "functions": 13,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 37
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_onboarding.py": {
+    "loc": 29,
+    "complexity": 1,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_phase_tracker.py": {
+    "loc": 132,
+    "complexity": 1,
+    "functions": 10,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 18
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_project_init.py": {
+    "loc": 89,
+    "complexity": 2,
+    "functions": 10,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 12
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_commands.py": {
+    "loc": 81,
+    "complexity": 2,
+    "functions": 16,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 13
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_config.py": {
+    "loc": 49,
+    "complexity": 1,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 11
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_quality_tiers.py": {
+    "loc": 38,
+    "complexity": 4,
+    "functions": 4,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_panel_resizer.py": {
+    "loc": 90,
+    "complexity": 4,
+    "functions": 4,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 25
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_help.py": {
+    "loc": 16,
+    "complexity": 2,
+    "functions": 1,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_logger.py": {
+    "loc": 86,
+    "complexity": 3,
+    "functions": 9,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 13
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/tests/test_cost_breakdown.py": {
+    "loc": 62,
+    "complexity": 1,
+    "functions": 4,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 14
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/scripts/publish_pypi.sh": {
+    "loc": 10,
+    "type": "sh"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/scripts/build_binary.sh": {
+    "loc": 15,
+    "type": "sh"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/.github/FUNDING.yml": {
+    "loc": 2,
+    "type": "yml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/.github/workflows/release.yml": {
+    "loc": 39,
+    "type": "yml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/config.py": {
+    "loc": 38,
+    "complexity": 8,
+    "functions": 0,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/Dockerfile": {
+    "loc": 21,
+    "type": "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/Dockerfile"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/database.py": {
+    "loc": 29,
+    "complexity": 5,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/fly.toml": {
+    "loc": 18,
+    "type": "toml"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/main.py": {
+    "loc": 63,
+    "complexity": 1,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/middleware/auth.py": {
+    "loc": 62,
+    "complexity": 9,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/middleware/rate_limit.py": {
+    "loc": 60,
+    "complexity": 11,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/migrations/002_billing_moderation.sql": {
+    "loc": 35,
+    "type": "sql"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/migrations/001_initial_schema.sql": {
+    "loc": 115,
+    "type": "sql"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/migrations/003_tos_tracking.sql": {
+    "loc": 5,
+    "type": "sql"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/migrations/run_migration.py": {
+    "loc": 60,
+    "complexity": 9,
+    "functions": 1,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/auth.py": {
+    "loc": 142,
+    "complexity": 15,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/billing.py": {
+    "loc": 138,
+    "complexity": 27,
+    "functions": 5,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/users.py": {
+    "loc": 78,
+    "complexity": 8,
+    "functions": 3,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/api_keys.py": {
+    "loc": 120,
+    "complexity": 12,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 5
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/routes/usage.py": {
+    "loc": 55,
+    "complexity": 6,
+    "functions": 1,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/services/encryption.py": {
+    "loc": 66,
+    "complexity": 8,
+    "functions": 3,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/api/services/moderation.py": {
+    "loc": 80,
+    "complexity": 10,
+    "functions": 6,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/repo_map.py": {
+    "loc": 251,
+    "complexity": 65,
+    "functions": 13,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 16
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/tool_registry.py": {
+    "loc": 52,
+    "complexity": 3,
+    "functions": 2,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/filesystem.py": {
+    "loc": 103,
+    "complexity": 31,
+    "functions": 4,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 20
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/__init__.py": {
+    "loc": 8,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/lsp.py": {
+    "loc": 467,
+    "complexity": 57,
+    "functions": 15,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/sandbox.py": {
+    "loc": 436,
+    "complexity": 49,
+    "functions": 13,
+    "classes": 5,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tools/tree_sitter_utils.py": {
+    "loc": 189,
+    "complexity": 56,
+    "functions": 11,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 12
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/diff_engine.py": {
+    "loc": 245,
+    "complexity": 46,
+    "functions": 15,
+    "classes": 6,
+    "type": "python",
+    "ruff_errors": 29
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/context_manager.py": {
+    "loc": 145,
+    "complexity": 14,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/config.py": {
+    "loc": 214,
+    "complexity": 34,
+    "functions": 11,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/memory.py": {
+    "loc": 46,
+    "complexity": 6,
+    "functions": 5,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/context_compactor.py": {
+    "loc": 99,
+    "complexity": 13,
+    "functions": 5,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/events.py": {
+    "loc": 336,
+    "complexity": 2,
+    "functions": 42,
+    "classes": 43,
+    "type": "python",
+    "ruff_errors": 30
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/chat_store.py": {
+    "loc": 226,
+    "complexity": 31,
+    "functions": 16,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/security.py": {
+    "loc": 393,
+    "complexity": 52,
+    "functions": 11,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/system_prompt.py": {
+    "loc": 86,
+    "complexity": 9,
+    "functions": 1,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/logger.py": {
+    "loc": 237,
+    "complexity": 32,
+    "functions": 10,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 12
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/parallel_dispatcher.py": {
+    "loc": 394,
+    "complexity": 37,
+    "functions": 7,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/chat_pipeline.py": {
+    "loc": 254,
+    "complexity": 47,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 28
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/architect.py": {
+    "loc": 161,
+    "complexity": 20,
+    "functions": 3,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/quality_tiers.py": {
+    "loc": 114,
+    "complexity": 1,
+    "functions": 7,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/phase_tracker.py": {
+    "loc": 376,
+    "complexity": 56,
+    "functions": 14,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 11
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/orchestrator.py": {
+    "loc": 275,
+    "complexity": 36,
+    "functions": 6,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 36
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/project_context.py": {
+    "loc": 167,
+    "complexity": 62,
+    "functions": 8,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 54
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/arbiter.py": {
+    "loc": 598,
+    "complexity": 62,
+    "functions": 9,
+    "classes": 5,
+    "type": "python",
+    "ruff_errors": 8
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/router.py": {
+    "loc": 138,
+    "complexity": 21,
+    "functions": 6,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 17
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/workspace.py": {
+    "loc": 219,
+    "complexity": 30,
+    "functions": 13,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 9
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/init.py": {
+    "loc": 120,
+    "complexity": 18,
+    "functions": 5,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/model_registry.py": {
+    "loc": 238,
+    "complexity": 23,
+    "functions": 11,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 13
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/commands.py": {
+    "loc": 247,
+    "complexity": 29,
+    "functions": 10,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 25
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/mode_manager.py": {
+    "loc": 81,
+    "complexity": 8,
+    "functions": 5,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/task_tracker.py": {
+    "loc": 181,
+    "complexity": 21,
+    "functions": 13,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/core/crash_recovery.py": {
+    "loc": 213,
+    "complexity": 31,
+    "functions": 14,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/auth/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/auth/keychain.py": {
+    "loc": 64,
+    "complexity": 8,
+    "functions": 7,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/auth/device_flow.py": {
+    "loc": 68,
+    "complexity": 11,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/auth/key_validator.py": {
+    "loc": 76,
+    "complexity": 9,
+    "functions": 1,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/auth/auth_manager.py": {
+    "loc": 147,
+    "complexity": 20,
+    "functions": 12,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/app.py": {
+    "loc": 890,
+    "complexity": 131,
+    "functions": 53,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 38
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/session_browser.py": {
+    "loc": 150,
+    "complexity": 14,
+    "functions": 9,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/recovery.py": {
+    "loc": 80,
+    "complexity": 5,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/onboarding.py": {
+    "loc": 356,
+    "complexity": 41,
+    "functions": 19,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 19
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/project_setup.py": {
+    "loc": 111,
+    "complexity": 8,
+    "functions": 6,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/tier_selector.py": {
+    "loc": 71,
+    "complexity": 9,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/command_palette.py": {
+    "loc": 144,
+    "complexity": 18,
+    "functions": 9,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/settings.py": {
+    "loc": 174,
+    "complexity": 22,
+    "functions": 8,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 14
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/help.py": {
+    "loc": 122,
+    "complexity": 8,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/overlays/layout_editor.py": {
+    "loc": 61,
+    "complexity": 3,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/file_tree.py": {
+    "loc": 180,
+    "complexity": 20,
+    "functions": 12,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/activity_feed.py": {
+    "loc": 128,
+    "complexity": 5,
+    "functions": 10,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/code_viewer.py": {
+    "loc": 621,
+    "complexity": 70,
+    "functions": 47,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 35
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/battle_view.py": {
+    "loc": 138,
+    "complexity": 9,
+    "functions": 5,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/panels/chat.py": {
+    "loc": 553,
+    "complexity": 53,
+    "functions": 29,
+    "classes": 5,
+    "type": "python",
+    "ruff_errors": 42
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/midnight.tcss": {
+    "loc": 272,
+    "type": "tcss"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/neon.tcss": {
+    "loc": 263,
+    "type": "tcss"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/polar.tcss": {
+    "loc": 263,
+    "type": "tcss"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/slate.tcss": {
+    "loc": 263,
+    "type": "tcss"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/themes/ember.tcss": {
+    "loc": 263,
+    "type": "tcss"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/cost_summary.py": {
+    "loc": 51,
+    "complexity": 4,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/status_bar.py": {
+    "loc": 135,
+    "complexity": 6,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 9
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/menu_bar.py": {
+    "loc": 197,
+    "complexity": 6,
+    "functions": 7,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/architect_approval_panel.py": {
+    "loc": 99,
+    "complexity": 4,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 12
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/active_agents_bar.py": {
+    "loc": 92,
+    "complexity": 5,
+    "functions": 5,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/context_menu.py": {
+    "loc": 21,
+    "complexity": 2,
+    "functions": 1,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/hunk_editor.py": {
+    "loc": 139,
+    "complexity": 8,
+    "functions": 10,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/collapsible_code.py": {
+    "loc": 199,
+    "complexity": 14,
+    "functions": 6,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/menu.py": {
+    "loc": 387,
+    "complexity": 58,
+    "functions": 21,
+    "classes": 6,
+    "type": "python",
+    "ruff_errors": 10
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/code_selector.py": {
+    "loc": 186,
+    "complexity": 14,
+    "functions": 17,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/toast.py": {
+    "loc": 159,
+    "complexity": 13,
+    "functions": 12,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/quick_actions.py": {
+    "loc": 146,
+    "complexity": 10,
+    "functions": 9,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/arbiter_verdict_panel.py": {
+    "loc": 130,
+    "complexity": 15,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/annotations.py": {
+    "loc": 173,
+    "complexity": 9,
+    "functions": 16,
+    "classes": 6,
+    "type": "python",
+    "ruff_errors": 19
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/context_chips.py": {
+    "loc": 211,
+    "complexity": 14,
+    "functions": 13,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 9
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/panel_resizer.py": {
+    "loc": 119,
+    "complexity": 8,
+    "functions": 5,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 6
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/tui/widgets/task_panel.py": {
+    "loc": 93,
+    "complexity": 11,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 2
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/custom.py": {
+    "loc": 48,
+    "complexity": 4,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/health.py": {
+    "loc": 73,
+    "complexity": 8,
+    "functions": 2,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/litellm_client.py": {
+    "loc": 164,
+    "complexity": 24,
+    "functions": 1,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 15
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/__init__.py": {
+    "loc": 13,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/google.py": {
+    "loc": 48,
+    "complexity": 5,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/factory.py": {
+    "loc": 56,
+    "complexity": 7,
+    "functions": 1,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/openai.py": {
+    "loc": 69,
+    "complexity": 15,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 5
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/deepseek.py": {
+    "loc": 55,
+    "complexity": 7,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/anthropic.py": {
+    "loc": 49,
+    "complexity": 5,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 3
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/xai.py": {
+    "loc": 46,
+    "complexity": 5,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/agents/base.py": {
+    "loc": 98,
+    "complexity": 4,
+    "functions": 5,
+    "classes": 3,
+    "type": "python",
+    "ruff_errors": 7
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/api/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/data/models.json": {
+    "loc": 200,
+    "type": "json"
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/services/registry.py": {
+    "loc": 219,
+    "complexity": 15,
+    "functions": 18,
+    "classes": 14,
+    "type": "python",
+    "ruff_errors": 16
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/services/monitoring.py": {
+    "loc": 37,
+    "complexity": 10,
+    "functions": 3,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/services/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/services/email.py": {
+    "loc": 55,
+    "complexity": 4,
+    "functions": 6,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 1
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/services/analytics.py": {
+    "loc": 48,
+    "complexity": 6,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/stripe_service.py": {
+    "loc": 260,
+    "complexity": 27,
+    "functions": 10,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 19
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/overage.py": {
+    "loc": 91,
+    "complexity": 10,
+    "functions": 4,
+    "classes": 2,
+    "type": "python",
+    "ruff_errors": 5
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/cost_breakdown.py": {
+    "loc": 194,
+    "complexity": 12,
+    "functions": 16,
+    "classes": 4,
+    "type": "python",
+    "ruff_errors": 8
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/__init__.py": {
+    "loc": 2,
+    "complexity": 1,
+    "functions": 0,
+    "classes": 0,
+    "type": "python",
+    "ruff_errors": 0
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/spending_caps.py": {
+    "loc": 89,
+    "complexity": 9,
+    "functions": 4,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 4
+  },
+  "/Users/michael/Documents/\ud83d\udcbb Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/src/billing/credits.py": {
+    "loc": 96,
+    "complexity": 13,
+    "functions": 6,
+    "classes": 1,
+    "type": "python",
+    "ruff_errors": 13
+  }
+}
