@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import json
-import uuid
-from datetime import datetime
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from enum import Enum
 import shutil
+import uuid
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
 
 from src.core.workspace import Workspace
+
 
 class MessageRole(Enum):
     USER = "user"
@@ -15,32 +18,38 @@ class MessageRole(Enum):
     ARBITER = "arbiter"
     SYSTEM = "system"
 
+
+Role = MessageRole  # Alias for ChatPipeline
+
+
 @dataclass
 class ChatMessage:
-    id: str                          # UUID4
+    id: str  # UUID4
     role: MessageRole
-    content: str                     # Full text (markdown supported)
+    content: str  # Full text (markdown supported)
     timestamp: datetime
-    agent_id: str | None = None      # Which model responded (e.g. "claude-sonnet")
-    agent_color: str | None = None   # Hex color for display (e.g. "#A78BFA")
-    task_id: str | None = None       # Groups messages belonging to same task
+    agent_id: str | None = None  # Which model responded (e.g. "claude-sonnet")
+    agent_color: str | None = None  # Hex color for display (e.g. "#A78BFA")
+    task_id: str | None = None  # Groups messages belonging to same task
     files_referenced: list[str] = field(default_factory=list)
-    cost: float | None = None        # Cost of this specific response
-    mode: str | None = None          # "scout", "standard", "ensemble", etc.
+    cost: float | None = None  # Cost of this specific response
+    tokens_used: int = 0  # Tokens consumed for this message exchange
+    mode: str | None = None  # "scout", "standard", "ensemble", etc.
     metadata: dict = field(default_factory=dict)  # Extensible for arbiter verdicts, diffs, etc.
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        d['role'] = self.role.value
-        d['timestamp'] = self.timestamp.isoformat()
+        d["role"] = self.role.value
+        d["timestamp"] = self.timestamp.isoformat()
         return d
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'ChatMessage':
+    def from_dict(cls, data: dict) -> "ChatMessage":
         d = dict(data)
-        d['role'] = MessageRole(d['role'])
-        d['timestamp'] = datetime.fromisoformat(d['timestamp'])
+        d["role"] = MessageRole(d["role"])
+        d["timestamp"] = datetime.fromisoformat(d["timestamp"])
         return cls(**d)
+
 
 class ChatStore:
     def __init__(self, workspace: Workspace) -> None:
@@ -56,36 +65,54 @@ class ChatStore:
         session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.current_session_id = session_id
         self._cache = []
-        
+
         session_file = self._get_session_path(session_id)
         if not session_file.exists():
             self._save_to_disk(session_file, [])
-            
+
         self._update_current_symlink(session_file)
         return session_id
 
-    def add_message(self, message: ChatMessage) -> None:
-        """Append a message to the current session. Auto-saves to disk."""
+    def add_message(
+        self,
+        role: MessageRole,
+        content: str,
+        model_id: str | None = None,
+        tokens_used: int = 0,
+        **kwargs,
+    ) -> ChatMessage:
+        """Append a message to the current session and return it. Auto-saves to disk."""
         if not self.current_session_id:
             self.new_session()
-            
-        self._cache.append(message)
-        session_file = self._get_session_path(self.current_session_id) # type: ignore
+
+        msg = ChatMessage(
+            id=str(uuid.uuid4()),
+            role=role,
+            content=content,
+            timestamp=datetime.now(),
+            agent_id=model_id,
+            tokens_used=tokens_used,
+            **kwargs,
+        )
+
+        self._cache.append(msg)
+        session_file = self._get_session_path(self.current_session_id)  # type: ignore
         self._save_to_disk(session_file, self._cache)
+        return msg
 
     def get_session_messages(self, session_id: str | None = None) -> list[ChatMessage]:
         """Get all messages for a session. None = current session."""
         target_id = session_id or self.current_session_id
         if not target_id:
             return []
-            
+
         if target_id == self.current_session_id and self._cache:
             return list(self._cache)
-            
+
         session_file = self._get_session_path(target_id)
         if not session_file.exists():
             return []
-            
+
         return self._load_from_disk(session_file)
 
     def get_recent_messages(self, count: int = 50) -> list[ChatMessage]:
@@ -105,14 +132,16 @@ class ChatStore:
                 if msg.role == MessageRole.USER:
                     preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
                     break
-            
-            sessions.append({
-                "id": file_path.stem,
-                "date": file_path.stat().st_mtime,
-                "message_count": len(messages),
-                "preview": preview
-            })
-        
+
+            sessions.append(
+                {
+                    "id": file_path.stem,
+                    "date": file_path.stat().st_mtime,
+                    "message_count": len(messages),
+                    "preview": preview,
+                }
+            )
+
         sessions.sort(key=lambda x: x["date"], reverse=True)
         return sessions
 
@@ -135,7 +164,7 @@ class ChatStore:
         session_file = self._get_session_path(session_id)
         if session_file.exists():
             session_file.unlink()
-            
+
         if self.current_session_id == session_id:
             self.current_session_id = None
             self._cache = []
@@ -172,7 +201,7 @@ class ChatStore:
         try:
             with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump([m.to_dict() for m in messages], f, indent=2)
-            temp_path.replace(file_path) # Atomic replace
+            temp_path.replace(file_path)  # Atomic replace
         except Exception:
             if temp_path.exists():
                 temp_path.unlink()
@@ -198,4 +227,4 @@ class ChatStore:
             except OSError:
                 shutil.copy2(target, current_link)
         except Exception:
-            pass # Non-critical if current.json link fails
+            pass  # Non-critical if current.json link fails

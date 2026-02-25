@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from src.core.chat_store import ChatMessage, MessageRole
+
 
 class ContextCompactor:
     def __init__(self, max_tokens: int = 100_000) -> None:
@@ -20,27 +23,31 @@ class ContextCompactor:
         Keeps the last 10 role exchanges (pairs) intact, and summarizes the rest.
         """
         messages = []
-        
+
         # 1. Always include System context
         sys_content = f"{agent_context}\n\nRepo Map:\n{repo_map}"
         messages.append({"role": "system", "content": sys_content})
-        
+
         # Compaction logic: Keep last 10 pairs (approx 20 messages)
         keep_full_count = 20
-        
-        # Only consider USER and AGENT messages for the LLM context (ignore orchestrator/system display msgs)
-        conversational_msgs = [m for m in chat_history if m.role in (MessageRole.USER, MessageRole.AGENT)]
-        
+
+        # Only consider USER and AGENT messages for the LLM context (ignore orchestrator/system display msgs)  # noqa: E501
+        conversational_msgs = [
+            m for m in chat_history if m.role in (MessageRole.USER, MessageRole.AGENT)
+        ]
+
         if len(conversational_msgs) > keep_full_count:
             to_summarize = conversational_msgs[:-keep_full_count]
             recent = conversational_msgs[-keep_full_count:]
-            
+
             # Use cached summary if the messages to summarize haven't changed
             if not self._summary_cache or len(to_summarize) > self._last_summarized_index:
                 self._summary_cache = self._summarize_old_messages(to_summarize)
                 self._last_summarized_index = len(to_summarize)
-                
-            messages.append({"role": "user", "content": f"[Earlier in session summary: {self._summary_cache}]"})
+
+            messages.append(
+                {"role": "user", "content": f"[Earlier in session summary: {self._summary_cache}]"}
+            )
         else:
             recent = conversational_msgs
 
@@ -58,9 +65,10 @@ class ContextCompactor:
 
         # Final safety check against budget
         total_estimated = sum(self._estimate_tokens(str(m.get("content", ""))) for m in messages)
-        if total_estimated > self.max_tokens:
-            # Over budget even after compaction: would need more aggressive trimming here
-            pass
+        # Aggressively trim older conversational messages from index 2
+        while total_estimated > self.max_tokens and len(messages) > 3:
+            popped = messages.pop(2)
+            total_estimated -= self._estimate_tokens(str(popped.get("content", "")))
 
         return messages
 
@@ -76,7 +84,7 @@ class ContextCompactor:
         """
         if not messages:
             return ""
-            
+
         summary = f"Session started at {messages[0].timestamp.strftime('%H:%M:%S')}. "
         tasks = [m.content[:50] + "..." for m in messages if m.role == MessageRole.USER]
         if tasks:

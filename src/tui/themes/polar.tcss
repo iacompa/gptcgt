@@ -1,16 +1,19 @@
 /* Polar Theme — Default Light */
+
 /* Background */
-Screen { background: #FFFFFF; }
-.panel { background: #F6F8FA; }
-.panel-active { background: #EAEEF2; }
+Screen { 
+    background: $background; 
+}
+.panel { background: $panel; }
+.panel-active { background: $surface; }
 
 /* Borders */
-.border { border: solid #D0D7DE; }
+.border { border: solid $secondary; }
 
 /* Text */
-.text-primary { color: #1F2328; }
-.text-secondary { color: #656D76; }
-.text-code { color: #1F2328; }
+.text-primary { color: $text; }
+.text-secondary { color: $text-muted; }
+.text-code { color: $text; }
 
 /* Accents */
 .accent { color: #0969DA; }
@@ -32,9 +35,9 @@ Screen { background: #FFFFFF; }
 
 /* Layout */
 #app-grid { layout: horizontal; height: 100%; }
-#left-panel { width: 20%; min-width: 15; }
-#center-panel { width: 50%; min-width: 30; }
-#right-panel { width: 30%; min-width: 20; }
+#left-panel-container { width: 1fr; min-width: 20; }
+#code-viewer { width: 2fr; min-width: 30; }
+#right-panel { width: 1fr; min-width: 25; }
 
 /* Status Bar */
 #status-bar { dock: bottom; height: 1; background: #F6F8FA; color: #1F2328; }
@@ -45,3 +48,224 @@ Screen { background: #FFFFFF; }
 .activity-orchestrator { color: #0969DA; }
 .activity-header { background: #EAEEF2; padding: 1; text-style: bold; }
 .active-agent-chip { padding: 0 1; }
+
+
+/* --- Canvas Mode: Select-to-Prompt & Context Chips --- */
+CodeView, #code-lines-scroll, CodeViewerPanel {
+    background: #FFFFFF;
+}
+
+CodeLineWidget {
+    width: auto;
+    min-width: 100%;
+    height: 1;
+    background: transparent;
+}
+
+.code-line:hover {
+    background: #EAEEF2;
+}
+
+.code-line-selected {
+    background: #DDF4FF;
+    color: #1F2328;
+}
+
+.selection-mode-indicator {
+    background: #1A7F37;
+    color: #FFFFFF;
+    text-align: center;
+    border-bottom: solid #D0D7DE;
+    height: 1;
+    content-align: center middle;
+}
+
+ContextChipBar {
+    background: #F6F8FA;
+    border-bottom: solid #D0D7DE;
+    padding: 0 1;
+    height: 3;
+}
+
+ContextChip {
+    background: #EAEEF2;
+    border: blank;
+    color: #1F2328;
+    margin: 0 1 0 0;
+    padding: 0 1;
+}
+
+ContextChip:hover {
+    background: #DDF4FF;
+}
+
+.chip-remove {
+    color: #CF222E;
+    margin-left: 1;
+}
+
+.chip-remove:hover {
+    color: #A40E26;
+    text-style: bold;
+}
+
+AddFileChip {
+    color: #0969DA;
+    border: blank;
+    background: transparent;
+    height: 1;
+    width: auto;
+    padding: 0 1;
+}
+
+AddFileChip:hover {
+    background: #EAEEF2;
+}
+
+/* --- Canvas Mode: Collapsible Code Blocks --- */
+.collapsible-code-content {
+    background: #F6F8FA;
+    border: solid #D0D7DE;
+    padding: 1;
+    margin: 0 0 1 0;
+    overflow-y: auto;
+    max-height: 20;
+}
+
+Collapsible {
+    border: solid #D0D7DE;
+    background: #FFFFFF;
+    margin: 0 0 1 0;
+}
+
+CollapsibleTitle > Label {
+    color: #1F2328;
+}
+
+/* --- Canvas Mode: Quick Actions Bar --- */
+QuickActionsBar {
+    background: #F6F8FA;
+    border-top: solid #D0D7DE;
+    height: 3;
+    padding: 0 1;
+}
+
+QuickActionButton {
+    background: #1A7F37;
+    color: #FFFFFF;
+    margin-right: 1;
+}
+
+QuickActionButton:hover {
+    background: #2DA44E;
+}
+
+.qa-label {
+    color: #656D76;
+    margin-right: 2;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Phase 6 — Interactive Canvas Mode (Part 2)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Hunk Editor */
+.hunk-editor-container {
+    border: dashed #0969DA;
+    background: #F6F8FA;
+    margin: 1 0;
+    padding: 0;
+}
+.hunk-editor-header {
+    background: #EAEEF2;
+    color: #9A6700;
+    text-style: bold;
+    padding: 0 1;
+    height: 1;
+}
+.hunk-editor-textarea {
+    min-height: 5;
+    height: auto;
+    max-height: 25;
+    background: #FFFFFF;
+    border: solid #D0D7DE;
+}
+.hunk-editor-controls {
+    height: 3;
+    align: center middle;
+    padding: 0 1;
+    background: #F6F8FA;
+}
+.hunk-editor-controls Button {
+    margin: 0 1;
+}
+.hunk-user-edited {
+    border-left: heavy #0969DA;
+}
+
+/* Annotations */
+.annotation-gutter {
+    width: 2;
+    text-align: center;
+    padding: 0;
+}
+.annotation-gutter-error { color: #CF222E; }
+.annotation-gutter-warning { color: #9A6700; }
+.annotation-gutter-info { color: #0969DA; }
+.annotation-gutter-suggestion { color: #0550AE; }
+.annotation-panel {
+    background: #F6F8FA;
+    border: solid #D0D7DE;
+    padding: 1 2;
+    margin: 0 0 0 4;
+    height: auto;
+}
+.annotation-panel-error { border-left: heavy #CF222E; }
+.annotation-panel-warning { border-left: heavy #9A6700; }
+.annotation-panel-info { border-left: heavy #0969DA; }
+.annotation-panel-suggestion { border-left: heavy #0550AE; }
+.annotation-panel-header { text-style: bold; margin-bottom: 1; }
+.annotation-panel-detail { color: #1F2328; margin-bottom: 1; }
+.annotation-panel-actions { height: 3; }
+.annotation-action-button { margin: 0 1; }
+
+/* Arbiter Verdict Panel */
+.arbiter-panel {
+    border: double #0969DA;
+    background: #FFFFFF;
+    padding: 1 2;
+    margin: 1 0;
+}
+.arbiter-panel-header { text-style: bold; color: #1F2328; margin-bottom: 1; }
+.arbiter-panel-summary { color: #656D76; margin-bottom: 1; }
+.arbiter-panel-spacer { height: 1; }
+.arbiter-agent-header { color: #0969DA; text-style: bold; margin-bottom: 1; }
+.arbiter-score-row {
+    padding: 0 1;
+    height: auto;
+}
+.arbiter-score-pass { color: #1A7F37; }
+.arbiter-score-warn { color: #9A6700; }
+.arbiter-score-fail { color: #CF222E; }
+.arbiter-detail-expanded {
+    background: #F6F8FA;
+    padding: 1 2;
+    margin: 0 0 1 2;
+    border-left: solid #D0D7DE;
+}
+.arbiter-total-row { text-style: bold; margin-top: 1; }
+.arbiter-winner-row {
+    border: solid #1A7F37;
+    background: #DAFBE1;
+    padding: 0 1;
+}
+.arbiter-eliminated-row { color: #656D76; }
+.arbiter-evidence-header { color: #0969DA; text-style: bold; }
+.arbiter-evidence-item { color: #1F2328; }
+.arbiter-action-buttons { height: 3; margin-top: 1; }
+.arbiter-diff-button { margin: 0 1; }
+.arbiter-cherry-pick-button { margin: 0 1; }
+.arbiter-timing { color: #656D76; margin-top: 1; }
+.arbiter-confidence-badge { text-style: bold; }
+

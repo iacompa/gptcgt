@@ -1,11 +1,12 @@
 """Active agents status bar widget."""
 
-from textual.app import ComposeResult
-from textual.containers import Horizontal
-from textual.widgets import Static
-from textual.reactive import reactive
+from __future__ import annotations
 
-from src.core.events import AgentDispatched, AgentCompleted, AgentStatusUpdate
+from textual.app import ComposeResult
+from textual.reactive import reactive
+from textual.widgets import Static
+
+from src.core.events import AgentCompleted, AgentDispatched, AgentStatusUpdate
 
 AGENT_DOTS = {
     "claude": "🟣",
@@ -23,6 +24,7 @@ AGENT_DISPLAY_NAMES = {
     "deepseek": "DeepSeek",
 }
 
+
 class ActiveAgentsBar(Static):
     """A small horizontal bar showing which agents are currently active."""
 
@@ -31,10 +33,10 @@ class ActiveAgentsBar(Static):
         width: 100%;
         height: auto;
         min-height: 1;
-        background: #1C2333;
-        color: #E6EDF3;
+        background: $surface;
+        color: $text;
         padding: 1;
-        border-bottom: solid #30363D;
+        border-bottom: solid $secondary;
     }
     """
 
@@ -47,20 +49,22 @@ class ActiveAgentsBar(Static):
     def watch_active_agents(self, active_agents: dict[str, tuple[str, str]]) -> None:
         """Update the text when the active_agents dict changes."""
         text_widget = self.query_one("#active-agents-text", Static)
-        
+
         if not active_agents:
             text_widget.update("No agents active")
             return
-            
-        header = f"Activity — {len(active_agents)} agent{'s' if len(active_agents) > 1 else ''} working"
-        
+
+        header = (
+            f"Activity — {len(active_agents)} agent{'s' if len(active_agents) > 1 else ''} working"
+        )
+
         agent_strings = []
         for agent_id, (model_name, status) in active_agents.items():
             dot = AGENT_DOTS.get(model_name.lower(), "⚪")
             name = AGENT_DISPLAY_NAMES.get(model_name.lower(), model_name.capitalize())
             # Format status, e.g. "writing", "reading files"
             agent_strings.append(f"{dot} {name} ({status})")
-            
+
         agents_text = "   ".join(agent_strings)
         text_widget.update(f"[bold]{header}[/bold]\n{agents_text}")
 
@@ -88,4 +92,3 @@ class ActiveAgentsBar(Static):
         if event.agent_id in new_agents:
             del new_agents[event.agent_id]
         self.active_agents = new_agents
-

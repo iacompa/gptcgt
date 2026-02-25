@@ -32,9 +32,9 @@ Screen { background: #181111; }
 
 /* Layout */
 #app-grid { layout: horizontal; height: 100%; }
-#left-panel { width: 20%; min-width: 15; }
-#center-panel { width: 50%; min-width: 30; }
-#right-panel { width: 30%; min-width: 20; }
+#left-panel-container { width: 1fr; min-width: 20; }
+#code-viewer { width: 2fr; min-width: 30; }
+#right-panel { width: 1fr; min-width: 25; }
 
 /* Status Bar */
 #status-bar { dock: bottom; height: 1; background: #221818; color: #FDF4F4; }
@@ -45,3 +45,224 @@ Screen { background: #181111; }
 .activity-orchestrator { color: #F97316; }
 .activity-header { background: #2F2121; padding: 1; text-style: bold; }
 .active-agent-chip { padding: 0 1; }
+
+
+/* --- Canvas Mode: Select-to-Prompt & Context Chips --- */
+CodeView, #code-lines-scroll, CodeViewerPanel {
+    background: #181111;
+}
+
+CodeLineWidget {
+    width: auto;
+    min-width: 100%;
+    height: 1;
+    background: transparent;
+}
+
+.code-line:hover {
+    background: #2F2121;
+}
+
+.code-line-selected {
+    background: #4A2C1A;
+    color: #FDF4F4;
+}
+
+.selection-mode-indicator {
+    background: #84CC16;
+    color: #000000;
+    text-align: center;
+    border-bottom: solid #4A3434;
+    height: 1;
+    content-align: center middle;
+}
+
+ContextChipBar {
+    background: #181111;
+    border-bottom: solid #4A3434;
+    padding: 0 1;
+    height: 3;
+}
+
+ContextChip {
+    background: #2F2121;
+    border: blank;
+    color: #FDF4F4;
+    margin: 0 1 0 0;
+    padding: 0 1;
+}
+
+ContextChip:hover {
+    background: #4A2C1A;
+}
+
+.chip-remove {
+    color: #EF4444;
+    margin-left: 1;
+}
+
+.chip-remove:hover {
+    color: #FCA5A5;
+    text-style: bold;
+}
+
+AddFileChip {
+    color: #F97316;
+    border: blank;
+    background: transparent;
+    height: 1;
+    width: auto;
+    padding: 0 1;
+}
+
+AddFileChip:hover {
+    background: #2F2121;
+}
+
+/* --- Canvas Mode: Collapsible Code Blocks --- */
+.collapsible-code-content {
+    background: #181111;
+    border: solid #4A3434;
+    padding: 1;
+    margin: 0 0 1 0;
+    overflow-y: auto;
+    max-height: 20;
+}
+
+Collapsible {
+    border: solid #4A3434;
+    background: #221818;
+    margin: 0 0 1 0;
+}
+
+CollapsibleTitle > Label {
+    color: #EED2D2;
+}
+
+/* --- Canvas Mode: Quick Actions Bar --- */
+QuickActionsBar {
+    background: #221818;
+    border-top: solid #4A3434;
+    height: 3;
+    padding: 0 1;
+}
+
+QuickActionButton {
+    background: #84CC16;
+    color: #000000;
+    margin-right: 1;
+}
+
+QuickActionButton:hover {
+    background: #A3E635;
+}
+
+.qa-label {
+    color: #BFA5A5;
+    margin-right: 2;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Phase 6 — Interactive Canvas Mode (Part 2)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Hunk Editor */
+.hunk-editor-container {
+    border: dashed #F97316;
+    background: #2F2121;
+    margin: 1 0;
+    padding: 0;
+}
+.hunk-editor-header {
+    background: #221818;
+    color: #EAB308;
+    text-style: bold;
+    padding: 0 1;
+    height: 1;
+}
+.hunk-editor-textarea {
+    min-height: 5;
+    height: auto;
+    max-height: 25;
+    background: #181111;
+    border: solid #4A3434;
+}
+.hunk-editor-controls {
+    height: 3;
+    align: center middle;
+    padding: 0 1;
+    background: #221818;
+}
+.hunk-editor-controls Button {
+    margin: 0 1;
+}
+.hunk-user-edited {
+    border-left: heavy #F97316;
+}
+
+/* Annotations */
+.annotation-gutter {
+    width: 2;
+    text-align: center;
+    padding: 0;
+}
+.annotation-gutter-error { color: #EF4444; }
+.annotation-gutter-warning { color: #EAB308; }
+.annotation-gutter-info { color: #F97316; }
+.annotation-gutter-suggestion { color: #FB923C; }
+.annotation-panel {
+    background: #221818;
+    border: solid #4A3434;
+    padding: 1 2;
+    margin: 0 0 0 4;
+    height: auto;
+}
+.annotation-panel-error { border-left: heavy #EF4444; }
+.annotation-panel-warning { border-left: heavy #EAB308; }
+.annotation-panel-info { border-left: heavy #F97316; }
+.annotation-panel-suggestion { border-left: heavy #FB923C; }
+.annotation-panel-header { text-style: bold; margin-bottom: 1; }
+.annotation-panel-detail { color: #EED2D2; margin-bottom: 1; }
+.annotation-panel-actions { height: 3; }
+.annotation-action-button { margin: 0 1; }
+
+/* Arbiter Verdict Panel */
+.arbiter-panel {
+    border: double #F97316;
+    background: #221818;
+    padding: 1 2;
+    margin: 1 0;
+}
+.arbiter-panel-header { text-style: bold; color: #FDF4F4; margin-bottom: 1; }
+.arbiter-panel-summary { color: #BFA5A5; margin-bottom: 1; }
+.arbiter-panel-spacer { height: 1; }
+.arbiter-agent-header { color: #F97316; text-style: bold; margin-bottom: 1; }
+.arbiter-score-row {
+    padding: 0 1;
+    height: auto;
+}
+.arbiter-score-pass { color: #84CC16; }
+.arbiter-score-warn { color: #EAB308; }
+.arbiter-score-fail { color: #EF4444; }
+.arbiter-detail-expanded {
+    background: #181111;
+    padding: 1 2;
+    margin: 0 0 1 2;
+    border-left: solid #4A3434;
+}
+.arbiter-total-row { text-style: bold; margin-top: 1; }
+.arbiter-winner-row {
+    border: solid #84CC16;
+    background: #1A2E05;
+    padding: 0 1;
+}
+.arbiter-eliminated-row { color: #BFA5A5; }
+.arbiter-evidence-header { color: #F97316; text-style: bold; }
+.arbiter-evidence-item { color: #EED2D2; }
+.arbiter-action-buttons { height: 3; margin-top: 1; }
+.arbiter-diff-button { margin: 0 1; }
+.arbiter-cherry-pick-button { margin: 0 1; }
+.arbiter-timing { color: #8B7676; margin-top: 1; }
+.arbiter-confidence-badge { text-style: bold; }
+
