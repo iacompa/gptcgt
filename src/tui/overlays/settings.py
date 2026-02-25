@@ -274,7 +274,7 @@ class SettingsScreen(ModalScreen):
         else:
             yield Label("Plan: [bold]Bring Your Own Keys[/bold] (Free)", classes="section-label")
             yield Label(
-                "Sign in at [link=https://gptcgt.ai/pricing]gptcgt.ai/pricing[/link] for managed credits & Pro plan.",
+                "Sign in at gptcgt.ai/pricing for managed credits and Pro plan.",
                 classes="hint-text",
             )
 
