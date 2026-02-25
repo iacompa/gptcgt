@@ -1,0 +1,77 @@
+src/tools/repo_map.py
+    M 238:4 RepoMap.find_relevant_files - C
+    M 161:4 RepoMap._build_dependency_graph - C
+src/tools/filesystem.py
+    F 58:0 grep_search - D
+src/tools/lsp.py
+    M 131:4 LSPClient.verify_patch_references - C
+src/tools/sandbox.py
+    M 268:4 E2BSandbox._verify_with_sandbox - C
+src/tools/tree_sitter_utils.py
+    F 131:0 _extract_python - C
+src/core/diff_engine.py
+    M 268:4 PatchEngine.apply_approved - C
+src/core/context_manager.py
+    M 58:4 ContextManager.prepare_payload - C
+src/core/config.py
+    M 182:4 ConfigManager.auto_detect_project - C
+src/core/context_compactor.py
+    M 13:4 ContextCompactor.build_context - C
+src/core/security.py
+    M 354:4 SecurityScanner._run_semgrep - C
+src/core/system_prompt.py
+    C 18:0 SystemPromptBuilder - C
+    M 22:4 SystemPromptBuilder.build - C
+src/core/logger.py
+    C 62:0 SensitiveDataFilter - C
+    M 89:4 SensitiveDataFilter.filter - C
+src/core/parallel_dispatcher.py
+    M 245:4 ParallelDispatcher._run_single_agent - C
+    M 99:4 ParallelDispatcher.dispatch - C
+    C 88:0 ParallelDispatcher - C
+src/core/chat_pipeline.py
+    M 48:4 ChatPipeline.process_message - E
+    C 33:0 ChatPipeline - C
+src/core/architect.py
+    M 96:4 ArchitectPipeline._evaluate_plans - C
+src/core/phase_tracker.py
+    M 312:4 PhaseTracker.parse_markdown - D
+src/core/orchestrator.py
+    M 32:4 Orchestrator.process_task - E
+    C 25:0 Orchestrator - C
+    M 331:4 Orchestrator._analyze_intent_and_scope - C
+src/core/project_context.py
+    M 116:4 ProjectContextGenerator._detect_framework - C
+    M 66:4 ProjectContextGenerator._detect_language - C
+    M 163:4 ProjectContextGenerator._detect_test_runner - C
+    M 187:4 ProjectContextGenerator._detect_linter - C
+    M 205:4 ProjectContextGenerator._summarize_structure - C
+src/core/arbiter.py
+    M 142:4 Arbiter.evaluate - D
+    M 458:4 Arbiter._produce_verdict - D
+    M 335:4 Arbiter._stage1_structural - C
+    C 124:0 Arbiter - C
+src/core/router.py
+    M 87:4 CodingRouter.route_task - D
+src/core/model_registry.py
+    M 102:4 ModelRegistry.load - C
+src/core/commands.py
+    M 125:4 CommandRegistry.search - C
+src/tui/app.py
+    M 461:4 GptcgtApp.on_menu_action - D
+    M 903:4 GptcgtApp.on_quick_action - C
+    M 119:4 GptcgtApp.on_mount - C
+src/tui/widgets/menu.py
+    M 321:4 DropdownMenu.on_key - C
+src/tui/widgets/arbiter_verdict_panel.py
+    M 63:4 ArbiterVerdictPanel.compose - C
+src/agents/litellm_client.py
+    C 24:0 LiteLLMClient - D
+    M 28:4 LiteLLMClient.stream - D
+src/billing/stripe_service.py
+    M 142:4 StripeService.handle_webhook - C
+api/middleware/rate_limit.py
+    M 23:4 RateLimitMiddleware.dispatch - C
+
+46 blocks (classes, functions, methods) analyzed.
+Average complexity: C (17.47826086956522)

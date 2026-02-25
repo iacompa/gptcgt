@@ -1,0 +1,8 @@
+#!/bin/sh
+'''exec' "/Users/michael/Documents/💻 Business/Vibe Code Files/gptcgt/Antigravity/gptcgt build/gptcgt/test-env/bin/python3.11" "$0" "$@"
+' '''
+import sys
+from hatchling.cli import hatchling
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(hatchling())

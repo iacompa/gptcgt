@@ -1,0 +1,778 @@
+E501 Line too long (102 > 100)
+  --> src/agents/openrouter.py:20:101
+   |
+18 |         api_key = self.config.api_key or KeyChainManager.get_key("OPENROUTER_API_KEY")
+19 |         if not api_key:
+20 |             yield AgentResponse(error="OPENROUTER_API_KEY not found in keychain.", is_streaming=False)
+   |                                                                                                     ^^
+21 |             return
+   |
+
+E501 Line too long (102 > 100)
+   --> src/billing/cost_breakdown.py:165:101
+    |
+164 |             from src.core.events import CreditsUpdated
+165 |             App.get_running_app().post_message(CreditsUpdated(credits_remaining=0, credits_monthly=0))
+    |                                                                                                     ^^
+166 |         except Exception:
+167 |             pass
+    |
+
+E501 Line too long (108 > 100)
+   --> src/core/arbiter.py:608:101
+    |
+606 |         memory: str,
+607 |     ) -> None:
+608 |         """Uses a lightning-fast LIGHT model to compare failures against known false-positives in memory."""
+    |                                                                                                     ^^^^^^^^
+609 |         has_test_fails = verification.test_result and not verification.test_result.passed and verification.test_result.total > 0
+610 |         has_sec_fails = len(security_findings) > 0
+    |
+
+E501 Line too long (128 > 100)
+   --> src/core/arbiter.py:609:101
+    |
+607 |     ) -> None:
+608 |         """Uses a lightning-fast LIGHT model to compare failures against known false-positives in memory."""
+609 |         has_test_fails = verification.test_result and not verification.test_result.passed and verification.test_result.total > 0
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+610 |         has_sec_fails = len(security_findings) > 0
+    |
+
+E501 Line too long (122 > 100)
+   --> src/core/arbiter.py:651:101
+    |
+649 | SECURITY FINDINGS: {[f.description for f in security_findings]}
+650 |
+651 | If the memory explicitly states that these specific errors are false-positives or should be ignored, you must PARDON them.
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^
+652 | Return strictly a JSON object:
+653 | {{
+    |
+
+E501 Line too long (106 > 100)
+  --> src/core/chat_pipeline.py:66:101
+   |
+64 |             if not model_def and "/" in model_id_override:
+65 |                 from src.core.router import CodingRouter
+66 |                 model_def = CodingRouter().route_task("chat", complexity, self.default_tier, role="coder")
+   |                                                                                                     ^^^^^^
+67 |         else:
+68 |             from src.core.router import CodingRouter
+   |
+
+E501 Line too long (102 > 100)
+  --> src/core/chat_pipeline.py:69:101
+   |
+67 |         else:
+68 |             from src.core.router import CodingRouter
+69 |             model_def = CodingRouter().route_task("chat", complexity, self.default_tier, role="coder")
+   |                                                                                                     ^^
+70 |
+71 |         if not model_def:
+   |
+
+E501 Line too long (132 > 100)
+   --> src/core/chat_pipeline.py:190:101
+    |
+188 |                                 original_prompt=user_text,
+189 |                                 agent_output=iteration_text,
+190 |                                 failure_reason="User manually halted the generation stream (likely moving in the wrong direction).",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+191 |                             )
+192 |                         except Exception:
+    |
+
+E501 Line too long (102 > 100)
+   --> src/core/chat_pipeline.py:222:101
+    |
+221 |                 # Execute tools and intercept Swarm Delegation Handoffs
+222 |                 cmd_msgs = await self._execute_tools(tool_calls, tool_call_callback, thought_callback)
+    |                                                                                                     ^^
+223 |
+224 |                 # Check for __handoff_signal__ in the direct JSON tool response
+    |
+
+E501 Line too long (107 > 100)
+   --> src/core/chat_pipeline.py:229:101
+    |
+227 |                     if msg.get("role") == "tool":
+228 |                         try:
+229 |                             # Safely attempt to parse the string payload which might be the delegation JSON
+    |                                                                                                     ^^^^^^^
+230 |                             data = _json.loads(msg.get("content", ""))
+231 |                             if isinstance(data, dict) and data.get("__handoff_signal__"):
+    |
+
+E501 Line too long (156 > 100)
+   --> src/core/chat_pipeline.py:273:101
+    |
+272 | …
+273 | …: {target_id} ({elapsed:.1f}s)", f"Instruction:\n{instruction}\n\nResult:\n{child_full_text}")
+    |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+274 | …
+275 | …
+    |
+
+E501 Line too long (105 > 100)
+   --> src/core/chat_pipeline.py:398:101
+    |
+396 |         return False, full_response, healing_attempts
+397 |
+398 |     async def _execute_tools(self, tool_calls: list, tool_call_callback, thought_callback) -> list[dict]:
+    |                                                                                                     ^^^^^
+399 |         """Executes LLM requested functions mapping JSON outputs natively."""
+400 |         import time
+    |
+
+E501 Line too long (133 > 100)
+   --> src/core/chat_pipeline.py:420:101
+    |
+419 |             if thought_callback:
+420 |                 await thought_callback(f"Executed `{fn_name}` tool ({elapsed:.1f}s)", f"Arguments:\n{args_raw}\n\nResult:\n{result}")
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+421 |
+422 |             cmd_msgs.append(
+    |
+
+E501 Line too long (105 > 100)
+  --> src/core/intent_analyzer.py:48:101
+   |
+46 |             CodingRouter()
+47 |
+48 |             # Phase 19: Robust Fallback — Get the absolute cheapest model the user actually has keys for.
+   |                                                                                                     ^^^^^
+49 |             # If they don't have a LIGHT model configured, fall back to whatever they do have.
+50 |             available_models = self.registry.get_available_models()
+   |
+
+E501 Line too long (105 > 100)
+  --> src/core/reflection_engine.py:65:101
+   |
+64 |             # Route exclusively to the cheapest model to protect margins
+65 |             # Phase 19: Robust Fallback — Get the absolute cheapest model the user actually has keys for.
+   |                                                                                                     ^^^^^
+66 |             available_models = self.registry.get_available_models()
+67 |             if not available_models:
+   |
+
+E501 Line too long (109 > 100)
+  --> src/core/reflection_engine.py:79:101
+   |
+77 |             system_prompt = (
+78 |                 "You are an AI Memory Compaction Engine. Your job is to extract a 'lesson learned' "
+79 |                 "from a failed or overridden AI interaction, and merge it into a persistent memory file.\n\n"
+   |                                                                                                     ^^^^^^^^^
+80 |                 "RULES:\n"
+81 |                 "1. If there is existing memory, deduplicate the new lesson. Do not repeat facts.\n"
+   |
+
+E501 Line too long (126 > 100)
+  --> src/core/reflection_engine.py:97:101
+   |
+95 | Failure/Override Reason: {failure_reason}
+96 |
+97 | TASK: Synthesize the new lesson and merge it with the EXISTING MEMORY into a single, highly compressed bulleted markdown list.
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+98 | """
+   |
+
+E501 Line too long (102 > 100)
+   --> src/core/reflection_engine.py:124:101
+    |
+122 |             import asyncio
+123 |
+124 |             # Using asyncio.run to execute the async chat_stream within the synchronous thread worker.
+    |                                                                                                     ^^
+125 |             async def _run_stream() -> str:
+126 |                 full_compacted_memory = ""
+    |
+
+E501 Line too long (102 > 100)
+   --> src/core/router.py:141:101
+    |
+140 |         if not candidates:
+141 |             # Absolute fallback if somehow no keys are configured (handled downstream by ChatPipeline)
+    |                                                                                                     ^^
+142 |             candidates = self.registry.get_all()
+    |
+
+E501 Line too long (115 > 100)
+   --> src/core/router.py:184:101
+    |
+182 |             return sorted(candidates, key=lambda x: x.input_cost_per_mtok)[0]
+183 |         else:
+184 |             logger.warning(f"Router found no available candidates for {provider_family}. Falling back to default.")
+    |                                                                                                     ^^^^^^^^^^^^^^^
+185 |             return self.registry.get("openai/gpt-4o-mini")
+    |
+
+E501 Line too long (111 > 100)
+  --> src/core/system_prompt.py:33:101
+   |
+31 |             role_type: The persona the agent should adopt.
+32 |             custom_instructions: Any temporary overriding instructions.
+33 |             model_name: The specific LLM ID or Agent ID (e.g., 'gpt-4o', 'orchestrator') to load custom memory.
+   |                                                                                                     ^^^^^^^^^^^
+34 |
+35 |         """
+   |
+
+E501 Line too long (153 > 100)
+   --> src/core/system_prompt.py:122:101
+    |
+120 | …ngs>")
+121 | …
+122 | … to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+123 | …
+    |
+
+E501 Line too long (143 > 100)
+  --> src/tools/handoff.py:30:101
+   |
+28 | …
+29 | …
+30 | …del string to spin up (e.g. 'openai/o3-mini', 'anthropic/claude-3-5-sonnet-20241022').",
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 | …
+32 | …
+   |
+
+E501 Line too long (125 > 100)
+  --> src/tools/handoff.py:39:101
+   |
+37 |                 "type": "string",
+38 |                 "enum": ["delegate", "consult"],
+39 |                 "description": "Whether to 'consult' (wait for the answer and resume) or 'delegate' (hand it off and exit).",
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+40 |             },
+41 |             "attached_files": {
+   |
+
+E501 Line too long (102 > 100)
+  --> src/tools/handoff.py:44:101
+   |
+42 |                 "type": "array",
+43 |                 "items": {"type": "string"},
+44 |                 "description": "Absolute paths of files to pass into the new agent's context window.",
+   |                                                                                                     ^^
+45 |             },
+46 |         },
+   |
+
+E501 Line too long (141 > 100)
+   --> src/tui/app.py:104:101
+    |
+102 | …
+103 | …
+104 | …nel"), FileTreePanel(id="left-panel"), id="left-panel-container", classes="left-col"),
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+105 | …"),
+106 | …
+    |
+
+E501 Line too long (103 > 100)
+   --> src/tui/app.py:143:101
+    |
+141 |             chat_panel = self.query(ChatPanel).first()
+142 |             if hasattr(chat_panel, "input_area"):
+143 |                 chat_panel.input_area.theme = "github_light" if new_theme == "polar" else "vscode_dark"
+    |                                                                                                     ^^^
+144 |         except Exception:
+145 |             pass
+    |
+
+E501 Line too long (101 > 100)
+   --> src/tui/app.py:448:101
+    |
+446 |         async def on_model_selected(real_model_name: str):
+447 |             agent_msg.update_speaker(f"Orchestrator ({real_model_name})")
+448 |             self.post_message(AgentDispatched(agent_name="Orchestrator", model_name=real_model_name))
+    |                                                                                                     ^
+449 |
+450 |         from src.services.analytics import track
+    |
+
+E501 Line too long (102 > 100)
+   --> src/tui/app.py:620:101
+    |
+618 |         """Toggle the leftmost panel (dynamically evaluated via settings)."""
+619 |         order = self._get_active_layout_order()
+620 |         panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
+    |                                                                                                     ^^
+621 |         leftmost = self.query_one(panel_map[order[0]])
+622 |         resizer = self.query_one("#resizer-1")
+    |
+
+E501 Line too long (102 > 100)
+   --> src/tui/app.py:629:101
+    |
+627 |         """Toggle the rightmost panel (dynamically evaluated via settings)."""
+628 |         order = self._get_active_layout_order()
+629 |         panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
+    |                                                                                                     ^^
+630 |         rightmost = self.query_one(panel_map[order[2]])
+631 |         resizer = self.query_one("#resizer-2")
+    |
+
+E501 Line too long (102 > 100)
+   --> src/tui/app.py:638:101
+    |
+636 |         """Hide both side panels."""
+637 |         order = self._get_active_layout_order()
+638 |         panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
+    |                                                                                                     ^^
+639 |         left = self.query_one(panel_map[order[0]])
+640 |         right = self.query_one(panel_map[order[2]])
+    |
+
+E501 Line too long (102 > 100)
+   --> src/tui/app.py:654:101
+    |
+652 |         """Double click on resizer resetting to default."""
+653 |         order = self._get_active_layout_order()
+654 |         panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
+    |                                                                                                     ^^
+655 |         left = self.query_one(panel_map[order[0]])
+656 |         center = self.query_one(panel_map[order[1]])
+    |
+
+E501 Line too long (102 > 100)
+   --> src/tui/app.py:677:101
+    |
+675 |     def apply_layout(self, preset: str) -> None:
+676 |         order = self._get_active_layout_order()
+677 |         panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
+    |                                                                                                     ^^
+678 |         left = self.query_one(panel_map[order[0]])
+679 |         center = self.query_one(panel_map[order[1]])
+    |
+
+F401 [*] `src.tui.panels.chat.apply_brand_colors` imported but unused
+  --> src/tui/overlays/settings.py:19:33
+   |
+17 | from src.auth.keychain import KeyChainManager
+18 | from src.core.logger import get_logger
+19 | from src.tui.panels.chat import apply_brand_colors
+   |                                 ^^^^^^^^^^^^^^^^^^
+20 |
+21 | logger = get_logger("tui.settings")
+   |
+help: Remove unused import: `src.tui.panels.chat.apply_brand_colors`
+
+F811 [*] Redefinition of unused `apply_brand_colors` from line 19
+   --> src/tui/overlays/settings.py:122:41
+    |
+121 |     def _compose_api_tab(self):
+122 |         from src.tui.panels.chat import apply_brand_colors
+    |                                         ^^^^^^^^^^^^^^^^^^ `apply_brand_colors` redefined here
+123 |
+124 |         yield Label(
+    |
+   ::: src/tui/overlays/settings.py:19:33
+    |
+ 17 | from src.auth.keychain import KeyChainManager
+ 18 | from src.core.logger import get_logger
+ 19 | from src.tui.panels.chat import apply_brand_colors
+    |                                 ------------------ previous definition of `apply_brand_colors` here
+ 20 |
+ 21 | logger = get_logger("tui.settings")
+    |
+help: Remove definition: `apply_brand_colors`
+
+E501 Line too long (109 > 100)
+   --> src/tui/overlays/settings.py:136:101
+    |
+134 |         ]
+135 |
+136 |         # Manually map Anthropic -> Claude, OpenAI -> ChatGPT, Google -> Gemini, xAI -> Grok for the applying
+    |                                                                                                     ^^^^^^^^^
+137 |         mapping = {
+138 |             "Anthropic": "Claude",
+    |
+
+E501 Line too long (177 > 100)
+   --> src/tui/overlays/settings.py:169:101
+    |
+167 | …
+168 | …
+169 | …thropic/claude-3.5-sonnet').\nThese overrides bypass automatic tier routing.", classes="text-secondary")
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+170 | …
+171 | …
+    |
+
+E501 Line too long (125 > 100)
+   --> src/tui/overlays/settings.py:335:101
+    |
+333 |         layout_changed = getattr(self, "_layout_changed_flag", False)
+334 |         if layout_changed:
+335 |             notify(self.app, "Settings Saved", "Please restart the application to apply the new layout sequence.", "warning")
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+336 |             self._layout_changed_flag = False
+337 |         else:
+    |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:35:54
+   |
+33 |         w = match.group(0)
+34 |         lw = w.lower()
+35 |         if lw in ("chatgpt", "gpt", "chat", "openai"): color = "#34D399"  # Green
+   |                                                      ^
+36 |         elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"): color = "#FB923C"  # Orange
+37 |         elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:36:70
+   |
+34 |         lw = w.lower()
+35 |         if lw in ("chatgpt", "gpt", "chat", "openai"): color = "#34D399"  # Green
+36 |         elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"): color = "#FB923C"  # Orange
+   |                                                                      ^
+37 |         elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
+38 |         elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:37:52
+   |
+35 |         if lw in ("chatgpt", "gpt", "chat", "openai"): color = "#34D399"  # Green
+36 |         elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"): color = "#FB923C"  # Orange
+37 |         elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
+   |                                                    ^
+38 |         elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
+39 |         elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:38:35
+   |
+36 |         elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"): color = "#FB923C"  # Orange
+37 |         elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
+38 |         elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
+   |                                   ^
+39 |         elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
+40 |         elif lw == "openrouter": color = "#F43F5E"  # Pink
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:39:48
+   |
+37 |         elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
+38 |         elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
+39 |         elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
+   |                                                ^
+40 |         elif lw == "openrouter": color = "#F43F5E"  # Pink
+41 |         else: return w
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:40:32
+   |
+38 |         elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
+39 |         elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
+40 |         elif lw == "openrouter": color = "#F43F5E"  # Pink
+   |                                ^
+41 |         else: return w
+42 |         return f"[{color}]{w}[/{color}]"
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/tui/panels/chat.py:41:13
+   |
+39 |         elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
+40 |         elif lw == "openrouter": color = "#F43F5E"  # Pink
+41 |         else: return w
+   |             ^
+42 |         return f"[{color}]{w}[/{color}]"
+   |
+
+W293 [*] Blank line contains whitespace
+  --> src/tui/panels/chat.py:43:1
+   |
+41 |         else: return w
+42 |         return f"[{color}]{w}[/{color}]"
+43 |         
+   | ^^^^^^^^
+44 |     # Skip processing if it looks like there are markup tags to avoid nesting errors
+45 |     if "[" in text and "]" in text:
+   |
+help: Remove whitespace from blank line
+
+W293 [*] Blank line contains whitespace
+  --> src/tui/panels/chat.py:47:1
+   |
+45 |     if "[" in text and "]" in text:
+46 |         return text
+47 |         
+   | ^^^^^^^^
+48 |     return re.sub(r'\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|o…
+   |
+help: Remove whitespace from blank line
+
+E501 Line too long (185 > 100)
+  --> src/tui/panels/chat.py:48:101
+   |
+46 | …
+47 | …
+48 | …ropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b', replacer, text, flags=re.IGNORECASE)
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+49 | …
+50 | …
+   |
+
+E501 Line too long (173 > 100)
+  --> src/tui/panels/chat.py:63:101
+   |
+61 | …
+62 | …
+63 | … (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64 | …" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],
+65 | …", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
+   |
+
+E501 Line too long (167 > 100)
+  --> src/tui/panels/chat.py:64:101
+   |
+62 | …
+63 | …"), (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],
+64 | …, (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+65 | …(" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
+66 | … ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
+   |
+
+E501 Line too long (161 > 100)
+  --> src/tui/panels/chat.py:65:101
+   |
+63 | …23C"), (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],
+64 | …C"), (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],
+65 | …), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+66 | … (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
+67 | …" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+   |
+
+E501 Line too long (155 > 100)
+  --> src/tui/panels/chat.py:66:101
+   |
+64 | …923C"), (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],
+65 | …3C"), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
+66 | …"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
+   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 | …, (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+68 | … (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+   |
+
+E501 Line too long (149 > 100)
+  --> src/tui/panels/chat.py:67:101
+   |
+65 | …B923C"), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
+66 | …23C"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
+67 | …C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+68 | …"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+69 | …#60A5FA"), ("T", "#A78BFA")],
+   |
+
+E501 Line too long (147 > 100)
+  --> src/tui/panels/chat.py:68:101
+   |
+66 | …923C"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
+67 | …3C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+68 | …C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+69 | …"#60A5FA"), ("T", "#A78BFA")],
+70 | …"#60A5FA"), ("t", "#A78BFA")],
+   |
+
+W293 [*] Blank line contains whitespace
+   --> src/tui/panels/chat.py:185:1
+    |
+183 |             self._header_label = Label(apply_brand_colors(header), classes="msg-header")
+184 |             yield self._header_label
+185 |             
+    | ^^^^^^^^^^^^
+186 |             if self.content:
+187 |                 from src.tui.widgets.collapsible_code import parse_agent_response, CollapsibleCodeBlock
+    |
+help: Remove whitespace from blank line
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> src/tui/panels/chat.py:187:17
+    |
+186 |             if self.content:
+187 |                 from src.tui.widgets.collapsible_code import parse_agent_response, CollapsibleCodeBlock
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+188 |                 blocks = parse_agent_response(self.content)
+189 |                 for block in blocks:
+    |
+help: Organize imports
+
+E501 Line too long (103 > 100)
+   --> src/tui/panels/chat.py:187:101
+    |
+186 |             if self.content:
+187 |                 from src.tui.widgets.collapsible_code import parse_agent_response, CollapsibleCodeBlock
+    |                                                                                                     ^^^
+188 |                 blocks = parse_agent_response(self.content)
+189 |                 for block in blocks:
+    |
+
+E741 Ambiguous variable name: `l`
+   --> src/tui/panels/chat.py:193:25
+    |
+191 |                         yield CollapsibleCodeBlock(language=block.language, code=block.content)
+192 |                     else:
+193 |                         l = Label(apply_brand_colors(block.content))
+    |                         ^
+194 |                         l.styles.width = "auto"
+195 |                         yield l
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> src/tui/panels/chat.py:205:17
+    |
+204 |             if self.content:
+205 |                 from src.tui.widgets.collapsible_code import parse_agent_response, CollapsibleCodeBlock
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+206 |                 blocks = parse_agent_response(self.content)
+207 |                 for block in blocks:
+    |
+help: Organize imports
+
+E501 Line too long (103 > 100)
+   --> src/tui/panels/chat.py:205:101
+    |
+204 |             if self.content:
+205 |                 from src.tui.widgets.collapsible_code import parse_agent_response, CollapsibleCodeBlock
+    |                                                                                                     ^^^
+206 |                 blocks = parse_agent_response(self.content)
+207 |                 for block in blocks:
+    |
+
+E501 Line too long (101 > 100)
+   --> src/tui/panels/chat.py:209:101
+    |
+207 |                 for block in blocks:
+208 |                     if block.is_code:
+209 |                         self.mount(CollapsibleCodeBlock(language=block.language, code=block.content))
+    |                                                                                                     ^
+210 |                     else:
+211 |                         l = Label(apply_brand_colors(block.content))
+    |
+
+E741 Ambiguous variable name: `l`
+   --> src/tui/panels/chat.py:211:25
+    |
+209 |                         self.mount(CollapsibleCodeBlock(language=block.language, code=block.content))
+210 |                     else:
+211 |                         l = Label(apply_brand_colors(block.content))
+    |                         ^
+212 |                         l.styles.width = "auto"
+213 |                         self.mount(l)
+    |
+
+E501 Line too long (120 > 100)
+   --> src/tui/panels/chat.py:500:101
+    |
+498 |             self.input_area.soft_wrap = True
+499 |             yield self.input_area
+500 |             yield Label("Press [bold]Enter[/bold] to send • [bold]Shift+Enter[/bold] for newline", id="chat-input-hint")
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^
+501 |
+502 |     def on_mount(self) -> None:
+    |
+
+E501 Line too long (114 > 100)
+   --> src/tui/panels/chat.py:504:101
+    |
+502 |     def on_mount(self) -> None:
+503 |         if hasattr(self, "input_area"):
+504 |             self.input_area.theme = "github_light" if getattr(self.app, "theme", "") == "polar" else "vscode_dark"
+    |                                                                                                     ^^^^^^^^^^^^^^
+505 |         if hasattr(self.app, "chat_store"):
+506 |             self._load_session_history()
+    |
+
+E501 Line too long (114 > 100)
+   --> src/tui/panels/chat.py:586:101
+    |
+584 |                 if model_def:
+585 |                     registry = ModelRegistry()
+586 |                     est_dollars = registry.calculate_cost(model_def.id, prompt_tokens=tokens, completion_tokens=0)
+    |                                                                                                     ^^^^^^^^^^^^^^
+587 |                     # Force update the UI
+588 |                     app.status_bar.est_cost = est_dollars
+    |
+
+E501 Line too long (191 > 100)
+   --> src/tui/panels/chat.py:723:100
+    |
+722 | …
+723 | …{model_display} {event.status}...[/] [dim]{event.detail}[/]", id="transient-status", classes="transient-pill")
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+724 | …
+725 | …
+    |
+
+F821 Undefined name `Resize`
+   --> src/tui/panels/code_viewer.py:429:32
+    |
+427 |         yield CodeView(id="code-view")
+428 |
+429 |     def on_resize(self, event: Resize) -> None:
+    |                                ^^^^^^
+430 |         """Dynamically toggle between verbose text and compact symbols based on panel width."""
+431 |         width = event.size.width
+    |
+
+E501 Line too long (111 > 100)
+   --> src/tui/widgets/hunk_editor.py:102:101
+    |
+100 |         """Focus the TextArea immediately on mount."""
+101 |         if self._editor:
+102 |             self._editor.theme = "github_light" if getattr(self.app, "theme", "") == "polar" else "vscode_dark"
+    |                                                                                                     ^^^^^^^^^^^
+103 |             self._editor.focus()
+    |
+
+E501 Line too long (109 > 100)
+  --> src/tui/widgets/menu_bar.py:79:101
+   |
+77 |         # In a real app we'd inject dependencies or use app state
+78 |
+79 |         gptcgt_colored = "[#34D399]gpt[/#34D399][#A78BFA]c[/#A78BFA][#60A5FA]g[/#60A5FA][#FB923C]t[/#FB923C]"
+   |                                                                                                     ^^^^^^^^^
+80 |
+81 |         gptcgt_menu = [
+   |
+
+E501 Line too long (108 > 100)
+  --> src/tui/widgets/thought_block.py:11:101
+   |
+ 9 |     """
+10 |     An interactive, collapsible UI component for the Chat Panel.
+11 |     Used to cleanly hide internal Agent thinking loops (like Tool executions, Sandboxing, or Swarm handoffs)
+   |                                                                                                     ^^^^^^^^
+12 |     behind a clickable accordion displaying the elapsed thought time.
+13 |     """
+   |
+
+E501 Line too long (110 > 100)
+  --> tests/test_router_intents.py:68:101
+   |
+66 |         intent=TaskIntent.CHAT.value, complexity=2, global_tier=QualityTier.MAX
+67 |     )
+68 |     assert QualityTier.LIGHT.value in model.quality_tiers or QualityTier.STANDARD.value in model.quality_tiers
+   |                                                                                                     ^^^^^^^^^^
+69 |
+70 |     # Create intent with high complexity should use Premium
+   |
+
+Found 71 errors.
+[*] 7 fixable with the `--fix` option.
