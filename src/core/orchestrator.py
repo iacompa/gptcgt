@@ -148,9 +148,23 @@ class Orchestrator:
                     response_text += chunk
                     await yield_chunk_callback(chunk)
 
+                # P0 Fix: Inject scout-discovered relevant files into pipeline context
+                merged_files = list(attached_files) if attached_files else []
+                if relevant_files:
+                    ws = Workspace.get_instance()
+                    for rf in relevant_files[:10]:  # Cap at 10 to protect token budget
+                        rf_path = str(rf)
+                        if not any(af.get("path") == rf_path for af in merged_files):
+                            try:
+                                content = ws.safe_read(rf_path)
+                                if content:
+                                    merged_files.append({"path": rf_path, "content": content[:4000]})
+                            except Exception:
+                                pass
+
                 await pipeline.process_message(
                     user_text=user_input,
-                    attached_files=attached_files,
+                    attached_files=merged_files if merged_files else None,
                     model_id_override=selected_model.id,
                     yield_chunk_callback=intercept_yield,
                     tool_call_callback=tool_call_callback,

@@ -96,7 +96,7 @@ class SystemPromptBuilder:
                 project_content = ws.safe_read(project_path)
                 if project_content:
                     prompt_parts.append("\n# Project Context Map")
-                    prompt_parts.append(project_content)
+                    prompt_parts.append(project_content[:2000])
         except Exception:
             pass
 

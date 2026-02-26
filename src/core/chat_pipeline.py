@@ -33,12 +33,16 @@ ROLE_TO_LITELLM = {
 }
 
 
+MAX_DELEGATION_DEPTH = 3
+
+
 class ChatPipeline:
-    def __init__(self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD):
+    def __init__(self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD, _delegation_depth: int = 0):
         self.chat_store = chat_store
         self.default_tier = default_tier
         self.cost_tracker = None
         self.diff_extractor = DiffExtractor()
+        self._delegation_depth = _delegation_depth
         try:
             import textual.app
 
@@ -144,9 +148,9 @@ class ChatPipeline:
         try:
             if model_id_override:
                 model_def = registry.get(model_id_override)
-                if not model_def and "/" in model_id_override:
-                    from src.core.router import CodingRouter
-                    model_def = CodingRouter().route_task("chat", complexity, self.default_tier, role="coder")
+                if not model_def:
+                    logger.warning(f"Target model '{model_id_override}' not found in registry.")
+                    return None, f"Requested model '{model_id_override}' is not registered. Check the model ID."
             else:
                 from src.core.router import CodingRouter
                 model_def = CodingRouter().route_task("chat", complexity, self.default_tier, role="coder")
@@ -351,9 +355,30 @@ class ChatPipeline:
         action = handoff_payload.get("action", "consult")
         files = handoff_payload.get("files", [])
 
+        # P0 Fix: Recursion depth guard
+        if self._delegation_depth >= MAX_DELEGATION_DEPTH:
+            logger.warning(f"Delegation depth {self._delegation_depth} exceeds max {MAX_DELEGATION_DEPTH}. Aborting sub-dispatch.")
+            if error_callback:
+                await error_callback(f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted.")
+            return full_response, False
+
+        # P0 Fix: Read file content so ContextManager gets {"path": ..., "content": ...}
+        attached_files_with_content = None
+        if files:
+            attached_files_with_content = []
+            try:
+                from src.core.workspace import Workspace
+                ws = Workspace.get_instance()
+                for f in files:
+                    content = ws.safe_read(f) if ws.safe_exists(f) else ""
+                    attached_files_with_content.append({"path": f, "content": content})
+            except Exception as e:
+                logger.warning(f"Failed to read handoff files: {e}")
+                attached_files_with_content = [{"path": f, "content": ""} for f in files]
+
         import time
         start_handoff = time.monotonic()
-        sub_pipeline = ChatPipeline(self.chat_store, self.default_tier)
+        sub_pipeline = ChatPipeline(self.chat_store, self.default_tier, _delegation_depth=self._delegation_depth + 1)
         child_response_chunks: list[str] = []
 
         async def sub_chunk_catcher(text: str, _chunks: list = child_response_chunks):
@@ -363,7 +388,7 @@ class ChatPipeline:
 
         await sub_pipeline.process_message(
             user_text=instruction,
-            attached_files=[{"path": f} for f in files] if files else None,
+            attached_files=attached_files_with_content,
             model_id_override=target_id,
             yield_chunk_callback=sub_chunk_catcher,
             tool_call_callback=tool_call_callback,
