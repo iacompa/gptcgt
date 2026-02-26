@@ -43,7 +43,7 @@ async def test_file_tree_context_menu():
         # Verify menu opened
         menus = app.query(DropdownMenu)
         assert len(menus) == 1
-        assert any(item.item.label == "Rename" for item in menus.first()._item_widgets)
+        assert any(item.item.label == "New File..." for item in menus.first()._item_widgets)
 
         # Close
         menus.first().close_all()

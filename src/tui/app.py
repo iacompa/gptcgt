@@ -686,6 +686,14 @@ class GptcgtApp(App[None]):
             import webbrowser
 
             webbrowser.open("https://github.com/your/repo/issues")
+        elif action.startswith("ai_") or action.startswith("tree_"):
+            # Route file tree AI context-menu actions
+            try:
+                from src.tui.panels.file_tree import FileTreePanel
+                file_tree = self.query_one(FileTreePanel)
+                file_tree._handle_ai_tree_action(action)
+            except Exception as e:
+                logger.debug(f"AI tree action failed: {e}")
 
     def on_menu_toggle(self, event: MenuToggle) -> None:
         """Handle toggles in menu."""
