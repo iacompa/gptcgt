@@ -652,21 +652,24 @@ class ChatPanel(Vertical):
         files = re.findall(r"@([a-zA-Z0-9_\-\./]+)", text)
         clean_text = re.sub(r"@[a-zA-Z0-9_\-\./]+", "", text).strip()
 
-        # Security: validate @file paths against workspace root
+        # Security: validate @file paths via Workspace security boundary
         file_paths = []
         try:
-            from src.core.workspace import Workspace
+            from src.core.workspace import Workspace, WorkspaceEscapeError
             ws = Workspace.get_instance()
-            project_root = ws.get_project_root().resolve()
             for f in files:
                 try:
-                    resolved = (project_root / f).resolve()
-                    resolved.relative_to(project_root)  # Raises ValueError if outside
+                    ws.validate_path(f)  # Raises WorkspaceEscapeError if outside root
                     file_paths.append(Path(f))
-                except ValueError:
+                except WorkspaceEscapeError:
                     logger.warning(f"@file path rejected (outside workspace): {f}")
+                    from src.tui.widgets.toast import notify
+                    try:
+                        import textual.app as _tapp
+                        notify(_tapp.active_app.get(), "Security", f"Path '{f}' is outside project", "warning")
+                    except Exception:
+                        pass
         except Exception:
-            # If workspace isn't available, reject all @file paths (safe default)
             logger.warning("Workspace unavailable — rejecting all @file paths for security")
             file_paths = []
 

@@ -118,11 +118,70 @@ class Orchestrator:
             bb.write("task_brief", task_brief.to_system_context(), author="orchestrator")
             bb.write("relevant_files", [str(f) for f in relevant_files], author="scout")
 
-            # 6. Execute via Pipeline
-            is_standard = self.mode_manager.active_mode in (
-                OperationMode.STANDARD,
-                OperationMode.SCOUT,
-            ) or self.mode_manager.active_mode.name.startswith("SINGLE_MODEL_")
+            # 2-Phase Architect Mode: plan → execute
+            is_architect_task = (
+                analysis["intent"] == "architect"
+                and analysis.get("complexity", 5) >= 7
+            )
+            if is_architect_task:
+                await narration_callback("🏗️ Architect Mode: Phase 1 — Generating plan...", "info")
+                from src.core.chat_pipeline import ChatPipeline
+                plan_pipeline = ChatPipeline(self.chat_store, global_tier)
+
+                plan_text = ""
+
+                async def capture_plan(chunk: str):
+                    nonlocal plan_text
+                    plan_text += chunk
+                    await yield_chunk_callback(chunk)
+
+                await plan_pipeline.process_message(
+                    user_text=(
+                        f"You are in ARCHITECT MODE (Phase 1: Planning Only).\n"
+                        f"Generate a detailed implementation plan for: {user_input}\n"
+                        f"Output ONLY the plan with numbered steps, files to modify, and rationale.\n"
+                        f"Do NOT write any code yet."
+                    ),
+                    attached_files=attached_files if attached_files else None,
+                    model_id_override=selected_model.id,
+                    yield_chunk_callback=capture_plan,
+                    tool_call_callback=tool_call_callback,
+                    thought_callback=thought_callback,
+                    error_callback=error_callback,
+                    cancel_event=cancel_event,
+                    complexity=analysis.get("complexity", 5),
+                )
+                bb.write("architect_plan", plan_text, author="architect")
+
+                await narration_callback("🏗️ Architect Mode: Phase 2 — Executing plan...", "info")
+                exec_pipeline = ChatPipeline(self.chat_store, global_tier)
+                await exec_pipeline.process_message(
+                    user_text=(
+                        f"You are in ARCHITECT MODE (Phase 2: Constrained Execution).\n"
+                        f"Execute ONLY the following approved plan — do not deviate:\n\n"
+                        f"{plan_text[:3000]}\n\n"
+                        f"Original request: {user_input}"
+                    ),
+                    attached_files=attached_files if attached_files else None,
+                    model_id_override=selected_model.id,
+                    yield_chunk_callback=yield_chunk_callback,
+                    tool_call_callback=tool_call_callback,
+                    thought_callback=thought_callback,
+                    error_callback=error_callback,
+                    cancel_event=cancel_event,
+                    complexity=analysis.get("complexity", 5),
+                )
+
+            # 6. Execute via Pipeline (standard / single-model)
+            is_standard = (
+                not is_architect_task
+                and (
+                    self.mode_manager.active_mode in (
+                        OperationMode.STANDARD,
+                        OperationMode.SCOUT,
+                    ) or self.mode_manager.active_mode.name.startswith("SINGLE_MODEL_")
+                )
+            )
             if is_standard:
                 await narration_callback(
                     f"Executing task in {self.mode_manager.active_mode.name} mode...", "info"
