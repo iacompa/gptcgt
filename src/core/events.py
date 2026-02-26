@@ -350,7 +350,8 @@ class VerificationUpdate(Message):
 
 
 class ContextTruncated(Message):
-    """Emitted when the context manager drops history or truncates a file to fit the token budget.
+    """
+    Emitted when the context manager drops history or truncates a file to fit the token budget.
 
     Surfaces a visible warning in the chat panel so the user understands why
     their conversation history or attached files were shortened.
@@ -369,7 +370,8 @@ class ContextTruncated(Message):
 
 
 class ReflectionRetryHint(Message):
-    """Emitted by the ReflectionEngine when it has distilled a lesson from a failed interaction.
+    """
+    Emitted by the ReflectionEngine when it has distilled a lesson from a failed interaction.
 
     The chat panel and orchestrator can use this to surface the lesson in the UI
     and optionally pass it back into the next dispatch as an extra system message hint,

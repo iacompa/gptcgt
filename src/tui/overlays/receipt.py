@@ -15,7 +15,7 @@ class BuildReceipt(ModalScreen[None]):
         align: center middle;
         background: $background 50%;
     }
-    
+
     #receipt-container {
         width: 60;
         height: auto;
@@ -23,37 +23,37 @@ class BuildReceipt(ModalScreen[None]):
         background: $surface;
         border: thick $success;
     }
-    
+
     .receipt-header {
         text-align: center;
         text-style: bold;
         color: $success;
         margin-bottom: 1;
     }
-    
+
     .receipt-row {
         layout: horizontal;
         height: 1;
         margin-bottom: 1;
     }
-    
+
     .receipt-label {
         width: 1fr;
         color: $text-muted;
     }
-    
+
     .receipt-value {
         width: 1fr;
         text-align: right;
         text-style: bold;
     }
-    
+
     #receipt-buttons {
         margin-top: 2;
         width: 100%;
         align: center middle;
     }
-    
+
     #receipt-buttons Button {
         margin: 0 1;
     }

@@ -77,7 +77,8 @@ class CodingRouter:
             return []
 
     def _refresh_elo_cache(self) -> None:
-        """Load ELO ratings from SQLite into an in-memory dict.
+        """
+        Load ELO ratings from SQLite into an in-memory dict.
 
         Refreshed at most once every 60 seconds so routing performance
         is not penalised by repeated disk reads on every keystroke.
@@ -97,7 +98,8 @@ class CodingRouter:
             logger.debug(f"ELO cache refresh skipped: {e}")
 
     def _apply_elo_sort(self, candidates: list[ModelDefinition]) -> list[ModelDefinition]:
-        """Re-rank candidates using ELO data.
+        """
+        Re-rank candidates using ELO data.
 
         Models with ELO > 1200 (above-average win rate) are sorted ahead
         of same-tier peers. Models with ELO < 1100 drop to the back.
@@ -121,7 +123,8 @@ class CodingRouter:
         provider_family: str | None = None,
         role: str | None = None,
     ) -> ModelDefinition:
-        """Determines the best model to use.
+        """
+        Determines the best model to use.
 
         Selection priority (highest to lowest):
         1. Explicit user-configured model for this role / global default

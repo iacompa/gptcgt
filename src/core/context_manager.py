@@ -19,12 +19,14 @@ logger = get_logger("core.context_manager")
 
 
 def _try_post_truncation_event(reason: str, tokens_dropped: int = 0, files: list[str] | None = None) -> None:
-    """Post a ContextTruncated event to the live TUI app if one is running.
-    
+    """
+    Post a ContextTruncated event to the live TUI app if one is running.
+
     Safe to call from any context — silently skips if no app is active.
     """
     try:
         import textual.app as _tapp
+
         from src.core.events import ContextTruncated
         _tapp.active_app.get().post_message(
             ContextTruncated(reason=reason, tokens_dropped=tokens_dropped, files_truncated=files or [])
@@ -135,7 +137,7 @@ class ContextManager:
 
         if truncated_files:
             _try_post_truncation_event(
-                reason=f"File too large for context window — truncated to fit.",
+                reason="File too large for context window — truncated to fit.",
                 files_truncated=truncated_files,
             )
 

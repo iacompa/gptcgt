@@ -301,7 +301,7 @@ class SettingsScreen(ModalScreen):
             plan, credits, month_credits, is_auth = "BYOK", None, None, False
 
         if is_auth and credits is not None:
-            yield Label(f"Plan: [bold]{plan}[/bold]  •  {credits}/{month_credits} credits remaining", classes="section-label")
+            yield Label(f"Plan: [bold]{plan}[/bold]  •  {credits}/{month_credits} credits remaining", classes="section-label")  # noqa: E501
         else:
             yield Label("Plan: [bold]Bring Your Own Keys[/bold] (Free)", classes="section-label")
             yield Label(
@@ -383,14 +383,14 @@ class SettingsScreen(ModalScreen):
         registry = ModelRegistry()
         data = await registry.fetch_openrouter_models()
         registry.register_custom_openrouter_model(model_id, "", QualityTier.STANDARD, openrouter_data=data)
-        
+
         # Save to config
         active_models = getattr(self.app.config.user, "openrouter_active_models", [])
         safe_id = model_id if model_id.startswith("openrouter/") else f"openrouter/{model_id}"
         if safe_id not in active_models:
             active_models.append(safe_id)
             self.app.config.set_user("openrouter_active_models", active_models)
-        
+
         try:
             lbl = self.query_one("#openrouter-status-msg", Label)
             lbl.update(f"✅ Added {safe_id} successfully.")
@@ -518,7 +518,7 @@ class SettingsScreen(ModalScreen):
 
         layout_changed = getattr(self, "_layout_changed_flag", False)
         if layout_changed:
-            notify(self.app, "Settings Saved", "Please restart the application to apply the new layout sequence.", "warning")
+            notify(self.app, "Settings Saved", "Please restart the application to apply the new layout sequence.", "warning")  # noqa: E501
             self._layout_changed_flag = False
         else:
             notify(self.app, "Settings Saved", "Your preferences have been updated.", "success")

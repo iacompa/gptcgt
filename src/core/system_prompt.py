@@ -129,7 +129,7 @@ class SystemPromptBuilder:
                     prompt_parts.append(memory_content)
                     prompt_parts.append("</accumulated_learnings>")
                     prompt_parts.append(
-                        "<directive>CRITICAL: You must adhere to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"
+                        "<directive>CRITICAL: You must adhere to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"  # noqa: E501
                     )
 
                     # Phase 19: Transient UI memory injection indicators

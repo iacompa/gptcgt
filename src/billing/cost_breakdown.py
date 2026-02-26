@@ -163,6 +163,7 @@ class CostBreakdownTracker:
         # Broadcast the credits ping so the status bar updates
         try:
             import textual.app as _tapp
+
             from src.core.events import CreditsUpdated
             _cur_app = _tapp.active_app.get()
             # Use real values from auth_manager if available, else fall back to 0
