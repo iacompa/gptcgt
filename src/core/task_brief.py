@@ -45,6 +45,7 @@ class TaskBrief:
 
     def to_system_context(self) -> str:
         """Convert to a system prompt fragment for injection."""
+        self.validate()  # Ensure required fields before injection
         parts = [
             "# Task Brief",
             f"**Intent:** {self.intent} | **Complexity:** {self.complexity}/10",
@@ -58,7 +59,7 @@ class TaskBrief:
             parts.append(f"**Key Symbols:** {', '.join(self.mentioned_symbols[:10])}")
 
         if self.memory_hints:
-            parts.append("**Lessons from Memory:**")
+            parts.append("## Lessons from Memory:")
             for hint in self.memory_hints[:5]:
                 parts.append(f"  - {hint}")
 
@@ -71,3 +72,12 @@ class TaskBrief:
                 parts.append(f"  - {c}")
 
         return "\n".join(parts)
+
+    def validate(self) -> None:
+        """Validate that required fields are populated. Raises ValueError if not."""
+        if not self.intent:
+            raise ValueError("TaskBrief.intent is required")
+        if not self.user_request:
+            raise ValueError("TaskBrief.user_request is required")
+        if not 1 <= self.complexity <= 10:
+            raise ValueError(f"TaskBrief.complexity must be 1-10, got {self.complexity}")

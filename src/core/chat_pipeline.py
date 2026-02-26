@@ -83,6 +83,22 @@ class ChatPipeline:
         self.complexity = complexity
         registry = ModelRegistry()
 
+        # Spending cap preflight: hard-stop before any API call
+        if self.cost_tracker:
+            try:
+                from src.billing.spending_caps import SpendingCapService
+                SpendingCapService()
+                today_spend = self.cost_tracker.get_today_spend()
+                if today_spend.total_cost >= MAX_DELEGATION_COST_USD * 10:  # User-level daily cap
+                    if error_callback:
+                        await error_callback(
+                            f"⛔ Spending Cap exceeded (${today_spend.total_cost:.2f} today). "
+                            "Adjust your spending cap in Settings or wait until tomorrow."
+                        )
+                    return
+            except Exception:
+                pass  # Non-blocking if billing service is unavailable
+
         model_def, model_error = self._resolve_model(model_id_override, complexity)
         if model_error:
             if error_callback:

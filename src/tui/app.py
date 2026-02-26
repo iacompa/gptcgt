@@ -488,28 +488,26 @@ class GptcgtApp(App[None]):
 
             agent_msg.append_chunk(f"\n[Error: {msg}]")
             from src.tui.widgets.toast import notify
-
             notify(self, "LLM Error", msg, "error")
 
         file_dicts = []
         try:
-            from src.core.workspace import Workspace
+            from src.core.workspace import Workspace, WorkspaceEscapeError
             ws = Workspace.get_instance()
-            project_root = ws.get_project_root().resolve()
         except Exception:
-            project_root = None
+            ws = None
 
         for f in attached_files:
             try:
-                # Security: validate file is within project root
-                if project_root:
-                    resolved = f.resolve()
+                if ws:
                     try:
-                        resolved.relative_to(project_root)
-                    except ValueError:
+                        ws.validate_path(str(f))
+                    except WorkspaceEscapeError:
                         logger.warning(f"Attached file rejected (outside workspace): {f}")
                         continue
-                content = f.read_text()
+                    content = ws.safe_read(str(f))
+                else:
+                    content = f.read_text()
                 file_dicts.append({"path": str(f), "content": content})
             except Exception as e:
                 logger.error(f"Failed to read attached file {f}: {e}")
