@@ -99,6 +99,24 @@ class Orchestrator:
                 pcg = ProjectContextGenerator()
                 pcg.generate_and_save()
 
+            # 5.5. Create TaskBrief and populate Blackboard
+            from src.core.task_brief import TaskBrief
+            from src.core.blackboard import AgentBlackboard
+            task_brief = TaskBrief(
+                intent=analysis["intent"],
+                complexity=analysis.get("complexity", 5),
+                user_request=user_input[:500],
+                mentioned_files=analysis.get("mentioned_files", []),
+                mentioned_symbols=analysis.get("mentioned_symbols", []),
+                selected_model_id=selected_model.id,
+                selected_model_name=selected_model.name,
+                quality_tier=global_tier.value,
+            )
+            bb = AgentBlackboard.get_instance()
+            bb.clear()  # Fresh blackboard per task cycle
+            bb.write("task_brief", task_brief.to_system_context(), author="orchestrator")
+            bb.write("relevant_files", [str(f) for f in relevant_files], author="scout")
+
             # 6. Execute via Pipeline
             is_standard = self.mode_manager.active_mode in (
                 OperationMode.STANDARD,
