@@ -293,6 +293,25 @@ class Arbiter:
             test_score = 100.0  # Default if no tests available
             if verification_result.test_result and verification_result.test_result.total > 0:
                 test_score = verification_result.test_result.pass_rate
+            # Wire TesterAgent: generate + run targeted tests from the diff
+            try:
+                from src.agents.tester_agent import TesterAgent
+                tester = TesterAgent()
+                diff_text = slot.response_text[:5000] if slot.response_text else ""
+                if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
+                    import asyncio
+                    tester_result = await tester.generate_and_run_tests(
+                        diff_text=diff_text,
+                        language="python",
+                        project_root=str(project_root) if project_root else ".",
+                    )
+                    if tester_result.passed + tester_result.failed > 0:
+                        # Blend TesterAgent results with existing test score (60/40 weight)
+                        tester_score = tester_result.pass_rate
+                        test_score = (test_score * 0.6) + (tester_score * 0.4)
+                        logger.info(f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}")
+            except Exception as e:
+                logger.debug(f"TesterAgent invocation skipped: {e}")
             score.stage_scores["test_pass_rate"] = test_score
 
             # Stage 4: Security score

@@ -78,20 +78,45 @@ class ReflectionEngine:
             cheapest_available = sorted(available_models, key=lambda x: x.input_cost_per_mtok)[0]
             light_model = cheapest_available
 
-            # Prepare the compaction prompt
+            # Prepare the compaction prompt — YAML-structured schema
             system_prompt = (
                 "You are an AI Memory Compaction Engine. Your job is to extract a 'lesson learned' "
                 "from a failed or overridden AI interaction, and merge it into a persistent memory file.\n\n"
+                "OUTPUT FORMAT (STRICT):\n"
+                "```\n"
+                "---\n"
+                "agent: {agent_name}\n"
+                "last_updated: {ISO timestamp}\n"
+                "version: {increment from existing}\n"
+                "total_lessons: {count}\n"
+                "---\n"
+                "## Routing Patterns\n"
+                "- [confidence:high] When X, use Y model\n"
+                "## Known Gotchas\n"
+                "- [confidence:medium] This project uses ruff not pylint\n"
+                "## File Affinity\n"
+                "- [scope:project] src/core/config.py is always relevant for settings\n"
+                "## Failure Patterns\n"
+                "- [timestamp:{ISO}] Description of what went wrong\n"
+                "```\n\n"
                 "RULES:\n"
-                "1. If there is existing memory, deduplicate the new lesson. Do not repeat facts.\n"
-                "2. Your output MUST be strictly a series of actionable, bulleted maxims.\n"
-                "3. You must keep the total response UNDER 500 words to preserve context margins.\n"
-                "4. Only output the compacted markdown bullet points. No conversational filler."
+                "1. If there is existing memory, merge the new lesson into the correct section.\n"
+                "2. Deduplicate — do not repeat facts already present.\n"
+                "3. Each bullet MUST have a [confidence:high|medium|low] or [scope:project|file] tag.\n"
+                "4. Keep total response UNDER 800 words.\n"
+                "5. Preserve the YAML frontmatter. Increment version. Update last_updated and total_lessons."
             )
 
+            from datetime import datetime
+            _default_mem = (
+                "---\nagent: " + model_name
+                + "\nlast_updated: " + datetime.now().isoformat()
+                + "\nversion: 0\ntotal_lessons: 0\n---\n"
+            )
+            _memory_block = existing_memory or _default_mem
             user_prompt = f"""
 EXISTING MEMORY:
-{existing_memory or 'No previous memory.'}
+{_memory_block}
 
 ---
 FRICTION EVENT ({trigger_event}):
@@ -99,7 +124,7 @@ Prompt: {original_prompt}
 Output: {agent_output[:1000]}... (truncated)
 Failure/Override Reason: {failure_reason}
 
-TASK: Synthesize the new lesson and merge it with the EXISTING MEMORY into a single, highly compressed bulleted markdown list.
+TASK: Merge the new lesson into the EXISTING MEMORY using the structured schema above. Output only the full updated markdown file.
 """
 
             # Initialize the base agent for the LIGHT model
@@ -177,4 +202,40 @@ TASK: Synthesize the new lesson and merge it with the EXISTING MEMORY into a sin
             )
         except Exception as e:
             logger.debug(f"Reflection _clear_ui_state failed: {e}")
+
+    def log_success(
+        self,
+        model_name: str,
+        model_id: str,
+        tier: str,
+        cost_usd: float,
+        input_tokens: int,
+        output_tokens: int,
+        relevant_files_injected: int = 0,
+        relevant_files_used: int = 0,
+    ) -> None:
+        """Proactive learning: log a successful task for routing optimization."""
+        try:
+            from datetime import datetime
+            target_file = f".gptcgt/agents/{model_name.lower().replace(' ', '_')}.md"
+            existing = ""
+            if self.workspace.safe_exists(target_file):
+                existing = self.workspace.safe_read(target_file)
+
+            hit_rate = (relevant_files_used / relevant_files_injected * 100) if relevant_files_injected > 0 else 0
+
+            log_entry = (
+                f"\n- [timestamp:{datetime.now().isoformat()}] SUCCESS: "
+                f"model={model_id}, tier={tier}, cost=${cost_usd:.4f}, "
+                f"tokens={input_tokens}→{output_tokens}, "
+                f"file_relevance_hit_rate={hit_rate:.0f}%"
+            )
+
+            # Append to existing, cap file at 5000 chars
+            new_memory = (existing + log_entry)[-5000:]
+            self.workspace.safe_write(target_file, new_memory)
+            logger.info(f"Proactive learning logged for {model_name}: ${cost_usd:.4f}, {hit_rate:.0f}% relevance")
+        except Exception as e:
+            logger.debug(f"Proactive learning log failed: {e}")
+
 
