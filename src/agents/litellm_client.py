@@ -50,6 +50,7 @@ class LiteLLMClient:
             timeout: Request timeout in seconds
             api_key: The provider API key. Must be resolved before calling.
             base_url: Optional custom endpoint
+            extra_headers: Optional dict of custom HTTP headers
 
         Yields:
             AgentResponse chunks containing text deltas and eventually finish reasons.

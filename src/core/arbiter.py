@@ -52,6 +52,7 @@ SCORING_WEIGHTS = {
 @dataclass
 class ProofBundle:
     """Explicit deterministic proof of a patch's viability before user presentation."""
+
     linter_clean: bool = False
     tests_passed: bool = False
     security_clean: bool = False
@@ -308,7 +309,7 @@ class Arbiter:
                         # Blend TesterAgent results with existing test score (60/40 weight)
                         tester_score = tester_result.pass_rate
                         test_score = (test_score * 0.6) + (tester_score * 0.4)
-                        logger.info(f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}")
+                        logger.info(f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}")  # noqa: E501
             except Exception as e:
                 logger.debug(f"TesterAgent invocation skipped: {e}")
             score.stage_scores["test_pass_rate"] = test_score
@@ -351,7 +352,7 @@ class Arbiter:
             confidence = 0.5
 
             # Linter check
-            linter_clean = bool(verification_result.lint_result and getattr(verification_result.lint_result, 'new_violations', 0) == 0)
+            linter_clean = bool(verification_result.lint_result and getattr(verification_result.lint_result, 'new_violations', 0) == 0)  # noqa: E501
             if linter_clean:
                 confidence += 0.2
 
@@ -383,10 +384,11 @@ class Arbiter:
             # Elimination based on Frontier Safety Rules
             if confidence < 0.85:
                 score.eliminated = True
-                score.elimination_reason = f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."
+                score.elimination_reason = f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."  # noqa: E501
                 # Push failure to reflection engine implicitly for next iterations
                 try:
                     import textual.app as _tapp
+
                     from src.core.reflection_engine import ReflectionEngine
                     _app = _tapp.active_app.get()
                     engine = ReflectionEngine(_app)
@@ -691,7 +693,7 @@ class Arbiter:
         memory: str,
     ) -> None:
         """Uses a lightning-fast LIGHT model to compare failures against known false-positives in memory."""
-        has_test_fails = verification.test_result and not verification.test_result.passed and verification.test_result.total > 0
+        has_test_fails = verification.test_result and not verification.test_result.passed and verification.test_result.total > 0  # noqa: E501
         has_sec_fails = len(security_findings) > 0
 
         if not (has_test_fails or has_sec_fails):
@@ -733,7 +735,7 @@ ARBITER MEMORY:
 TEST FAILURES: {verification.test_result.test_failures if verification.test_result else 'None'}
 SECURITY FINDINGS: {[f.message for f in security_findings]}
 
-If the memory explicitly states that these specific errors are false-positives or should be ignored, you must PARDON them.
+If memory says these errors are false-positives, you must PARDON them.
 Return strictly a JSON object:
 {{
     "pardon_tests": true/false,

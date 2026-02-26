@@ -25,6 +25,7 @@ logger = get_logger("core.blackboard")
 @dataclass
 class BlackboardEntry:
     """Single entry on the blackboard."""
+
     key: str
     value: Any
     author: str  # agent_id that wrote it

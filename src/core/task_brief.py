@@ -46,7 +46,7 @@ class TaskBrief:
     def to_system_context(self) -> str:
         """Convert to a system prompt fragment for injection."""
         parts = [
-            f"# Task Brief",
+            "# Task Brief",
             f"**Intent:** {self.intent} | **Complexity:** {self.complexity}/10",
             f"**Quality Tier:** {self.quality_tier}",
         ]

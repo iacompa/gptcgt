@@ -590,7 +590,6 @@ class CodeViewerPanel(Vertical):
         engine = PatchEngine()
         winner_name = "Unknown"
         loser_names = []
-        cost = 0.0
 
         if self.multi_patch_set:
             modified = engine.apply_multi_approved(self.multi_patch_set)
@@ -598,7 +597,7 @@ class CodeViewerPanel(Vertical):
             # ELO Recording
             try:
                 tracker = EloTracker()
-                winner_id = self.patch_set.model_id if hasattr(self.patch_set, "model_id") else self.patch_set.model_name
+                winner_id = self.patch_set.model_id if hasattr(self.patch_set, "model_id") else self.patch_set.model_name  # noqa: E501
                 winner_name = self.patch_set.model_name
 
                 loser_ids = []
@@ -613,7 +612,7 @@ class CodeViewerPanel(Vertical):
                     loser_ids=loser_ids,
                     complexity=len(modified),
                     duration_sec=getattr(self.patch_set, "generation_time", 5.0),
-                    costs={ps.model_id if hasattr(ps, "model_id") else ps.model_name: getattr(ps, "cost", 0.05) for ps in self.multi_patch_set.patch_sets}
+                    costs={ps.model_id if hasattr(ps, "model_id") else ps.model_name: getattr(ps, "cost", 0.05) for ps in self.multi_patch_set.patch_sets}  # noqa: E501
                 )
             except Exception as e:
                 logger.debug(f"ELO recording failed: {e}")

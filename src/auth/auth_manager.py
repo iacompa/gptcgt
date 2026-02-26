@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class AuthManager:
-    """Manages authentication state, token refresh, and user profile.
+    """
+    Manages authentication state, token refresh, and user profile.
 
     Token validation is intentionally lazy: __init__ trusts any stored token
     for instant startup, then validate_token_on_startup() should be awaited
@@ -33,7 +34,8 @@ class AuthManager:
             self._is_authenticated = True
 
     async def validate_token_on_startup(self) -> None:
-        """Async background validation: probes server to confirm token is live.
+        """
+        Async background validation: probes server to confirm token is live.
 
         - 200 OK  → profile cached, _is_authenticated = True
         - 401     → auto-refresh attempted, logout if refresh also fails

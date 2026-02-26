@@ -207,7 +207,9 @@ class OnboardingScreen(ModalScreen):
 
     async def _validate_key(self, var_name: str, key_val: str, stat_label: Label) -> None:
         try:
-            from src.auth.key_validator import KeyValidator  # Lazy: only loaded when user validates a key
+            from src.auth.key_validator import (
+                KeyValidator,  # Lazy: only loaded when user validates a key
+            )
             is_valid, msg = await KeyValidator.validate(var_name, key_val)
 
             if is_valid:

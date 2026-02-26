@@ -30,11 +30,17 @@ async def lifespan(app: FastAPI):
 
         sys.exit(1)
 
-    # Securely inject server keys
+    # Securely inject server keys for all supported providers
     if services.llm_keys.anthropic:
         os.environ["ANTHROPIC_API_KEY"] = services.llm_keys.anthropic
     if services.llm_keys.openai:
         os.environ["OPENAI_API_KEY"] = services.llm_keys.openai
+    if getattr(services.llm_keys, "google", None):
+        os.environ["GEMINI_API_KEY"] = services.llm_keys.google
+    if getattr(services.llm_keys, "mistral", None):
+        os.environ["MISTRAL_API_KEY"] = services.llm_keys.mistral
+    if getattr(services.llm_keys, "groq", None):
+        os.environ["GROQ_API_KEY"] = services.llm_keys.groq
 
     # Startup actions
     await init_db_pool()

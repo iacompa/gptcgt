@@ -277,11 +277,11 @@ class ModelRegistry:
         # Enforce openrouter/ prefix for litellm
         if not model_id.startswith("openrouter/"):
             model_id = f"openrouter/{model_id}"
-            
+
         in_cost = 0.0
         out_cost = 0.0
         max_context = 128000
-        
+
         if openrouter_data:
             search_id = model_id.replace("openrouter/", "")
             for m in openrouter_data:
@@ -296,10 +296,10 @@ class ModelRegistry:
                     if not name:
                         name = m.get("name", search_id)
                     break
-                    
+
         if not name:
             name = model_id.split("/")[-1].replace("-", " ").title()
-            
+
         model = ModelDefinition(
             id=model_id,
             name=name,

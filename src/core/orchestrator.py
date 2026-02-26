@@ -68,6 +68,7 @@ class Orchestrator:
                     )
                     try:
                         import textual.app as _tapp
+
                         from src.core.events import FileRelevanceUpdated
 
                         _tapp.active_app.get().post_message(
@@ -100,8 +101,8 @@ class Orchestrator:
                 pcg.generate_and_save()
 
             # 5.5. Create TaskBrief and populate Blackboard
-            from src.core.task_brief import TaskBrief
             from src.core.blackboard import AgentBlackboard
+            from src.core.task_brief import TaskBrief
             task_brief = TaskBrief(
                 intent=analysis["intent"],
                 complexity=analysis.get("complexity", 5),
@@ -151,6 +152,7 @@ class Orchestrator:
                 reflection_hint: str | None = None
                 try:
                     import textual.app as _tapp
+
                     from src.tui.panels.chat import ChatPanel
                     _chat = _tapp.active_app.get().query_one(ChatPanel)
                     if _chat._pending_reflection_hint:
@@ -234,6 +236,8 @@ class Orchestrator:
                 )
 
 
+                import textual.app as _tapp
+
                 from src.core.arbiter import Arbiter
                 from src.core.events import (
                     ArbiterVerdictReady,
@@ -249,8 +253,6 @@ class Orchestrator:
                 from src.core.workspace import Workspace
                 from src.tools.lsp import LSPClient
                 from src.tools.sandbox import E2BSandbox
-
-                import textual.app as _tapp
                 _tui_app = _tapp.active_app.get()
                 sandbox = E2BSandbox()
                 ws = Workspace.get_instance()
