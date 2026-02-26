@@ -42,6 +42,10 @@ class GptcgtApp(App[None]):
     CSS = """
     Screen {
         scrollbar-size: 1 1;
+        scrollbar-background: transparent;
+        scrollbar-color: $surface-light;
+        scrollbar-color-hover: $primary-muted;
+        scrollbar-color-active: $primary;
     }
     """
 

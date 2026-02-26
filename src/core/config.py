@@ -37,6 +37,9 @@ class UserConfig:
     coder_model: str = ""
     orchestrator_model: str = ""
     arbiter_model: str = ""
+    architect_model: str = ""
+    scout_model: str = ""
+    tester_model: str = ""
 
     # Privacy
     telemetry_enabled: bool = False
