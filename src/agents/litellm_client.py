@@ -35,6 +35,7 @@ class LiteLLMClient:
         timeout: float = 300.0,
         api_key: str | None = None,
         base_url: str | None = None,
+        extra_headers: dict | None = None,
     ) -> AsyncGenerator[AgentResponse, None]:
         """
         Stream a completion from litellm.
@@ -78,6 +79,9 @@ class LiteLLMClient:
 
         if base_url:
             kwargs["api_base"] = base_url
+
+        if extra_headers:
+            kwargs["extra_headers"] = extra_headers
 
         logger.debug(
             f"Calling litellm.acompletion for model {model} (messages: {len(request_messages)})"
