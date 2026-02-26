@@ -12,25 +12,23 @@ class PanelResizer(Widget):
     PanelResizer {
         width: 1;
         height: 100%;
-        background: $secondary;
-        color: $text-muted;
+        background: transparent;
+        color: $surface-light;
         content-align: center middle;
     }
 
     PanelResizer:hover {
-        background: $primary;
-        color: #FFFFFF;
+        color: $primary;
     }
 
     PanelResizer.-dragging {
-        background: $primary;
-        color: #FFFFFF;
+        color: $primary;
     }
     """
 
     def render(self) -> str:
-        # A simple vertical grip pattern
-        return "⋮\n" * (self.size.height // 2)
+        # A simple thin vertical line pattern
+        return "│\n" * self.size.height
 
     def __init__(self, left_panel_id: str, right_panel_id: str, **kwargs) -> None:
         super().__init__(**kwargs)
