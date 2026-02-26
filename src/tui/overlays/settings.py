@@ -243,6 +243,16 @@ class SettingsScreen(ModalScreen):
         current_tier = getattr(self.app.config.user, "quality_tier", "standard")
         yield Select(tier_opts, value=current_tier, id="settings-tier")
 
+        yield Label("\nDynamic OpenRouter Models", classes="section-label")
+        yield Label(
+            "Add custom OpenRouter models (e.g., 'meta-llama/llama-3.3-70b-instruct').",
+            classes="hint-text",
+        )
+        with Horizontal(classes="provider-row"):
+            yield Input(placeholder="Model ID", id="settings-add-openrouter-input", classes="provider-input")
+            yield Button("Add Model", id="btn-add-openrouter", variant="primary", classes="provider-validate-btn")
+        yield Label("", id="openrouter-status-msg", classes="hint-text")
+
     def _compose_appearance_tab(self):
         yield Label("Theme:")
         theme = self.app.config.user.theme
@@ -343,6 +353,14 @@ class SettingsScreen(ModalScreen):
                 return
             stat.update("🔄 Testing...")
             self.app.run_worker(self._validate_key_live(var_name, key_val, stat))
+        elif event.button.id == "btn-add-openrouter":
+            inp = self.query_one("#settings-add-openrouter-input", Input)
+            val = inp.value.strip()
+            if not val:
+                return
+            lbl = self.query_one("#openrouter-status-msg", Label)
+            lbl.update("🔄 Fetching pricing data...")
+            self.app.run_worker(self._fetch_and_add_openrouter_model(val))
         elif event.button.id == "btn-receipts":
             from src.tui.overlays.receipt import ReceiptOverlay
             try:
@@ -359,6 +377,26 @@ class SettingsScreen(ModalScreen):
         elif event.button.id == "btn-issues":
             import webbrowser
             webbrowser.open("https://github.com/your/repo/issues")
+
+    async def _fetch_and_add_openrouter_model(self, model_id: str) -> None:
+        from src.core.model_registry import ModelRegistry, QualityTier
+        registry = ModelRegistry()
+        data = await registry.fetch_openrouter_models()
+        registry.register_custom_openrouter_model(model_id, "", QualityTier.STANDARD, openrouter_data=data)
+        
+        # Save to config
+        active_models = getattr(self.app.config.user, "openrouter_active_models", [])
+        safe_id = model_id if model_id.startswith("openrouter/") else f"openrouter/{model_id}"
+        if safe_id not in active_models:
+            active_models.append(safe_id)
+            self.app.config.set_user("openrouter_active_models", active_models)
+        
+        try:
+            lbl = self.query_one("#openrouter-status-msg", Label)
+            lbl.update(f"✅ Added {safe_id} successfully.")
+            self.query_one("#settings-add-openrouter-input", Input).value = ""
+        except Exception:
+            pass
 
     async def _validate_key_live(
         self, var_name: str, key_val: str, stat_label: Label

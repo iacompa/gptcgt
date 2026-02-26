@@ -195,6 +195,20 @@ class GptcgtApp(App[None]):
         except Exception:
             pass
 
+    async def _init_openrouter_models(self, active_models: list[str]) -> None:
+        """Fetch pricing and definitions for user-saved OpenRouter models."""
+        try:
+            from src.core.model_registry import ModelRegistry, QualityTier
+            registry = ModelRegistry()
+            data = await registry.fetch_openrouter_models()
+            for model_id in active_models:
+                registry.register_custom_openrouter_model(
+                    model_id, "", QualityTier.STANDARD, openrouter_data=data
+                )
+            logger.info(f"Loaded {len(active_models)} custom OpenRouter models from config.")
+        except Exception as e:
+            logger.warning(f"Failed to init background OpenRouter models: {e}")
+
     async def on_ready(self) -> None:
         """Initialize workspace and chat history on ready."""
         try:
@@ -223,6 +237,16 @@ class GptcgtApp(App[None]):
                     exclusive=False,
                 )
             )
+
+            # Load stored OpenRouter custom models asynchronously
+            def _load_openrouter_models():
+                try:
+                    active_ors = getattr(self.config.user, "openrouter_active_models", [])
+                    if active_ors:
+                        self.run_worker(self._init_openrouter_models(active_ors), exclusive=False)
+                except Exception:
+                    pass
+            self.call_after_refresh(_load_openrouter_models)
 
             self._register_themes()
             self._active_theme_name = self.config.user.theme
