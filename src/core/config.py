@@ -40,6 +40,7 @@ class UserConfig:
     architect_model: str = ""
     scout_model: str = ""
     tester_model: str = ""
+    openrouter_active_models: list[str] = field(default_factory=list)
 
     # Privacy
     telemetry_enabled: bool = False

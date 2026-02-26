@@ -28,6 +28,10 @@ class OpenRouterAgent(BaseAgent):
             "timeout": self.config.timeout,
             "api_key": api_key,
             "base_url": self.config.base_url,
+            "extra_headers": {
+                "HTTP-Referer": "https://gptcgt.ai",
+                "X-Title": "gptcgt Terminal IDE",
+            }
         }
 
         if self.config.max_tokens:
