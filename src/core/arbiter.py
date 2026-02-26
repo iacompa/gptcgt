@@ -368,8 +368,17 @@ class Arbiter:
                 score.elimination_reason = f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."
                 # Push failure to reflection engine implicitly for next iterations
                 try:
+                    import textual.app as _tapp
                     from src.core.reflection_engine import ReflectionEngine
-                    ReflectionEngine.log_failure(slot.patch_set, score.elimination_reason)
+                    _app = _tapp.active_app.get()
+                    engine = ReflectionEngine(_app)
+                    engine.reflect_on_friction(
+                        model_name=slot.model.name,
+                        trigger_event="arbiter_elimination",
+                        original_prompt="",
+                        agent_output=slot.response_text[:500],
+                        failure_reason=score.elimination_reason,
+                    )
                 except Exception:
                     pass
 
@@ -704,7 +713,7 @@ ARBITER MEMORY:
 {memory}
 
 TEST FAILURES: {verification.test_result.test_failures if verification.test_result else 'None'}
-SECURITY FINDINGS: {[f.description for f in security_findings]}
+SECURITY FINDINGS: {[f.message for f in security_findings]}
 
 If the memory explicitly states that these specific errors are false-positives or should be ignored, you must PARDON them.
 Return strictly a JSON object:

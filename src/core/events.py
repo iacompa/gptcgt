@@ -143,6 +143,7 @@ class AgentDispatched(Message):
     def __init__(self, agent_name: str, model_name: str, input_tokens: int = 0) -> None:
         super().__init__()
         self.agent_name = agent_name
+        self.agent_id = agent_name  # Alias for ActiveAgentsBar compatibility
         self.model_name = model_name
         self.input_tokens = input_tokens
 
