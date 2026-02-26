@@ -531,18 +531,25 @@ class ChatPipeline:
             if should_verify:
                 ws = Workspace.get_instance()
                 verdict = await sandbox.verify_patch(patch_set, ws.get_project_root(), "python")
-                if not verdict.tests_passed and verdict.test_failures:
+                has_failures = (
+                    verdict.test_result
+                    and not verdict.test_result.all_passed
+                    and verdict.test_result.failures
+                )
+                if has_failures:
                     healing_attempts += 1
                     if yield_chunk_callback:
                         await yield_chunk_callback(
                             "\n\n[Tests Failed] 🔄 Self-healing retry initiated...\n"
                         )
+                    first_failure = verdict.test_result.failures[0]
+                    failure_msg = first_failure.get("message", str(first_failure))
                     messages.append({"role": "assistant", "content": full_response})
                     messages.append({
                         "role": "user",
                         "content": (
                             f"The test sandbox failed with the following errors upon running your code. "
-                            f"Please fix them:\n{verdict.test_failures[0]}\nGenerate the corrected code."
+                            f"Please fix them:\n{failure_msg}\nGenerate the corrected code."
                         ),
                     })
                     return True, "", healing_attempts
