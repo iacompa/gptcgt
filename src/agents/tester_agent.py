@@ -83,16 +83,37 @@ class TesterAgent:
 
         # 2. Run tests in sandbox
         try:
+            from pathlib import Path as PathLib
+
+            from src.core.diff_engine import FilePatch, PatchSet
             from src.tools.sandbox import E2BSandbox
+
             sandbox = E2BSandbox()
-            verification = await sandbox.run_test(
+            # Build a minimal PatchSet containing the generated test file
+            test_patch = FilePatch(
+                file_path=f"tests/test_generated_{hash(test_code) % 10000}.py",
+                original_content="",
+                hunks=[],
+            )
+            test_patch_set = PatchSet(
+                patches=[test_patch],
+                agent_id="tester_agent",
+                model_name="tester",
+                raw_response=test_code,
+            )
+            verification = await sandbox.verify_patch(
+                test_patch_set,
+                PathLib(project_root),
+                language,
                 test_command=test_command,
-                project_root=project_root,
             )
             if verification and verification.test_result:
-                result.passed = verification.test_result.tests_passed
-                result.failed = verification.test_result.tests_failed
-                result.failure_details = verification.test_result.test_failures or []
+                result.passed = verification.test_result.passed
+                result.failed = verification.test_result.failed
+                result.failure_details = [
+                    f.get("message", str(f))
+                    for f in (verification.test_result.failures or [])
+                ]
         except Exception as e:
             logger.error(f"TesterAgent sandbox execution failed: {e}")
             result.errors = 1

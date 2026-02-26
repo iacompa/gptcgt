@@ -492,8 +492,23 @@ class GptcgtApp(App[None]):
             notify(self, "LLM Error", msg, "error")
 
         file_dicts = []
+        try:
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
+            project_root = ws.get_project_root().resolve()
+        except Exception:
+            project_root = None
+
         for f in attached_files:
             try:
+                # Security: validate file is within project root
+                if project_root:
+                    resolved = f.resolve()
+                    try:
+                        resolved.relative_to(project_root)
+                    except ValueError:
+                        logger.warning(f"Attached file rejected (outside workspace): {f}")
+                        continue
                 content = f.read_text()
                 file_dicts.append({"path": str(f), "content": content})
             except Exception as e:
