@@ -114,12 +114,21 @@ class ContextManager:
 
         # 2. Add Attachments to the new user message
         # Format: "\n\n--- Filed Attached: {path} ---\n{content}"
+        MAX_TOKENS_PER_FILE = 2000  # Hard cap per file to prevent single-file context flood
         attachments_text = ""
         truncated_files: list[str] = []
         if attached_files:
             for f in attached_files:
                 f_text = f"\n\n--- File Attached: {f['path']} ---\n{f['content']}\n"
                 f_tokens = self.count_tokens(f_text)
+                # Per-file hard cap
+                if f_tokens > MAX_TOKENS_PER_FILE:
+                    char_limit = MAX_TOKENS_PER_FILE * 3
+                    trunc_msg = f"\n...[TRUNCATED: {f_tokens} tokens exceeded {MAX_TOKENS_PER_FILE} cap]...\n"
+                    f_text = f_text[:char_limit] + trunc_msg
+                    f_tokens = self.count_tokens(f_text)
+                    truncated_files.append(f["path"])
+                    logger.info(f"Per-file cap: {f['path']} truncated to {MAX_TOKENS_PER_FILE} tokens")
                 if f_tokens <= remaining_budget:
                     attachments_text += f_text
                     remaining_budget -= f_tokens
