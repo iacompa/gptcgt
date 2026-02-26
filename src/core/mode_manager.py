@@ -65,8 +65,9 @@ class ModeManager:
         logger.info(f"Operation mode explicitly set to: {mode.name}")
 
     def initialize_task(self, _requested_tier: QualityTier) -> None:
-        """Sets up the mode for a new task. Checks budget constraints.
-        
+        """
+        Sets up the mode for a new task. Checks budget constraints.
+
         IMPORTANT: Only applies the STANDARD fallback if the mode was not
         already explicitly set by the user (e.g., ENSEMBLE, BATTLE, ARCHITECT).
         This prevents every task dispatch from silently overriding the user's

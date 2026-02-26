@@ -23,11 +23,11 @@ class LeaderboardPanel(Vertical):
         display: none;
     }
 
-    
+
     LeaderboardPanel.visible {
         display: block;
     }
-    
+
     LeaderboardPanel > Static#leaderboard-title {
         content-align: center middle;
         text-style: bold;

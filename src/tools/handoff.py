@@ -27,7 +27,7 @@ class DelegateToAgentTool:
         "properties": {
             "target_agent_id": {
                 "type": "string",
-                "description": "The explicit LiteLLM model string to spin up (e.g. 'openai/o3-mini', 'anthropic/claude-3-5-sonnet-20241022').",
+                "description": "The explicit LiteLLM model string to spin up (e.g. 'openai/o3-mini', 'anthropic/claude-3-5-sonnet-20241022').",  # noqa: E501
             },
             "instruction": {
                 "type": "string",
@@ -36,7 +36,7 @@ class DelegateToAgentTool:
             "action": {
                 "type": "string",
                 "enum": ["delegate", "consult"],
-                "description": "Whether to 'consult' (wait for the answer and resume) or 'delegate' (hand it off and exit).",
+                "description": "Whether to 'consult' (wait for the answer and resume) or 'delegate' (hand it off and exit).",  # noqa: E501
             },
             "attached_files": {
                 "type": "array",

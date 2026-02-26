@@ -213,7 +213,7 @@ class FileTreePanel(Vertical):
                     MenuItem(f"🐍 Explain '{file_name}'", action=f"ai_explain_file|{clicked_path}"),
                     MenuItem(f"🐛 Find Bugs in '{file_name}'", action=f"ai_bugs_file|{clicked_path}"),
                     MenuItem(f"🧪 Write Tests for '{file_name}'", action=f"ai_tests_file|{clicked_path}"),
-                    MenuItem(f"📎 Add to Chat Context", action=f"tree_add_context|{clicked_path}"),
+                    MenuItem("📎 Add to Chat Context", action=f"tree_add_context|{clicked_path}"),
                     MenuItem(is_separator=True),
                     MenuItem("Copy Relative Path", action="tree_copy_path"),
                     MenuItem("Reveal in Finder", action="tree_reveal"),
@@ -254,9 +254,9 @@ class FileTreePanel(Vertical):
                     TaskReceived(task_str=prompts[cmd], attached_files=[file_path])
                 )
         elif action == "ai_explain_project":
-            self.app.post_message(TaskReceived(task_str="Explain what this project does and its overall architecture.", attached_files=[]))
+            self.app.post_message(TaskReceived(task_str="Explain what this project does and its overall architecture.", attached_files=[]))  # noqa: E501
         elif action == "ai_bugs_project":
-            self.app.post_message(TaskReceived(task_str="Scan the codebase for bugs, security issues, and code smells.", attached_files=[]))
+            self.app.post_message(TaskReceived(task_str="Scan the codebase for bugs, security issues, and code smells.", attached_files=[]))  # noqa: E501
 
     @on(FileRelevanceUpdated)
     def highlight_relevant_files(self, event: FileRelevanceUpdated) -> None:

@@ -1,4 +1,5 @@
-"""Secure OS native keychain storage for API keys.
+"""
+Secure OS native keychain storage for API keys.
 
 Cross-platform: Uses OS native keychain on macOS (Keychain.app),
 Windows (Credential Manager), and Linux with D-Bus/GNOME Keyring.
@@ -41,7 +42,8 @@ def _check_keyring() -> bool:
 
 
 class KeyChainManager:
-    """Manages secure storage of API keys using the OS native keychain.
+    """
+    Manages secure storage of API keys using the OS native keychain.
 
     On headless Linux (CI, Docker, bare servers), falls back to environment
     variables automatically so BYOK users can set: export OPENAI_API_KEY=...

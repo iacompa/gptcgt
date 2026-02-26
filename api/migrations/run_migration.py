@@ -30,13 +30,13 @@ async def run_migration():
     print("Connecting to database...")
     try:
         conn = await asyncpg.connect(DATABASE_URL)
-        
+
         for migration in migrations:
             schema_path = Path(__file__).parent / migration
             if not schema_path.exists():
                 print(f"Warning: Schema file not found at {schema_path}, skipping...")
                 continue
-                
+
             sql = schema_path.read_text()
             print(f"Applying schema {migration}...")
             await conn.execute(sql)

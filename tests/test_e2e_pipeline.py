@@ -18,7 +18,6 @@ import pytest
 from src.core.chat_pipeline import ChatPipeline
 from src.core.chat_store import ChatStore
 
-
 # ------------------------------------------------------------------ #
 # Fake LLM chunk helpers                                               #
 # ------------------------------------------------------------------ #
