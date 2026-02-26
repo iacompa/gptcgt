@@ -213,6 +213,27 @@ class SettingsScreen(ModalScreen):
             id="settings-arbiter"
         )
 
+        yield Label("Architect (Planning) Model:")
+        yield Input(
+            value=getattr(c, "architect_model", ""),
+            placeholder="e.g. anthropic/claude-3-7-sonnet-20250219",
+            id="settings-architect"
+        )
+
+        yield Label("Scout (Exploration) Model:")
+        yield Input(
+            value=getattr(c, "scout_model", ""),
+            placeholder="e.g. openai/o3-mini",
+            id="settings-scout"
+        )
+
+        yield Label("Tester (QA) Model:")
+        yield Input(
+            value=getattr(c, "tester_model", ""),
+            placeholder="e.g. google/gemini-2.5-pro",
+            id="settings-tester"
+        )
+
         yield Label("\nFallback Quality Tier (when model fields above are blank):")
         tier_opts = [
             ("💡 Light — Fast & cheap (~$0.01/task)", "light"),
@@ -406,6 +427,12 @@ class SettingsScreen(ModalScreen):
             self.app.config.set_user("coder_model", coder.strip())
             arbiter = self.query_one("#settings-arbiter", Input).value
             self.app.config.set_user("arbiter_model", arbiter.strip())
+            architect = self.query_one("#settings-architect", Input).value
+            self.app.config.set_user("architect_model", architect.strip())
+            scout = self.query_one("#settings-scout", Input).value
+            self.app.config.set_user("scout_model", scout.strip())
+            tester = self.query_one("#settings-tester", Input).value
+            self.app.config.set_user("tester_model", tester.strip())
         except Exception:
             pass
 
