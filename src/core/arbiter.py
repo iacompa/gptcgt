@@ -440,6 +440,44 @@ class Arbiter:
         total_ms = int((time.time() - eval_start) * 1000)
         verdict = self._produce_verdict(dispatch.dispatch_id, scores, total_ms)
 
+        # ═══════════════════════════════════════════════════
+        # ELO FEEDBACK: Push results to EloTracker + Router
+        # ═══════════════════════════════════════════════════
+        try:
+            from src.core.elo_tracker import EloTracker
+            from src.core.router import CodingRouter
+
+            if verdict.winner:
+                winner_id = verdict.winner.model_id
+                loser_ids = [
+                    s.model_id for s in scores
+                    if s.model_id != winner_id and not s.eliminated
+                ]
+                costs = {s.model_id: s.cost_usd for s in scores}
+
+                elo = EloTracker()
+                elo.record_match(
+                    winner_id=winner_id,
+                    loser_ids=loser_ids,
+                    complexity=dispatch.slots[0].model.max_context_tokens // 10000 if dispatch.slots else 5,
+                    duration_sec=total_ms / 1000.0,
+                    costs=costs,
+                )
+
+                router = CodingRouter()
+                for s in scores:
+                    router.record_outcome(
+                        task_id=dispatch.dispatch_id,
+                        model_id=s.model_id,
+                        intent="edit",
+                        complexity=5,
+                        success=(s.model_id == winner_id),
+                        error_message=s.elimination_reason if s.eliminated else None,
+                    )
+                logger.info(f"ELO feedback pushed: winner={winner_id}, losers={loser_ids}")
+        except Exception as e:
+            logger.debug(f"ELO feedback push failed (non-critical): {e}")
+
         if on_progress:
             await on_progress("verdict", "", verdict.comparison_summary)
 
