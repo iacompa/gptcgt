@@ -34,6 +34,9 @@ ROLE_TO_LITELLM = {
 
 
 MAX_DELEGATION_DEPTH = 3
+MAX_DELEGATION_TOKENS = 50000
+MAX_DELEGATION_COST_USD = 0.50
+MAX_DELEGATION_WALL_CLOCK_SEC = 120
 
 
 class ChatPipeline:
@@ -362,6 +365,18 @@ class ChatPipeline:
                 await error_callback(f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted.")
             return full_response, False
 
+        # Multi-budget guard: check accumulated cost and tokens
+        if self.cost_tracker:
+            try:
+                accumulated = self.cost_tracker.get_daily_total()
+                if accumulated >= MAX_DELEGATION_COST_USD:
+                    logger.warning(f"Delegation cost cap reached: ${accumulated:.4f} >= ${MAX_DELEGATION_COST_USD}")
+                    if error_callback:
+                        await error_callback(f"Delegation cost limit (${MAX_DELEGATION_COST_USD:.2f}) reached.")
+                    return full_response, False
+            except Exception:
+                pass
+
         # P0 Fix: Read file content so ContextManager gets {"path": ..., "content": ...}
         attached_files_with_content = None
         if files:
@@ -457,6 +472,26 @@ class ChatPipeline:
                 _tapp.active_app.get().post_message(PatchSetProposed(patch_set=patch_set))
             except Exception as e:
                 logger.debug(f"Could not post PatchSetProposed: {e}")
+
+        # Proactive success logging: record routing + cost for learning
+        try:
+            import textual.app as _tapp
+            _app = _tapp.active_app.get()
+            from src.core.reflection_engine import ReflectionEngine
+            engine = ReflectionEngine(_app)
+            cost = registry.calculate_cost(
+                model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"]
+            )
+            engine.log_success(
+                model_name=model_def.name,
+                model_id=model_def.id,
+                tier=self.default_tier.value,
+                cost_usd=cost,
+                input_tokens=total_usage["prompt_tokens"],
+                output_tokens=total_usage["completion_tokens"],
+            )
+        except Exception as e:
+            logger.debug(f"Proactive logging skipped: {e}")
 
     async def _handle_self_healing(
         self,
