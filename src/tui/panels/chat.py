@@ -645,7 +645,20 @@ class ChatPanel(Vertical):
         files = re.findall(r"@([a-zA-Z0-9_\-\./]+)", text)
         clean_text = re.sub(r"@[a-zA-Z0-9_\-\./]+", "", text).strip()
 
-        file_paths = [Path(f) for f in files]
+        # Security: validate @file paths against workspace root
+        file_paths = []
+        try:
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
+            project_root = ws.get_project_root()
+            for f in files:
+                resolved = (project_root / f).resolve()
+                if str(resolved).startswith(str(project_root)):
+                    file_paths.append(Path(f))
+                else:
+                    logger.warning(f"@file path rejected (outside workspace): {f}")
+        except Exception:
+            file_paths = [Path(f) for f in files]
 
         # Include context from chips
         for ctx in self.context_chips.get_context_summary():

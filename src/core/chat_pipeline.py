@@ -368,7 +368,8 @@ class ChatPipeline:
         # Multi-budget guard: check accumulated cost and tokens
         if self.cost_tracker:
             try:
-                accumulated = self.cost_tracker.get_daily_total()
+                today = self.cost_tracker.get_today_spend()
+                accumulated = today.total_cost
                 if accumulated >= MAX_DELEGATION_COST_USD:
                     logger.warning(f"Delegation cost cap reached: ${accumulated:.4f} >= ${MAX_DELEGATION_COST_USD}")
                     if error_callback:
@@ -398,20 +399,32 @@ class ChatPipeline:
 
         async def sub_chunk_catcher(text: str, _chunks: list = child_response_chunks):
             _chunks.append(text)
+            # Enforce token cap: estimate tokens from accumulated text
+            total_chars = sum(len(c) for c in _chunks)
+            if total_chars // 4 > MAX_DELEGATION_TOKENS:
+                raise RuntimeError(f"Delegation token cap ({MAX_DELEGATION_TOKENS}) exceeded.")
+            # Enforce wall-clock cap
+            if time.monotonic() - start_handoff > MAX_DELEGATION_WALL_CLOCK_SEC:
+                raise RuntimeError(f"Delegation wall-clock cap ({MAX_DELEGATION_WALL_CLOCK_SEC}s) exceeded.")
             if yield_chunk_callback:
                 await yield_chunk_callback(text)
 
-        await sub_pipeline.process_message(
-            user_text=instruction,
-            attached_files=attached_files_with_content,
-            model_id_override=target_id,
-            yield_chunk_callback=sub_chunk_catcher,
-            tool_call_callback=tool_call_callback,
-            thought_callback=thought_callback,
-            error_callback=error_callback,
-            cancel_event=cancel_event,
-            complexity=self.complexity,
-        )
+        try:
+            await sub_pipeline.process_message(
+                user_text=instruction,
+                attached_files=attached_files_with_content,
+                model_id_override=target_id,
+                yield_chunk_callback=sub_chunk_catcher,
+                tool_call_callback=tool_call_callback,
+                thought_callback=thought_callback,
+                error_callback=error_callback,
+                cancel_event=cancel_event,
+                complexity=self.complexity,
+            )
+        except RuntimeError as budget_err:
+            logger.warning(f"Delegation budget exceeded: {budget_err}")
+            if error_callback:
+                await error_callback(str(budget_err))
 
         child_full_text = "".join(child_response_chunks)
         elapsed = time.monotonic() - start_handoff

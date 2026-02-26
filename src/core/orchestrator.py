@@ -192,6 +192,41 @@ class Orchestrator:
                     complexity=analysis.get("complexity", 5),
                     reflection_hint=reflection_hint,
                 )
+
+                # Mid-task model escalation: detect confusion → auto-retry with MAX
+                confusion_signals = [
+                    "I'm not sure", "I don't know", "I cannot determine",
+                    "I'm unable to", "beyond my capabilities",
+                ]
+                is_confused = (
+                    len(response_text.strip()) < 50
+                    or any(sig.lower() in response_text.lower() for sig in confusion_signals)
+                )
+                if is_confused and global_tier != QualityTier.MAX:
+                    try:
+                        max_model = self.router.route_task(
+                            analysis["intent"], 10, QualityTier.MAX, role="coder"
+                        )
+                        if max_model.id != selected_model.id:
+                            await narration_callback(
+                                f"⚡ Escalating to {max_model.name} (confusion detected)", "routing"
+                            )
+                            escalation_pipeline = ChatPipeline(self.chat_store, QualityTier.MAX)
+                            await escalation_pipeline.process_message(
+                                user_text=user_input,
+                                attached_files=merged_files if merged_files else None,
+                                model_id_override=max_model.id,
+                                yield_chunk_callback=yield_chunk_callback,
+                                tool_call_callback=tool_call_callback,
+                                thought_callback=thought_callback,
+                                error_callback=error_callback,
+                                cancel_event=cancel_event,
+                                complexity=10,
+                                reflection_hint=reflection_hint,
+                            )
+                    except Exception as esc_err:
+                        logger.debug(f"Escalation skipped: {esc_err}")
+
                 self._extract_annotations_from_response(response_text)
             else:
                 await narration_callback(
