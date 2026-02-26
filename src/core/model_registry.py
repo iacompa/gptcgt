@@ -259,5 +259,61 @@ class ModelRegistry:
     def register_custom_model(self, model_def: ModelDefinition) -> None:
         self._models[model_def.id] = model_def
 
+    async def fetch_openrouter_models(self) -> list[dict]:
+        """Fetch real-time model list and pricing from OpenRouter."""
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get("https://openrouter.ai/api/v1/models")
+                response.raise_for_status()
+                data = response.json().get("data", [])
+                return data
+        except Exception as e:
+            logger.warning(f"Failed to fetch OpenRouter models: {e}")
+            return []
+
+    def register_custom_openrouter_model(self, model_id: str, name: str, tier: QualityTier, openrouter_data: list[dict] | None = None) -> None:
+        """Register a dynamic OpenRouter model from API data."""
+        # Enforce openrouter/ prefix for litellm
+        if not model_id.startswith("openrouter/"):
+            model_id = f"openrouter/{model_id}"
+            
+        in_cost = 0.0
+        out_cost = 0.0
+        max_context = 128000
+        
+        if openrouter_data:
+            search_id = model_id.replace("openrouter/", "")
+            for m in openrouter_data:
+                if m.get("id") == search_id:
+                    pricing = m.get("pricing", {})
+                    try:
+                        in_cost = float(pricing.get("prompt", 0)) * 1_000_000
+                        out_cost = float(pricing.get("completion", 0)) * 1_000_000
+                    except (ValueError, TypeError):
+                        pass
+                    max_context = m.get("context_length", max_context)
+                    if not name:
+                        name = m.get("name", search_id)
+                    break
+                    
+        if not name:
+            name = model_id.split("/")[-1].replace("-", " ").title()
+            
+        model = ModelDefinition(
+            id=model_id,
+            name=name,
+            provider=Provider.OPENROUTER,
+            input_cost_per_mtok=in_cost,
+            output_cost_per_mtok=out_cost,
+            max_context_tokens=max_context,
+            max_output_tokens=8192,
+            quality_tiers=[tier.value],
+            display_color="#3B82F6",
+            display_emoji="🐋"
+        )
+        self._models[model_id] = model
+        logger.info(f"Registered dynamic OpenRouter model: {model_id} (${in_cost:.2f} / ${out_cost:.2f})")
+
     def get_all(self) -> list[ModelDefinition]:
         return list(self._models.values())
