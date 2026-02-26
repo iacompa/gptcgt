@@ -240,7 +240,7 @@ class SettingsScreen(ModalScreen):
             ("⚡ Standard — Balanced (~$0.04/task)", "standard"),
             ("🔥 Max — Best quality (~$0.12/task)", "max"),
         ]
-        current_tier = getattr(self.app.config.user, "quality_tier", "standard")
+        current_tier = getattr(self.app.config.user, "default_quality_tier", "standard")
         yield Select(tier_opts, value=current_tier, id="settings-tier")
 
         yield Label("\nDynamic OpenRouter Models", classes="section-label")
@@ -477,7 +477,7 @@ class SettingsScreen(ModalScreen):
         try:
             tier = self.query_one("#settings-tier", Select).value
             if tier:
-                self.app.config.set_user("quality_tier", tier)
+                self.app.config.set_user("default_quality_tier", tier)
         except Exception:
             pass
 

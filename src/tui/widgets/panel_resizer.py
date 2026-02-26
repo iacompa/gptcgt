@@ -13,7 +13,7 @@ class PanelResizer(Widget):
         width: 1;
         height: 100%;
         background: transparent;
-        color: $surface-light;
+        color: $surface;
         content-align: center middle;
     }
 
