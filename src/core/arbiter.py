@@ -299,7 +299,6 @@ class Arbiter:
                 tester = TesterAgent()
                 diff_text = slot.response_text[:5000] if slot.response_text else ""
                 if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
-                    import asyncio
                     tester_result = await tester.generate_and_run_tests(
                         diff_text=diff_text,
                         language="python",

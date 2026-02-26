@@ -100,6 +100,16 @@ class SystemPromptBuilder:
         except Exception:
             pass
 
+        # 4.7. Agent Blackboard (shared inter-agent state)
+        try:
+            from src.core.blackboard import AgentBlackboard
+            bb = AgentBlackboard.get_instance()
+            bb_context = bb.to_context_string()
+            if bb_context:
+                prompt_parts.append(f"\n{bb_context}")
+        except Exception:
+            pass
+
         # 5. Temporal Awareness
         now = datetime.now()
         prompt_parts.append(f"\n# Temporal Context\nCurrent Time: {now.isoformat()}")
