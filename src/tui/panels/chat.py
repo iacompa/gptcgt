@@ -657,15 +657,18 @@ class ChatPanel(Vertical):
         try:
             from src.core.workspace import Workspace
             ws = Workspace.get_instance()
-            project_root = ws.get_project_root()
+            project_root = ws.get_project_root().resolve()
             for f in files:
-                resolved = (project_root / f).resolve()
-                if str(resolved).startswith(str(project_root)):
+                try:
+                    resolved = (project_root / f).resolve()
+                    resolved.relative_to(project_root)  # Raises ValueError if outside
                     file_paths.append(Path(f))
-                else:
+                except ValueError:
                     logger.warning(f"@file path rejected (outside workspace): {f}")
         except Exception:
-            file_paths = [Path(f) for f in files]
+            # If workspace isn't available, reject all @file paths (safe default)
+            logger.warning("Workspace unavailable — rejecting all @file paths for security")
+            file_paths = []
 
         # Include context from chips
         for ctx in self.context_chips.get_context_summary():
