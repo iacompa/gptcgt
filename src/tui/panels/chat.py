@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 from rich.text import Text
-from textual import app, on
+from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -34,20 +34,27 @@ def apply_brand_colors(text: str) -> str:
     def replacer(match):
         w = match.group(0)
         lw = w.lower()
-        if lw in ("chatgpt", "gpt", "chat", "openai"): color = "#34D399"  # Green
-        elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"): color = "#FB923C"  # Orange
-        elif lw in ("gemini", "deepseek", "google"): color = "#60A5FA"  # Blue
-        elif lw in ("grok", "xai"): color = "#9CA3AF"  # Grey
-        elif lw in ("teamtalk", "team", "talk"): color = "#A78BFA"  # Purple
-        elif lw == "openrouter": color = "#F43F5E"  # Pink
-        else: return w
+        if lw in ("chatgpt", "gpt", "chat", "openai"):
+            color = "#34D399"  # Green
+        elif lw in ("claude", "sonnet", "opus", "haiku", "anthropic"):
+            color = "#FB923C"  # Orange
+        elif lw in ("gemini", "deepseek", "google"):
+            color = "#60A5FA"  # Blue
+        elif lw in ("grok", "xai"):
+            color = "#9CA3AF"  # Grey
+        elif lw in ("teamtalk", "team", "talk"):
+            color = "#A78BFA"  # Purple
+        elif lw == "openrouter":
+            color = "#F43F5E"  # Pink
+        else:
+            return w
         return f"[{color}]{w}[/{color}]"
 
     # Skip processing if it looks like there are markup tags to avoid nesting errors
     if "[" in text and "]" in text:
         return text
 
-    return re.sub(r'\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b', replacer, text, flags=re.IGNORECASE)
+    return re.sub(r'\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b', replacer, text, flags=re.IGNORECASE)  # noqa: E501
 
 class AnimatedWelcome(Static):
     DEFAULT_CSS = """
@@ -62,12 +69,12 @@ class AnimatedWelcome(Static):
         super().__init__(**kwargs)
         self.step = 0
         self.frames = [
-            [("ChatGPT", "#34D399"), (" ", ""), ("Claude", "#FB923C"), (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],
-            [("hatGPT", "#34D399"), (" ", ""), ("Claud", "#FB923C"), (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],
-            [("atGPT", "#34D399"), (" ", ""), ("Clau", "#FB923C"), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],
-            [("tGPT", "#34D399"), (" ", ""), ("Cla", "#FB923C"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],
-            [("GPT", "#34D399"), (" ", ""), ("Cl", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
-            [("GPT", "#34D399"), (" ", ""), ("C", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],
+            [("ChatGPT", "#34D399"), (" ", ""), ("Claude", "#FB923C"), (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],  # noqa: E501
+            [("hatGPT", "#34D399"), (" ", ""), ("Claud", "#FB923C"), (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],  # noqa: E501
+            [("atGPT", "#34D399"), (" ", ""), ("Clau", "#FB923C"), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],  # noqa: E501
+            [("tGPT", "#34D399"), (" ", ""), ("Cla", "#FB923C"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],  # noqa: E501
+            [("GPT", "#34D399"), (" ", ""), ("Cl", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],  # noqa: E501
+            [("GPT", "#34D399"), (" ", ""), ("C", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],  # noqa: E501
             [("GPT", "#34D399"), ("C", "#FB923C"), ("G", "#60A5FA"), ("T", "#A78BFA")],
             [("gpt", "#34D399"), ("c", "#FB923C"), ("g", "#60A5FA"), ("t", "#A78BFA")],
         ]
@@ -217,9 +224,9 @@ class ChatMessage(Static):
                         if block.is_code:
                             yield CollapsibleCodeBlock(language=block.language, code=block.content)
                         else:
-                            l = Label(apply_brand_colors(block.content))
-                            l.styles.width = "auto"
-                            yield l
+                            label = Label(apply_brand_colors(block.content))
+                            label.styles.width = "auto"
+                            yield label
 
 
     def update_speaker(self, name: str) -> None:
@@ -801,7 +808,7 @@ class ChatPanel(Vertical):
                 logger.debug(f"Transient status remove failed: {e}")
 
             model_display = f"({event.model_name})" if event.model_name else ""
-            status_pill = Label(f"🧠 [bold #58A6FF]{event.agent_id.capitalize()} {model_display} {event.status}...[/] [dim]{event.detail}[/]", id="transient-status", classes="transient-pill")
+            status_pill = Label(f"🧠 [bold #58A6FF]{event.agent_id.capitalize()} {model_display} {event.status}...[/] [dim]{event.detail}[/]", id="transient-status", classes="transient-pill")  # noqa: E501
             status_pill.styles.margin = (0, 0, 1, 0)
             self.scroll_container.mount(status_pill)
             self.scroll_container.scroll_end(animate=False)
@@ -931,6 +938,7 @@ class ChatPanel(Vertical):
     def on_reflection_retry_hint(self, event: ReflectionRetryHint) -> None:
         """Surface a lesson from the reflection engine and store it for the next dispatch."""
         from datetime import datetime
+
         from textual.widgets import Collapsible
         time_str = datetime.now().strftime("%I:%M %p")
 

@@ -381,6 +381,10 @@ class ParallelDispatcher:
             slot.patch_set = self._diff_extractor.extract(
                 full_response, slot.agent_id, slot.model.name
             )
+            # Populate PatchSet metadata for downstream ELO + cost tracking
+            slot.patch_set.cost_usd = slot.cost_usd
+            slot.patch_set.generation_time = slot.duration_ms / 1000.0
+            slot.patch_set.model_id = slot.model.id
 
             slot.status = "completed"
 

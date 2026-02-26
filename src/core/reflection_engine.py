@@ -124,7 +124,7 @@ Prompt: {original_prompt}
 Output: {agent_output[:1000]}... (truncated)
 Failure/Override Reason: {failure_reason}
 
-TASK: Merge the new lesson into the EXISTING MEMORY using the structured schema above. Output only the full updated markdown file.
+TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output only the updated file.
 """
 
             # Initialize the base agent for the LIGHT model

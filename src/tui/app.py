@@ -20,6 +20,7 @@ from src.core.logger import get_logger, setup_logging
 from src.core.quality_tiers import QualityTier, QualityTierManager
 from src.core.task_tracker import TaskTracker
 from src.core.workspace import Workspace
+
 # Panels needed at compose() time — must be eager
 from src.tui.panels.chat import ChatPanel
 from src.tui.panels.code_viewer import CodeViewerPanel
@@ -30,6 +31,7 @@ from src.tui.widgets.menu_bar import MenuBar
 from src.tui.widgets.panel_resizer import PanelResizer
 from src.tui.widgets.status_bar import EnhancedStatusBar
 from src.tui.widgets.task_panel import TaskPanel
+
 # Overlays are lazy-loaded inside each action method (never needed at startup)
 
 logger = get_logger("tui.app")
@@ -134,7 +136,7 @@ class GptcgtApp(App[None]):
         with Horizontal(id="app-grid"):
             # Construct the 3 main clusters
             panels = {
-                "files": Vertical(TaskPanel(id="task-panel"), FileTreePanel(id="left-panel"), id="left-panel-container", classes="left-col"),
+                "files": Vertical(TaskPanel(id="task-panel"), FileTreePanel(id="left-panel"), id="left-panel-container", classes="left-col"),  # noqa: E501
                 "code": CodeViewerPanel(id="code-viewer"),
                 "chat": ChatPanel(id="right-panel")
             }

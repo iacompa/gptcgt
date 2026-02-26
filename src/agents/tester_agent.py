@@ -22,6 +22,7 @@ logger = get_logger("agents.tester_agent")
 @dataclass
 class TestResult:
     """Structured result from the TesterAgent."""
+
     passed: int = 0
     failed: int = 0
     errors: int = 0
@@ -68,6 +69,7 @@ class TesterAgent:
 
         Returns:
             TestResult with pass/fail counts and generated test code.
+
         """
         result = TestResult()
 

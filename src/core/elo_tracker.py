@@ -12,6 +12,7 @@ class EloTracker:
     Tracks ELO ratings, match histories, and financial costs for LLM models
     competing inside the GPTCGT Arena.
     """
+
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
             # Default to tracking inside the user's gptcgt config folder
@@ -185,15 +186,15 @@ class EloTracker:
                 cursor = conn.cursor()
 
                 cursor.execute("""
-                    SELECT 
-                        id, 
-                        elo_rating, 
-                        matches_won, 
-                        matches_lost, 
+                    SELECT
+                        id,
+                        elo_rating,
+                        matches_won,
+                        matches_lost,
                         total_spent,
                         (matches_won + matches_lost) as total_matches,
-                        CASE 
-                            WHEN (matches_won + matches_lost) > 0 THEN 
+                        CASE
+                            WHEN (matches_won + matches_lost) > 0 THEN
                                 ROUND(CAST(matches_won AS FLOAT) / (matches_won + matches_lost) * 100, 1)
                             ELSE 0.0
                         END as win_rate

@@ -40,7 +40,7 @@ MAX_DELEGATION_WALL_CLOCK_SEC = 120
 
 
 class ChatPipeline:
-    def __init__(self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD, _delegation_depth: int = 0):
+    def __init__(self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD, _delegation_depth: int = 0):  # noqa: E501
         self.chat_store = chat_store
         self.default_tier = default_tier
         self.cost_tracker = None
@@ -322,6 +322,7 @@ class ChatPipeline:
         """Fire-and-forget: spawn ReflectionEngine on user abort."""
         try:
             import textual.app as _tapp
+
             from src.core.reflection_engine import ReflectionEngine
             engine = ReflectionEngine(_tapp.active_app.get())
             engine.reflect_on_friction(
@@ -360,9 +361,9 @@ class ChatPipeline:
 
         # P0 Fix: Recursion depth guard
         if self._delegation_depth >= MAX_DELEGATION_DEPTH:
-            logger.warning(f"Delegation depth {self._delegation_depth} exceeds max {MAX_DELEGATION_DEPTH}. Aborting sub-dispatch.")
+            logger.warning(f"Delegation depth {self._delegation_depth} exceeds max {MAX_DELEGATION_DEPTH}. Aborting sub-dispatch.")  # noqa: E501
             if error_callback:
-                await error_callback(f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted.")
+                await error_callback(f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted.")  # noqa: E501
             return full_response, False
 
         # Multi-budget guard: check accumulated cost and tokens
@@ -481,6 +482,7 @@ class ChatPipeline:
         if patch_set.file_count > 0:
             try:
                 import textual.app as _tapp
+
                 from src.core.events import PatchSetProposed
                 _tapp.active_app.get().post_message(PatchSetProposed(patch_set=patch_set))
             except Exception as e:
