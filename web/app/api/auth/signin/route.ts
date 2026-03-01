@@ -1,31 +1,43 @@
-import { getSignInUrl } from '@workos-inc/authkit-nextjs';
 import { NextResponse } from 'next/server';
+import { createSessionToken } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = async (request: Request) => {
+export async function POST(request: Request) {
     try {
-        const signInUrl = await getSignInUrl();
-        console.log('[SIGNIN] Redirecting to:', signInUrl);
-        return NextResponse.redirect(signInUrl);
+        const body = await request.json();
+        const { email, password } = body;
+
+        if (!email) {
+            return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+        }
+
+        // For MVP: accept any email with a non-empty password
+        // Later: validate against FastAPI backend
+        if (!password || password.length < 6) {
+            return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+        }
+
+        const token = createSessionToken(email);
+
+        const response = NextResponse.json({ success: true, email });
+
+        // Set HTTP-only cookie with the JWT
+        response.cookies.set('gptcgt_session', token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7, // 7 days
+        });
+
+        return response;
     } catch (error: any) {
-        console.error('[SIGNIN ERROR]', error?.message || error);
-        console.error('[SIGNIN STACK]', error?.stack);
-        // Return the error as JSON so we can debug
-        return NextResponse.json(
-            {
-                error: 'Failed to generate sign-in URL',
-                detail: error?.message || String(error),
-                stack: error?.stack?.split('\n').slice(0, 5),
-                envCheck: {
-                    hasClientId: !!process.env.WORKOS_CLIENT_ID,
-                    hasApiKey: !!process.env.WORKOS_API_KEY,
-                    hasCookiePassword: !!process.env.WORKOS_COOKIE_PASSWORD,
-                    hasRedirectUri: !!process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
-                    redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
-                },
-            },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: error?.message || 'Sign in failed' }, { status: 500 });
     }
-};
+}
+
+// Keep GET for backward compatibility — redirect to auth page
+export async function GET() {
+    return NextResponse.redirect(new URL('/auth', process.env.NEXT_PUBLIC_BASE_URL || 'https://gptcgt.ai'));
+}
