@@ -1,25 +1,24 @@
 import { handleAuth } from '@workos-inc/authkit-nextjs';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// Wrap handleAuth to catch and log errors
-const authHandler = handleAuth({ returnPathname: '/dashboard' });
-
-export const GET = async (request: NextRequest) => {
-    try {
-        return await authHandler(request);
-    } catch (error: any) {
-        console.error('[CALLBACK ERROR]', error?.message || error);
-        console.error('[CALLBACK STACK]', error?.stack);
-        // Return a user-friendly error instead of a 500
+// Use onError callback to expose the actual error from WorkOS
+export const GET = handleAuth({
+    returnPathname: '/dashboard',
+    onError: async ({ error }) => {
+        const message = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : undefined;
+        console.error('[CALLBACK AUTH ERROR]', message);
+        console.error('[CALLBACK AUTH STACK]', stack);
         return NextResponse.json(
             {
-                error: 'Authentication failed',
-                detail: error?.message || 'Unknown error during callback',
-                hint: 'Check that WORKOS_CLIENT_ID, WORKOS_API_KEY, WORKOS_COOKIE_PASSWORD, and NEXT_PUBLIC_WORKOS_REDIRECT_URI are correctly configured in Vercel environment variables.'
+                error: 'Authentication callback failed',
+                detail: message,
+                stack: stack?.split('\n').slice(0, 5),
+                hint: 'Verify WORKOS_CLIENT_ID and WORKOS_API_KEY match your WorkOS environment (staging vs production). Check that WORKOS_COOKIE_PASSWORD is at least 32 characters.',
             },
             { status: 500 }
         );
-    }
-};
+    },
+});
