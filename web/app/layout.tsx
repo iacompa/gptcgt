@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Footer } from "@/components/footer";
 
 export const metadata = {
-    title: "GPTCGT - Multi-Model AI Coding Terminal",
+    title: "gptcgt - Multi-Model AI Coding Terminal",
     description: "Run multiple AIs on your code. Pick the best solution with proof. Terminal-native, provider-agnostic, with transparent cost tracking.",
     icons: {
         icon: "/favicon.svg",
@@ -26,7 +26,7 @@ export default function RootLayout({
                             <div className="flex items-center gap-4">
                                 <Link href="/" className="font-bold text-xl tracking-tight text-white flex items-center gap-2">
                                     <Image src="/logo.svg" alt="gptcgt logo" width={32} height={32} className="rounded-md" />
-                                    GPTCGT
+                                    gptcgt
                                 </Link>
                                 <nav className="hidden md:ml-6 md:flex md:space-x-4">
                                     <Link href="/pricing" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Pricing</Link>
