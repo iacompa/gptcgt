@@ -29,7 +29,8 @@ export default function AuthPage() {
                 return;
             }
 
-            router.push("/dashboard");
+            // Force a hard redirect so the browser sends the new cookie
+            window.location.href = "/dashboard";
         } catch (err) {
             setError("Network error. Please try again.");
         } finally {
