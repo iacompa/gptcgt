@@ -1,4 +1,4 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
+import { cookies } from "next/headers";
 import * as jwt from "jsonwebtoken";
 
 export interface Session {
@@ -10,34 +10,38 @@ export interface Session {
     accessToken: string;
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+
 export async function getSession(): Promise<Session | null> {
     try {
-        const { user } = await withAuth();
+        const cookieStore = await cookies();
+        const token = cookieStore.get("gptcgt_session")?.value;
 
-        if (!user) {
-            return null;
-        }
+        if (!token) return null;
 
-        const secret = process.env.JWT_SECRET;
-        if (!secret) {
-            throw new Error("JWT_SECRET environment variable is missing.");
-        }
+        const payload = jwt.verify(token, JWT_SECRET) as any;
 
         return {
             user: {
-                id: user.id,
-                email: user.email,
-                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email.split("@")[0]
+                id: payload.sub || payload.email,
+                email: payload.email,
+                name: payload.name || payload.email.split("@")[0],
             },
-            accessToken: jwt.sign(
-                { sub: user.id, email: user.email },
-                secret,
-                { expiresIn: "1h", algorithm: "HS256" }
-            )
+            accessToken: token,
         };
     } catch (e) {
-        // If WorkOS is not configured or session is invalid, return null
-        console.error("Auth session error:", e);
         return null;
     }
+}
+
+export function createSessionToken(email: string, name?: string): string {
+    return jwt.sign(
+        {
+            sub: email,
+            email,
+            name: name || email.split("@")[0],
+        },
+        JWT_SECRET,
+        { expiresIn: "7d", algorithm: "HS256" }
+    );
 }
