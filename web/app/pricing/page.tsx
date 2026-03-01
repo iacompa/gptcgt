@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Shield, Database, Users } from "lucide-react";
+import { Check, Shield, Database, Users, KeyRound } from "lucide-react";
 import Link from "next/link";
 
 export default function PricingPage() {
@@ -11,14 +11,41 @@ export default function PricingPage() {
                 <p className="mt-2 text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Scale capabilities, not headcount
                 </p>
+                <p className="mt-4 text-lg text-gray-400">Use your own API keys for free, or subscribe for managed credits and zero-config access to every provider.</p>
             </div>
 
-            <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-8 lg:max-w-7xl lg:grid-cols-3">
+            <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-6 lg:max-w-7xl lg:grid-cols-4">
+                {/* BYOK Free Tier */}
+                <div className="rounded-3xl p-8 xl:p-10 ring-1 ring-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/20 transition-colors flex flex-col justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <KeyRound className="h-5 w-5 text-emerald-400" />
+                            <h3 className="text-2xl font-bold text-white">BYOK</h3>
+                        </div>
+                        <p className="mt-4 text-sm leading-6 text-gray-400">Bring Your Own Keys. Use your own API keys from any provider — pay them directly.</p>
+                        <p className="mt-6 flex items-baseline gap-x-1">
+                            <span className="text-4xl font-bold tracking-tight text-emerald-400">Free</span>
+                            <span className="text-sm font-semibold leading-6 text-gray-400">forever</span>
+                        </p>
+                        <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> All 6 Operation Modes</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Unlimited Usage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> 10+ Provider Support</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Local Model Support (Ollama)</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Secure OS Keychain Storage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> ELO Rankings &amp; Routing</li>
+                        </ul>
+                    </div>
+                    <Link href="/docs/keys" className="mt-8 block rounded-md bg-emerald-500/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-emerald-400 hover:bg-emerald-500/20 ring-1 ring-inset ring-emerald-500/20">
+                        Get started — it&apos;s free
+                    </Link>
+                </div>
+
                 {/* Pro Plan */}
                 <div className="rounded-3xl p-8 xl:p-10 ring-1 ring-gray-800 bg-gray-900/40 hover:bg-gray-900 transition-colors flex flex-col justify-between">
                     <div>
                         <h3 className="text-2xl font-bold text-white">Pro</h3>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">Ideal for individual developers building powerful apps.</p>
+                        <p className="mt-4 text-sm leading-6 text-gray-400">Managed credits — zero config, one subscription for all providers.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
                             <span className="text-4xl font-bold tracking-tight text-white">$29</span>
                             <span className="text-sm font-semibold leading-6 text-gray-400">/month</span>
@@ -26,6 +53,7 @@ export default function PricingPage() {
                         <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
                             <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> 1,000 Credits Monthly</li>
                             <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Optional PAYG Overage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> No API Keys Needed</li>
                             <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Standard Support</li>
                         </ul>
                     </div>
