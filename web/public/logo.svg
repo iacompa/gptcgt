@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#c084fc" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Subtle inner glow -->
+  <rect x="24" y="24" width="464" height="464" rx="80" fill="url(#glow)"/>
+  <!-- Terminal bracket: > -->
+  <path d="M120 160 L240 256 L120 352" stroke="white" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+  <!-- Cursor line -->
+  <line x1="272" y1="340" x2="392" y2="340" stroke="white" stroke-width="32" stroke-linecap="round" opacity="0.7"/>
+  <!-- Three dots representing multi-model -->
+  <circle cx="296" cy="180" r="18" fill="white" opacity="0.9"/>
+  <circle cx="344" cy="180" r="18" fill="white" opacity="0.7"/>
+  <circle cx="392" cy="180" r="18" fill="white" opacity="0.5"/>
+</svg>
