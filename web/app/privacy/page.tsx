@@ -15,15 +15,21 @@ export default function PrivacyPolicyPage() {
                     </p>
 
                     <h2 className="mt-16 text-2xl font-bold tracking-tight text-white">1. Information We Collect</h2>
-                    <ul className="mt-8 space-y-8 text-gray-300">
+                    <p className="mt-6 mb-8 text-gray-300">
+                        In the spirit of absolute transparency, here is the exact list of the limited personal information our application collects:
+                    </p>
+                    <ul className="space-y-8 text-gray-300">
                         <li className="flex gap-x-3">
-                            <span><strong className="font-semibold text-white">Account Information:</strong> We collect your email address and basic profile information when you register for an account to provide you with secure access to our services.</span>
+                            <span><strong className="font-semibold text-white">Account Profile:</strong> We collect only your <strong>Email Address</strong> and <strong>Username</strong> when you register, strictly to provide secure access to your account.</span>
                         </li>
                         <li className="flex gap-x-3">
-                            <span><strong className="font-semibold text-white">Usage Data:</strong> We collect aggregated, anonymous telemetry regarding model execution times, success rates, and basic CLI interactions (e.g., "User ran a prompt using Claude 3.5 Sonnet"). <strong className="text-indigo-400">We do not collect the contents of your code, your prompts, or your AI responses.</strong></span>
+                            <span><strong className="font-semibold text-white">Billing Details:</strong> If you use our Managed Credits (Pro Tier), our payment processor (Stripe) securely collects and processes your payment method. We only store your <strong>Country</strong> and <strong>ZIP/Postal Code</strong> on our servers for tax and fraud-prevention purposes.</span>
                         </li>
                         <li className="flex gap-x-3">
-                            <span><strong className="font-semibold text-white">API Keys:</strong> Under the "Bring Your Own Keys" (BYOK) model, your provider API keys (OpenAI, Anthropic, etc.) are stored exclusively on your local machine using your operating system's secure keychain. They are never transmitted to or stored on our servers.</span>
+                            <span><strong className="font-semibold text-white">Usage Data (Telemetry):</strong> We collect aggregated, anonymous telemetry—specifically <strong>Token Consumption counts</strong> and basic CLI model choices (e.g., "Script ran using Claude 3.5 Sonnet"). <strong className="text-indigo-400">We do not collect the contents of your code, your prompts, or your AI responses.</strong></span>
+                        </li>
+                        <li className="flex gap-x-3">
+                            <span><strong className="font-semibold text-white">API Keys:</strong> Under the "Bring Your Own Keys" (BYOK) model, your provider API keys (OpenAI, Anthropic, etc.) are <strong>stored exclusively on your local machine</strong> using your operating system's secure keychain. They are never transmitted to or stored on our servers.</span>
                         </li>
                     </ul>
 
@@ -57,7 +63,7 @@ export default function PrivacyPolicyPage() {
                         We implement strict security measures to protect your account data. All communications between the gptcgt CLI and our servers are encrypted using TLS. Your local API keys are secured by your native OS credential manager (macOS Keychain, Windows Credential Manager, or Linux Secret Service).
                     </p>
 
-                    <h2 className="mt-16 text-2xl font-bold tracking-tight text-white">5. Your Privacy Rights</h2>
+                    <h2 className="mt-16 text-2xl font-bold tracking-tight text-white">5. User Rights (GDPR/CCPA)</h2>
                     <p className="mt-6">
                         You have the right to access, update, or delete your account information at any time. If you wish to permanently delete your account and all associated billing unformation, please contact us at support@gptcgt.ai.
                     </p>
