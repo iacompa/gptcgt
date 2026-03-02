@@ -1,21 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
-    <!-- Dark background -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+    <!-- Deep Dark Theme Background -->
     <rect width="512" height="512" rx="112" fill="#05070a" />
     <rect width="512" height="512" rx="112" fill="none" stroke="#1f2937" stroke-width="8" />
-
-    <!-- 4-Color multi-model gradient -->
+    
+    <!-- Glowing AI Multi-Model Gradient -->
     <defs>
-        <linearGradient id="prompt-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#34D399" />
-            <stop offset="33%" stop-color="#60A5FA" />
-            <stop offset="66%" stop-color="#A78BFA" />
-            <stop offset="100%" stop-color="#FB923C" />
+        <linearGradient id="multi-model-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#34D399"/>     <!-- GPT Green -->
+            <stop offset="33%" stop-color="#60A5FA"/>    <!-- Gemini Blue -->
+            <stop offset="66%" stop-color="#A78BFA"/>    <!-- Claude Purple -->
+            <stop offset="100%" stop-color="#FB923C"/>   <!-- Team Orange -->
         </linearGradient>
     </defs>
-
-    <!-- > symbol (The Prompt) -->
-    <path d="M 111 190 L 271 290 L 111 390" fill="none" stroke="url(#prompt-grad)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
     
-    <!-- _ cursor (The Code) -->
-    <rect x="311" y="326" width="90" height="64" rx="16" fill="#f3f4f6" />
+    <!-- Subtle backlight glow for the star -->
+    <circle cx="320" cy="256" r="120" fill="#A78BFA" opacity="0.25" filter="blur(40px)" />
+    
+    <!-- The Terminal Prompt (Represents Coding/CLI) -->
+    <!-- Crisp, solid white -->
+    <path d="M 100 140 L 216 256 L 100 372" stroke="white" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- The AI Sparkle (Represents Artificial Intelligence) -->
+    <!-- 4 colors represent the 4 active models (GPT, Claude, Gemini, Team) -->
+    <!-- Positioned to burst out *from inside* the prompt apex -->
+    <path d="M 320 80 Q 320 256 160 256 Q 320 256 320 432 Q 320 256 480 256 Q 320 256 320 80 Z" fill="url(#multi-model-grad)" />
+    
+    <!-- Glowing dot center of the AI star -->
+    <circle cx="320" cy="256" r="16" fill="white" />
 </svg>
