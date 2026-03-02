@@ -2,11 +2,6 @@
     <!-- Dark background -->
     <rect width="512" height="512" rx="112" fill="#05070a" />
     <rect width="512" height="512" rx="112" fill="none" stroke="#1f2937" stroke-width="8" />
-    
-    <!-- macOS style terminal dots -->
-    <circle cx="90" cy="90" r="18" fill="#ef4444" opacity="0.8" />
-    <circle cx="145" cy="90" r="18" fill="#f59e0b" opacity="0.8" />
-    <circle cx="200" cy="90" r="18" fill="#10b981" opacity="0.8" />
 
     <!-- 4-Color multi-model gradient -->
     <defs>
@@ -19,8 +14,8 @@
     </defs>
 
     <!-- > symbol (The Prompt) -->
-    <path d="M 130 190 L 290 290 L 130 390" fill="none" stroke="url(#prompt-grad)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 111 190 L 271 290 L 111 390" fill="none" stroke="url(#prompt-grad)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round" />
     
     <!-- _ cursor (The Code) -->
-    <rect x="330" y="326" width="90" height="64" rx="16" fill="#f3f4f6" />
+    <rect x="311" y="326" width="90" height="64" rx="16" fill="#f3f4f6" />
 </svg>
