@@ -20,13 +20,18 @@ export default function RootLayout({
     return (
         <html lang="en" className="dark">
             <body className="font-sans bg-gray-950 text-gray-100 antialiased">
-                <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-50">
+                <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
                             <div className="flex items-center gap-4">
                                 <Link href="/" className="font-bold text-xl tracking-tight text-white flex items-center gap-2">
                                     <Image src="/logo.svg" alt="gptcgt logo" width={32} height={32} className="rounded-md" />
-                                    gptcgt
+                                    <span className="flex">
+                                        <span className="text-emerald-400">gpt</span>
+                                        <span className="text-orange-400">c</span>
+                                        <span className="text-blue-400">g</span>
+                                        <span className="text-purple-400">t</span>
+                                    </span>
                                 </Link>
                                 <nav className="hidden md:ml-6 md:flex md:space-x-4">
                                     <Link href="/pricing" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Pricing</Link>
