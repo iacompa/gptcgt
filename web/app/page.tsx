@@ -25,7 +25,7 @@ export default function Home() {
                         Go to Dashboard <ArrowRight size={20} />
                     </Link>
                     <div className="px-6 py-3 rounded-md bg-black/40 border border-gray-700 font-mono text-gray-300 flex items-center gap-2">
-                        <span className="text-gray-500">$</span> pip install gptcgt
+                        <span className="text-gray-500">$</span> pip install <span className="flex"><span className="text-emerald-400">gpt</span><span className="text-orange-400">c</span><span className="text-blue-400">g</span><span className="text-purple-400">t</span></span>
                     </div>
                 </div>
             </div>
