@@ -106,7 +106,7 @@ export function HeroAnimation() {
                 <g className="brand-logo" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800 }}>
 
                     {/* G (ChatGPT & Grok) */}
-                    <g transform="translate(150, 200)">
+                    <g transform="translate(300, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#gpt-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">g</text>
                         {/* CHAT flowing right into G */}
                         <text x="-240" y="0" fontSize="80" fill="#34D399" textAnchor="middle" dominantBaseline="middle" className="suffix-item" style={{ "--targetX": "-240px", "--targetY": "0px" } as any}>c</text>
@@ -120,15 +120,15 @@ export function HeroAnimation() {
                     </g>
 
                     {/* P & T (ChatGPT continued) */}
-                    <g transform="translate(260, 200)">
+                    <g transform="translate(380, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#gpt-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">p</text>
                     </g>
-                    <g transform="translate(370, 200)">
+                    <g transform="translate(460, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#gpt-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">t</text>
                     </g>
 
                     {/* C (Claude) */}
-                    <g transform="translate(530, 200)">
+                    <g transform="translate(540, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#claude-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">c</text>
                         {/* LAUDE flowing up into C */}
                         <text x="0" y="80" fontSize="80" fill="#A78BFA" textAnchor="middle" dominantBaseline="middle" className="suffix-item" style={{ "--targetX": "0px", "--targetY": "80px" } as any}>l</text>
@@ -139,7 +139,7 @@ export function HeroAnimation() {
                     </g>
 
                     {/* G (Gemini) */}
-                    <g transform="translate(680, 200)">
+                    <g transform="translate(620, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#gemini-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">g</text>
                         {/* EMINI flowing up into G */}
                         <text x="0" y="80" fontSize="80" fill="#60A5FA" textAnchor="middle" dominantBaseline="middle" className="suffix-item" style={{ "--targetX": "0px", "--targetY": "80px" } as any}>e</text>
@@ -150,7 +150,7 @@ export function HeroAnimation() {
                     </g>
 
                     {/* T (Team) */}
-                    <g transform="translate(830, 200)">
+                    <g transform="translate(700, 200)">
                         <text x="0" y="0" fontSize="120" fill="url(#team-grad)" textAnchor="middle" dominantBaseline="middle" className="core-letter">t</text>
                         {/* EAM flowing left into T */}
                         <text x="80" y="0" fontSize="80" fill="#FB923C" textAnchor="middle" dominantBaseline="middle" className="suffix-item" style={{ "--targetX": "80px", "--targetY": "0px" } as any}>e</text>
