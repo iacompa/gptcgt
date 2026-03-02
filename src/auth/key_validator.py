@@ -37,6 +37,21 @@ class KeyValidator:
         if not api_key:
             return False, "Key is empty."
 
+        if env_var_name == "E2B_API_KEY":
+            try:
+                from e2b_code_interpreter import Sandbox
+                logger.debug("Testing E2B Sandbox key connection...")
+                sb = Sandbox(api_key=api_key, template="python-3.11")
+                sb.kill()
+                return True, "Valid (E2B)"
+            except ImportError:
+                return True, "Valid (Saved without test)"
+            except Exception as e:
+                err_msg = str(e)
+                if "401" in err_msg or "unauthorized" in err_msg.lower():
+                    return False, "Invalid E2B Key"
+                return False, f"E2B Error: {err_msg[:30]}"
+
         model_id = cls.TEST_MODELS.get(env_var_name)
         if not model_id:
             # For custom keys, we don't know the endpoint easily, assume valid if present.
