@@ -35,12 +35,16 @@ async def lifespan(app: FastAPI):
         os.environ["ANTHROPIC_API_KEY"] = services.llm_keys.anthropic
     if services.llm_keys.openai:
         os.environ["OPENAI_API_KEY"] = services.llm_keys.openai
-    if getattr(services.llm_keys, "google", None):
-        os.environ["GEMINI_API_KEY"] = services.llm_keys.google
+    if getattr(services.llm_keys, "gemini", None):
+        os.environ["GEMINI_API_KEY"] = services.llm_keys.gemini
     if getattr(services.llm_keys, "mistral", None):
         os.environ["MISTRAL_API_KEY"] = services.llm_keys.mistral
     if getattr(services.llm_keys, "groq", None):
         os.environ["GROQ_API_KEY"] = services.llm_keys.groq
+    if getattr(services.llm_keys, "deepseek", None):
+        os.environ["DEEPSEEK_API_KEY"] = services.llm_keys.deepseek
+    if getattr(services.llm_keys, "e2b", None):
+        os.environ["E2B_API_KEY"] = services.llm_keys.e2b
 
     # Startup actions
     await init_db_pool()
@@ -192,3 +196,91 @@ async def proxy_health():
         raise HTTPException(status_code=503, detail="Database connection failed")
 
     return {"status": "ok", "litellm_version": litellm.__version__}
+
+
+from pydantic import BaseModel
+from typing import Dict, Optional
+
+class SandboxExecuteRequest(BaseModel):
+    files: Dict[str, str]
+    language: str
+    command: Optional[str] = None
+
+@app.post("/v1/sandbox/execute")
+async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: str = Depends(verify_proxy_auth)):
+    e2b_key = os.environ.get("E2B_API_KEY")
+    if not e2b_key:
+        raise HTTPException(status_code=503, detail="E2B Sandbox not configured on proxy server")
+
+    # 1. Prevent Abuse: Payload Size Limit (Max 2MB total files)
+    total_size = sum(len(content) for content in request_data.files.values())
+    if total_size > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Payload too large (max 2MB)")
+
+    pool = get_pool()
+    mode = "sandbox"
+    cost = 1  # 1 credit (~$0.001) per sandbox run
+
+    # 2. Credit Check
+    affordability = await credit_service.check_credits(pool, user_id, mode)
+    if affordability["remaining"] < cost:
+        raise HTTPException(status_code=402, detail="Insufficient credits for sandbox execution")
+
+    # 3. Spending Cap Check
+    cap_status = await spending_caps.check_before_task(pool, user_id, cost)
+    if not cap_status["allowed"]:
+        raise HTTPException(status_code=403, detail="Spending cap exceeded")
+
+    try:
+        from e2b_code_interpreter import Sandbox
+    except ImportError:
+        raise HTTPException(status_code=503, detail="e2b_code_interpreter missing on server")
+
+    template_map = {
+        "python": "python-3.11",
+        "javascript": "node-18",
+        "typescript": "node-18",
+        "go": "go-1.21",
+        "rust": "rust-1.75",
+    }
+    template = template_map.get(request_data.language.lower(), "python-3.11")
+
+    # 4. Zero-Retention Execution
+    try:
+        sandbox = Sandbox(api_key=e2b_key, template=template)
+    except Exception as e:
+        logger.error(f"Failed to provision E2B sandbox: {e}")
+        raise HTTPException(status_code=502, detail="Sandbox provisioning failed")
+
+    try:
+        # Write files entirely in-memory to the E2B VM
+        for rel_path, content in request_data.files.items():
+            sandbox.files.write(f"/home/user/project/{rel_path}", content)
+
+        if not request_data.command:
+            raise HTTPException(status_code=400, detail="Command is required")
+
+        result = sandbox.commands.run(
+            f"cd /home/user/project && {request_data.command}",
+            timeout=45
+        )
+
+        # 5. Deduct fixed credit cost
+        meter = UsageMeter(mode=mode, workos_user_id=user_id, cost_credits=cost)
+        await meter.record_fixed_cost("e2b_sandbox_run")
+
+        return {
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "exit_code": result.exit_code,
+            "duration_ms": result.duration_ms,
+        }
+    except Exception as e:
+        logger.error(f"Execution error in sandbox: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # 6. Immediate Cleanup
+        try:
+            sandbox.kill()
+        except:
+            pass

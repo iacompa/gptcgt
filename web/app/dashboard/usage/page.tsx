@@ -11,6 +11,7 @@ export default function UsagePage() {
     // Stats
     const [totalCredits, setTotalCredits] = useState(0);
     const [totalRequests, setTotalRequests] = useState(0);
+    const [totalSandboxRuns, setTotalSandboxRuns] = useState(0);
     const [chartData, setChartData] = useState<any[]>([]);
 
     useEffect(() => {
@@ -26,11 +27,15 @@ export default function UsagePage() {
             // Calculate Stats
             let credits = 0;
             let requests = data.length;
+            let sandboxRuns = 0;
 
             const chartMap = new Map<string, number>();
 
             data.forEach((evt: any) => {
                 credits += evt.credits_consumed;
+                if (evt.task_mode === "sandbox" || (evt.models_used && evt.models_used.includes("e2b_sandbox_run"))) {
+                    sandboxRuns++;
+                }
 
                 // Group by day out of ISO string
                 const day = evt.created_at.split('T')[0];
@@ -39,6 +44,7 @@ export default function UsagePage() {
 
             setTotalCredits(credits);
             setTotalRequests(requests);
+            setTotalSandboxRuns(sandboxRuns);
 
             // Format for recharts
             const cData = Array.from(chartMap.entries())
@@ -70,7 +76,7 @@ export default function UsagePage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                     <p className="text-sm text-gray-400 mb-1">Total Proxy Credits</p>
                     <p className="text-2xl font-bold">{totalCredits.toLocaleString()}</p>
@@ -78,6 +84,10 @@ export default function UsagePage() {
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
                     <p className="text-sm text-gray-400 mb-1">Total Pipeline Executions</p>
                     <p className="text-2xl font-bold">{totalRequests.toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                    <p className="text-sm text-gray-400 mb-1">Sandbox Executions</p>
+                    <p className="text-2xl font-bold">{totalSandboxRuns.toLocaleString()}</p>
                 </div>
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 relative overflow-hidden">
                     <div className="relative z-10">

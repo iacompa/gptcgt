@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" className="dark">
-            <body className="font-sans bg-gray-950 text-gray-100 antialiased h-screen flex flex-col">
+            <body className="font-sans bg-gray-950 text-gray-100 antialiased">
                 <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-md sticky top-0 z-50">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex items-center justify-between h-16">
@@ -43,7 +43,7 @@ export default function RootLayout({
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-auto relative">
+                <main className="flex-1 relative">
                     {children}
                 </main>
                 <Footer />
