@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { HeroAnimation } from "@/components/hero-animation";
 
 export default function Home() {
     return (
@@ -8,8 +9,9 @@ export default function Home() {
                 <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]" />
             </div>
 
-            <div className="mx-auto max-w-3xl py-32 sm:py-48 lg:py-56 text-center">
-                <h1 className="text-5xl font-extrabold tracking-tight sm:text-7xl bg-clip-text text-transparent bg-gradient-to-r from-gray-100 to-gray-400 pb-2">
+            <div className="mx-auto max-w-4xl py-24 sm:py-32 lg:py-40 text-center">
+                <HeroAnimation />
+                <h1 className="mt-8 text-5xl font-extrabold tracking-tight sm:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-gray-100 to-gray-400 pb-2">
                     Run multiple AIs on your code.
                 </h1>
                 <p className="mt-6 text-xl leading-8 text-gray-400">
