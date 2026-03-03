@@ -81,10 +81,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         user_id,
                     )
                     if credits is not None and credits <= 0:
-                        return self._json_response(
-                            402,
-                            "⚠️ Credits exhausted. Please visit your dashboard at https://gptcgt.ai/dashboard/billing to purchase more credits."
+                        msg = (
+                            "⚠️ Credits exhausted. Visit your dashboard at "
+                            "https://gptcgt.ai/dashboard/billing to purchase more."
                         )
+                        return self._json_response(402, msg)
 
         except jwt.PyJWTError:
             return self._json_response(401, "Invalid token")
