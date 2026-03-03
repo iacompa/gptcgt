@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, Callable
 
 from src.core.logger import get_logger
 
@@ -29,20 +29,21 @@ class BlackboardEntry:
     key: str
     value: Any
     author: str  # agent_id that wrote it
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: datetime = field(default_factory=datetime.now)
     confidence: float = 1.0  # 0.0-1.0
+    ttl_seconds: int = 0  # 0 means lives forever (until task cycle clears)
+
+    @property
+    def is_expired(self) -> bool:
+        if self.ttl_seconds <= 0:
+            return False
+        return datetime.now() > self.timestamp + timedelta(seconds=self.ttl_seconds)
 
 
 class AgentBlackboard:
     """
     Thread-safe shared state for multi-agent coordination within a single task.
-
-    Usage:
-        bb = AgentBlackboard()
-        bb.write("architectural_plan", plan_text, author="architect")
-        bb.write("relevant_files", file_list, author="scout")
-        plan = bb.read("architectural_plan")
-        all_entries = bb.read_all()
+    Implements a Pub/Sub event bus with TTL expiration.
     """
 
     _instance: AgentBlackboard | None = None
@@ -51,6 +52,7 @@ class AgentBlackboard:
     def __init__(self) -> None:
         self._entries: dict[str, BlackboardEntry] = {}
         self._history: list[BlackboardEntry] = []
+        self._subscribers: dict[str, list[Callable[[BlackboardEntry], None]]] = {}
 
     @classmethod
     def get_instance(cls) -> AgentBlackboard:
@@ -61,42 +63,73 @@ class AgentBlackboard:
                     cls._instance = cls()
         return cls._instance
 
-    def write(self, key: str, value: Any, author: str, confidence: float = 1.0) -> None:
-        """Write or overwrite a key on the blackboard."""
+    def subscribe(self, topic: str, callback: Callable[[BlackboardEntry], None]) -> None:
+        """Subscribe a callback to a blackboard key (or '*' for all)."""
+        with self._lock:
+            if topic not in self._subscribers:
+                self._subscribers[topic] = []
+            self._subscribers[topic].append(callback)
+
+    def write(self, key: str, value: Any, author: str, confidence: float = 1.0, ttl_seconds: int = 0) -> None:
+        """Write a key, triggering pub/sub subscribers."""
         entry = BlackboardEntry(
-            key=key, value=value, author=author, confidence=confidence
+            key=key, value=value, author=author, confidence=confidence, ttl_seconds=ttl_seconds
         )
+
+        subs = []
         with self._lock:
             self._entries[key] = entry
             self._history.append(entry)
-        logger.debug(f"Blackboard: {author} wrote '{key}' (confidence={confidence:.2f})")
+            subs = list(self._subscribers.get(key, [])) + list(self._subscribers.get("*", []))
+
+        logger.debug(f"Blackboard: {author} wrote '{key}' (confidence={confidence:.2f}, ttl={ttl_seconds}s)")
+
+        # Dispatch callbacks asynchronously or outside lock to prevent deadlocks
+        for cb in subs:
+            try:
+                cb(entry)
+            except Exception as e:
+                logger.error(f"Blackboard pub/sub callback failed for '{key}': {e}")
 
     def read(self, key: str) -> Any | None:
-        """Read a value by key. Returns None if not found."""
+        """Read a value by key. Returns None if not found or expired."""
         with self._lock:
             entry = self._entries.get(key)
+            if entry and entry.is_expired:
+                del self._entries[key]
+                return None
             return entry.value if entry else None
 
     def read_entry(self, key: str) -> BlackboardEntry | None:
-        """Read the full entry (including author, timestamp, confidence)."""
+        """Read the full entry, respecting TTL."""
         with self._lock:
-            return self._entries.get(key)
+            entry = self._entries.get(key)
+            if entry and entry.is_expired:
+                del self._entries[key]
+                return None
+            return entry
 
     def read_all(self) -> dict[str, BlackboardEntry]:
-        """Read all current entries."""
+        """Read all current unexpired entries."""
         with self._lock:
+            now = datetime.now()  # noqa: F841
+            # Clean expired first
+            expired = [k for k, e in self._entries.items() if e.is_expired]
+            for k in expired:
+                del self._entries[k]
             return dict(self._entries)
 
     def read_by_author(self, author: str) -> list[BlackboardEntry]:
-        """Read all entries written by a specific agent."""
-        with self._lock:
-            return [e for e in self._entries.values() if e.author == author]
+        """Read all unexpired entries written by a specific agent."""
+        all_entries = self.read_all()
+        return [e for e in all_entries.values() if e.author == author]
 
     def clear(self) -> None:
         """Reset blackboard for next task cycle."""
         with self._lock:
             self._entries.clear()
             self._history.clear()
+            self._subscribers.clear()
         logger.debug("Blackboard cleared for new task cycle.")
 
     def to_context_string(self) -> str:

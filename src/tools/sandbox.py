@@ -27,6 +27,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from src.core.diff_engine import PatchSet
 from src.core.logger import get_logger
@@ -54,6 +55,7 @@ class TestResult:
     errors: int = 0
     skipped: int = 0
     failures: list[dict] = field(default_factory=list)  # [{test_name, error, traceback}]
+    raw_output: str = ""
 
     @property
     def all_passed(self) -> bool:
@@ -164,7 +166,8 @@ class E2BSandbox:
     """
 
     def __init__(self) -> None:
-        self._api_key = os.environ.get("E2B_API_KEY", "")
+        from src.auth.keychain import KeyChainManager
+        self._api_key = KeyChainManager.get_key("E2B_API_KEY") or os.environ.get("E2B_API_KEY", "")
         self._available = bool(self._api_key)
         if not self._available:
             logger.info(
@@ -181,6 +184,8 @@ class E2BSandbox:
         project_root: Path,
         language: str,
         test_command: str | None = None,
+        on_stdout: "Callable[[str], None] | None" = None,
+        on_stderr: "Callable[[str], None] | None" = None,
     ) -> VerificationResult:
         """
         Run the full verification pipeline on a PatchSet.
@@ -201,10 +206,21 @@ class E2BSandbox:
         result.files_touched = patch_set.file_count
 
         if not self._available:
-            return await self._verify_local_only(patch_set, project_root, language, result)
+            from src.auth.keychain import KeyChainManager
+            session_token = KeyChainManager.get_key("GPTCGT_SESSION_TOKEN")
+            if session_token:
+                try:
+                    return await self._verify_with_proxy(
+                        patch_set, project_root, language, test_command, session_token, result, on_stdout, on_stderr
+                    )
+                except Exception as e:
+                    logger.warning(f"Proxy verification failed, falling back to local: {e}")
+                    return await self._verify_local_only(patch_set, project_root, language, result)
+            else:
+                return await self._verify_local_only(patch_set, project_root, language, result)
 
         return await self._verify_with_sandbox(
-            patch_set, project_root, language, test_command, result
+            patch_set, project_root, language, test_command, result, on_stdout, on_stderr
         )
 
     async def _verify_local_only(
@@ -265,6 +281,83 @@ class E2BSandbox:
 
         return result
 
+    async def _verify_with_proxy(
+        self,
+        patch_set: PatchSet,
+        project_root: Path,
+        language: str,
+        test_command: str | None,
+        session_token: str,
+        result: VerificationResult,
+        on_stdout: "Callable[[str], None] | None" = None,
+        on_stderr: "Callable[[str], None] | None" = None,
+    ) -> VerificationResult:
+        """
+        Execute sandbox verification securely via the backend gptcgt proxy.
+        This provides Zero-Retention execution for Pro/Team users without needing a local E2B key.
+        """
+        import httpx
+        from src.core.config import ConfigManager
+        
+        files_to_upload = self._collect_files_for_sandbox(patch_set, project_root)
+        
+        # Apply patches locally in-memory to the files dictionary before transmission
+        for fp in patch_set.patches:
+            if str(fp.file_path) in files_to_upload:
+                lines = files_to_upload[str(fp.file_path)].splitlines()
+                for hunk in sorted(fp.hunks, key=lambda h: h.start_line, reverse=True):
+                    lines[hunk.start_line - 1 : hunk.end_line] = hunk.modified_lines
+                patched = "\n".join(lines)
+                if files_to_upload[str(fp.file_path)].endswith("\n"):
+                    patched += "\n"
+                files_to_upload[str(fp.file_path)] = patched
+
+        tools = LANGUAGE_TOOLS.get(language, LANGUAGE_TOOLS.get("python"))
+        test_cmd = test_command or tools.get("test_runner", "pytest")
+        
+        payload = {
+            "files": files_to_upload,
+            "language": language,
+            "command": test_cmd
+        }
+        
+        config = ConfigManager()
+        base_url = config.user.api_base_url or "https://gptcgt.ai/api"
+        # The proxy exposes /v1/sandbox/execute
+        url = f"{base_url}/v1/sandbox/execute"
+        
+        if on_stdout:
+            on_stdout(f"🚀 Sending {len(files_to_upload)} files to Zero-Retention Sandbox Proxy...\n")
+            
+        try:
+            async with httpx.AsyncClient(timeout=65.0) as client:
+                resp = await client.post(
+                    url,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {session_token}"}
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                
+            if on_stdout and data.get("stdout"):
+                on_stdout(data["stdout"])
+            if on_stderr and data.get("stderr"):
+                on_stderr(data["stderr"])
+                
+            # Parse test results
+            result.test_result = self._parse_test_output(
+                data.get("stdout", ""),
+                data.get("stderr", ""),
+                data.get("exit_code", 1),
+                language
+            )
+        except Exception as e:
+            if on_stderr:
+                on_stderr(f"❌ Proxy Execution Error: {str(e)}\n")
+            raise e
+            
+        return result
+
     async def _verify_with_sandbox(
         self,
         patch_set: PatchSet,
@@ -272,6 +365,8 @@ class E2BSandbox:
         language: str,
         test_command: str | None,
         result: VerificationResult,
+        on_stdout: "Callable[[str], None] | None" = None,
+        on_stderr: "Callable[[str], None] | None" = None,
     ) -> VerificationResult:
         """
         Full verification in E2B sandbox.
@@ -316,9 +411,14 @@ class E2BSandbox:
             modified_files_str = " ".join(str(fp.file_path) for fp in patch_set.patches)
             lint_cmd = tools["linter"].replace("{files}", modified_files_str)
             try:
+                cb_out = (lambda m: on_stdout(str(getattr(m, "line", m)) + "\n")) if on_stdout else None
+                cb_err = (lambda m: on_stderr(str(getattr(m, "line", m)) + "\n")) if on_stderr else None
+
                 lint_exec = sandbox.commands.run(
                     f"cd /home/user/project && {lint_cmd}",
                     timeout=30,
+                    on_stdout=cb_out,
+                    on_stderr=cb_err,
                 )
                 result.lint_result = self._parse_lint_output(lint_exec.stdout, language)
             except Exception as e:
@@ -327,9 +427,13 @@ class E2BSandbox:
             # Run tests
             test_cmd = test_command or tools["test_runner"]
             try:
+                cb_out = (lambda m: on_stdout(str(getattr(m, "line", m)) + "\n")) if on_stdout else None
+                cb_err = (lambda m: on_stderr(str(getattr(m, "line", m)) + "\n")) if on_stderr else None
                 test_exec = sandbox.commands.run(
                     f"cd /home/user/project && {test_cmd}",
                     timeout=120,
+                    on_stdout=cb_out,
+                    on_stderr=cb_err,
                 )
                 result.test_result = self._parse_test_output(
                     test_exec.stdout, test_exec.stderr, test_exec.exit_code, language
@@ -416,6 +520,7 @@ class E2BSandbox:
         """Parse test runner output into TestResult."""
         result = TestResult()
         combined = f"{stdout}\n{stderr}"
+        result.raw_output = combined
 
         if language == "python":
             # Parse pytest output

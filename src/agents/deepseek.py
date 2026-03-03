@@ -18,6 +18,14 @@ _residency_warned = False
 class DeepSeekAgent(BaseAgent):
     """Agent implementation for DeepSeek models."""
 
+    @property
+    def capabilities(self):
+        from src.agents.base import ProviderCapabilities
+        caps = ProviderCapabilities(max_context=self.config.max_tokens or 64000)
+        if "reasoner" in self.config.model_id or "r1" in self.config.model_id.lower():
+            caps.supports_tools = False
+        return caps
+
     async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[AgentResponse, None]:
         global _residency_warned
         async with _residency_lock:
@@ -38,10 +46,11 @@ class DeepSeekAgent(BaseAgent):
             system_prompt=self.config.system_prompt,
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
-            tools=self.config.tools if self.config.tools else None,
+            tools=self.config.tools if (self.config.tools and self.capabilities.supports_tools) else None,
             timeout=self.config.timeout,
             api_key=api_key,
             base_url=self.config.base_url,
+            extra_headers=self.config.extra_headers,
         ):
             yield chunk
 

@@ -222,12 +222,17 @@ class OnboardingScreen(ModalScreen):
                 }
                 provider_name = prov_map.get(var_name)
 
-                from src.core.model_registry import ModelRegistry
+                from src.core.model_registry import ModelRegistry, Provider
 
                 registry = ModelRegistry()
-                models = [
-                    m for m in registry.get_available_models() if m.provider.value == provider_name
-                ]
+  # noqa: W293
+                # Fetch provider models directly (bypass get_available_models since key isn't saved yet)
+                try:
+                    provider_enum = Provider(provider_name)
+                    models = registry.get_by_provider(provider_enum)
+                except ValueError:
+                    models = []
+
                 if models:
                     cheapest = min(models, key=lambda m: m.input_cost_per_mtok)
                     from src.agents.factory import AgentFactory

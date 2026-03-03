@@ -48,6 +48,7 @@ class EnhancedStatusBar(Static):
 
     today_cost = reactive(0.0)
     month_cost = reactive(0.0)
+    task_cost = reactive(0.0)  # Per-task cumulative cost
 
     budget_pct = reactive(0.0)
     credits_remaining = reactive(1000)
@@ -79,9 +80,13 @@ class EnhancedStatusBar(Static):
         else:
             cost_str = f"Est: ${self.est_cost:.2f}"
 
-        # Build historical cost
+        # Per-task cost (visible during streaming and after)
+        task_str = f"Task: ${self.task_cost:.3f}" if self.task_cost > 0 else ""
+
+        # Build historical cost — BYOK users see sandbox + daily limit
         if self.user_plan.lower() == "byok":
-            today_str = f"Est. Spend: ${self.today_cost:.2f}"
+            dl = self._get_daily_limit()
+            today_str = f"🔒 ${self.today_cost:.2f}/${dl:.0f}"
         else:
             today_str = f"Today: ${self.today_cost:.2f}"
 
@@ -113,13 +118,28 @@ class EnhancedStatusBar(Static):
             mode_str,
             credit_str,
             cost_str,
+        ]
+        if task_str:
+            parts.append(task_str)
+        parts.extend([
             today_str,
             month_str,
             budget_str,
             rem_str,
-        ]
+        ])
 
         return " │ ".join(parts)
+
+    def _get_daily_limit(self) -> float:
+        """Read the daily limit from config, with fallback."""
+        try:
+            import textual.app as _tapp
+            current_app = _tapp.active_app.get()
+            if hasattr(current_app, "config"):
+                return getattr(current_app.config.user, "daily_spend_limit", 10.0)
+        except Exception:
+            pass
+        return 10.0
 
     # Dispatched model display is handled by the ActiveAgentsBar component, not the global config op_mode  # noqa: E501
 

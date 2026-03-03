@@ -6,6 +6,7 @@ Provides a single source of truth for shortcuts, slash commands, and palette act
 from __future__ import annotations
 
 import difflib
+import shlex
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional
@@ -103,6 +104,27 @@ class CommandRegistry:
                 return False
         logger.warning(f"Command not found: {identifier}")
         return False
+
+    def resolve_slash(self, text: str) -> tuple[Command | None, list[str]]:
+        """
+        Parse a slash command string into (Command, args) using shlex.  # noqa: D213
+
+        Returns (None, []) if the command is not found.
+        """
+        try:
+            parts = shlex.split(text)
+        except ValueError:
+            parts = text.split()
+        if not parts:
+            return None, []
+        base = parts[0].lower()
+        args = parts[1:]
+        cmd = self._by_slash.get(base)
+        return cmd, args
+
+    def get_slash_commands(self) -> list[Command]:
+        """Return all registered slash commands (visible only)."""
+        return [cmd for cmd in self._by_slash.values() if cmd.visible]
 
     def set_enabled(self, command_id: str, enabled: bool) -> None:
         """Toggle command execution ability."""
@@ -378,7 +400,15 @@ def register_default_commands(app: Any) -> None:
         return None
 
     if hasattr(app, "chat_store"):
-        new_session_action = getattr(app.chat_store, "new_session", lambda: None)
+        def new_session_action():  # noqa: F811
+            app.chat_store.new_session()
+            # Immediately reload chat panel so user sees the reset
+            try:
+                from src.tui.panels.chat import ChatPanel
+                chat_panel = app.query_one("#right-panel", ChatPanel)
+                chat_panel._load_session_history()
+            except Exception:
+                pass
     registry.register(
         Command(
             "chat.new",
@@ -387,6 +417,77 @@ def register_default_commands(app: Any) -> None:
             slash="/new",
             category=CommandCategory.CHAT,
             icon="✨",
+            description="Start a fresh chat session.",
+        )
+    )
+
+    # ── New argument-aware slash commands ──────────────────
+    # These are registered as no-op actions; actual logic is in ChatPanel._handle_slash_command
+    # because they need access to the chat panel and/or take arguments.
+    registry.register(
+        Command(
+            id="chat.export",
+            title="Export Session",
+            action=lambda: None,  # handled by ChatPanel
+            slash="/export",
+            category=CommandCategory.CHAT,
+            icon="📤",
+            description="Export current session as timestamped markdown file.",
+        )
+    )
+    registry.register(
+        Command(
+            id="chat.compact",
+            title="Compact Context",
+            action=lambda: None,
+            slash="/compact",
+            category=CommandCategory.CHAT,
+            icon="📦",
+            description="Summarize older messages to reclaim context window.",
+        )
+    )
+    registry.register(
+        Command(
+            id="chat.cost",
+            title="Cost Summary",
+            action=lambda: None,
+            slash="/cost",
+            category=CommandCategory.CHAT,
+            icon="💰",
+            description="Show session/daily/monthly cost breakdown.",
+        )
+    )
+    registry.register(
+        Command(
+            id="chat.context",
+            title="Context Budget",
+            action=lambda: None,
+            slash="/context",
+            category=CommandCategory.CHAT,
+            icon="📊",
+            description="Show current context window usage stats.",
+        )
+    )
+    registry.register(
+        Command(
+            id="chat.mode",
+            title="Switch Mode",
+            action=lambda: None,
+            slash="/mode",
+            category=CommandCategory.CHAT,
+            icon="🎯",
+            description="Switch mode: /mode scout|standard|ensemble|battle|architect.",
+        )
+    )
+    registry.register(
+        Command(
+            id="chat.auto",
+            title="Autonomous Mode",
+            action=lambda: None,
+            slash="/auto",
+            category=CommandCategory.CHAT,
+            icon="🚀",
+            description="Start autonomous mode: /auto <goal>. AI agents collaborate to build your project.",
         )
     )
 
@@ -431,3 +532,4 @@ def register_default_commands(app: Any) -> None:
             icon="↪️",
         )
     )
+

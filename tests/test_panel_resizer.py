@@ -178,3 +178,52 @@ async def test_panel_resizer_double_click_reset():
         # We check if the app received the message. The app doesn't implement a handler,
         # but the event should be posted.
         assert resizer._click_count == 0  # Reset after double click
+
+
+@pytest.mark.asyncio
+async def test_panel_resizer_uses_screen_position_when_delta_is_zero():
+    """Regression: some terminals report delta_x=0 during a drag move."""
+    app = ResizerApp()
+    async with app.run_test(size=(100, 20)) as pilot:
+        left = app.query_one("#left-panel")
+        right = app.query_one("#right-panel")
+        resizer = app.query_one("#resizer", PanelResizer)
+
+        assert left.outer_size.width == 20
+        assert right.outer_size.width == 79
+
+        down_event = MouseDown(
+            resizer,
+            x=0,
+            y=0,
+            delta_x=0,
+            delta_y=0,
+            button=1,
+            shift=False,
+            meta=False,
+            ctrl=False,
+            screen_x=20,
+            screen_y=10,
+        )
+        resizer.post_message(down_event)
+        await pilot.pause()
+
+        # delta_x intentionally 0 while screen_x moves right by +8
+        move_event = MouseMove(
+            resizer,
+            x=0,
+            y=0,
+            delta_x=0,
+            delta_y=0,
+            button=1,
+            shift=False,
+            meta=False,
+            ctrl=False,
+            screen_x=28,
+            screen_y=10,
+        )
+        resizer.post_message(move_event)
+        await pilot.pause()
+
+        assert left.styles.width.value == 28.0
+        assert right.styles.width.value == 71.0

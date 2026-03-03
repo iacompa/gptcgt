@@ -10,9 +10,12 @@ from textual.widgets import Static
 
 from src.core.events import (
     AgentCompleted,
+    AgentConversation,
     AgentDispatched,
     AgentStatusUpdate,
+    BudgetExceeded,
     CostUpdated,
+    DAGTraceEvent,
     OrchestratorNarration,
     PatchProposed,
     SecurityAlert,
@@ -133,3 +136,44 @@ class ActivityFeedPanel(Vertical):
         self._add_entry(
             f"   {icon} Security Alert ({event.severity}): {event.details} in {event.filepath.name}"
         )
+
+    def on_dag_trace_event(self, event: DAGTraceEvent) -> None:
+        """Render DAG node transitions as concise activity entries."""
+        name = event.node.replace("_", " ").title()
+        if event.status == "running":
+            self._add_entry(f"   ⏳ {name}...", is_orchestrator=True)
+        elif event.status == "done":
+            elapsed = f"{event.elapsed_ms}ms" if event.elapsed_ms else ""
+            arrow = f" → {event.next_node.replace('_', ' ').title()}" if event.next_node else ""
+            self._add_entry(
+                f"   ✓ {name} ({elapsed}){arrow}", is_orchestrator=True
+            )
+        elif event.status == "error":
+            self._add_entry(
+                f"   ✗ {name} — {event.error or 'unknown error'}",
+                is_orchestrator=True,
+            )
+
+    # Phase 9: Inter-agent conversation rendering
+
+    _AGENT_ICONS = {
+        "coder": "💻", "tester": "🧪", "arbiter": "⚖️",
+        "scout": "🔍", "orchestrator": "🎯", "architect": "📐",
+    }
+
+    def on_agent_conversation(self, event: AgentConversation) -> None:
+        """Render inter-agent messages as a visible conversation."""
+        from_icon = self._AGENT_ICONS.get(event.from_agent, "🤖")
+        to_icon = self._AGENT_ICONS.get(event.to_agent, "🤖")
+        iter_tag = f"[{event.iteration}] " if event.iteration else ""
+        self._add_entry(f"   {iter_tag}{from_icon} → {to_icon}: {event.content}")
+
+    def on_budget_exceeded(self, event: BudgetExceeded) -> None:
+        """Show a prominent budget warning in the feed."""
+        if event.limit_type == "task_spend":
+            msg = f"⛔ Task budget reached: ${event.current_value:.2f} / ${event.limit_value:.2f}"
+        elif event.limit_type == "task_tokens":
+            msg = f"⛔ Token limit reached: {int(event.current_value):,} / {int(event.limit_value):,}"
+        else:
+            msg = f"⛔ Daily budget reached: ${event.current_value:.2f} / ${event.limit_value:.2f}"
+        self._add_entry(msg, is_orchestrator=True)

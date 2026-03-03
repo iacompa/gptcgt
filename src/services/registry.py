@@ -85,10 +85,11 @@ class LLMProviderKeys(ServiceConfig):
     gemini: str = field(default_factory=lambda: os.environ.get("GEMINI_API_KEY", ""))
     xai: str = field(default_factory=lambda: os.environ.get("XAI_API_KEY", ""))
     deepseek: str = field(default_factory=lambda: os.environ.get("DEEPSEEK_API_KEY", ""))
+    e2b: str = field(default_factory=lambda: os.environ.get("E2B_API_KEY", ""))
 
     @property
     def is_configured(self) -> bool:
-        return any([self.anthropic, self.openai, self.gemini, self.xai, self.deepseek])
+        return any([self.anthropic, self.openai, self.gemini, self.xai, self.deepseek, self.e2b])
 
 
 @dataclass

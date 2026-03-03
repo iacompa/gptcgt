@@ -105,3 +105,40 @@ class UsageMeter:
             )
         except Exception as e:
             logger.error(f"Failed to finalize usage and deduct credits: {e}")
+
+    async def record_fixed_cost(self, event_type: str = "sandbox_run"):
+        """Deduct a fixed cost without stream tracking (e.g. for E2B sandbox runs)."""
+        if self._finalized:
+            return
+        self._finalized = True
+        try:
+            pool = get_pool()
+            internal_id = await pool.fetchval(
+                "SELECT id FROM users WHERE workos_user_id = $1", self.workos_user_id
+            )
+            if not internal_id:
+                logger.error(f"Cannot record fixed cost: User UUID not found for workos_id {self.workos_user_id}")
+                return
+
+            new_balance = await pool.fetchval(
+                "SELECT deduct_credits($1, $2)", internal_id, self.cost_credits
+            )
+            if new_balance == -1:
+                logger.error(f"Fixed cost metered but user {self.workos_user_id} lacked credits.")
+
+            duration_ms = int((datetime.now() - self.start_time).total_seconds() * 1000)
+            await pool.execute(
+                """
+                INSERT INTO usage_events
+                (user_id, task_mode, credits_consumed, models_used, input_tokens, output_tokens, success, duration_ms, created_at)
+                VALUES ($1, $2, $3, $4, 0, 0, true, $5, now())
+                """,
+                internal_id,
+                self.mode,
+                self.cost_credits,
+                [event_type],
+                duration_ms,
+            )
+            logger.info(f"Fixed usage finalized: {self.workos_user_id} | {self.cost_credits}cr for {event_type}")
+        except Exception as e:
+            logger.error(f"Failed to record fixed cost: {e}")

@@ -99,6 +99,7 @@ class KeyChainManager:
             "XAI_API_KEY",
             "DEEPSEEK_API_KEY",
             "OPENROUTER_API_KEY",
+            "CUSTOM_API_KEY",
         ]:
             if cls.get_key(p):
                 return True

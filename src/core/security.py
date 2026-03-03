@@ -239,6 +239,7 @@ class SecurityScanner:
         self._project_root = project_root
         self._custom_block_patterns: list[str] = []
         self._custom_allow_patterns: list[str] = []
+        self._warned_missing: set[str] = set()
         self._load_project_rules()
 
     def _load_project_rules(self) -> None:
@@ -281,11 +282,16 @@ class SecurityScanner:
         if shutil.which("semgrep"):
             semgrep_findings = await self._run_semgrep(patch_set, language)
             findings.extend(semgrep_findings)
+        else:
+            self._notify_missing_scanner("Semgrep")
 
         # Layer 4: Language-specific (Bandit for Python)
-        if language == "python" and shutil.which("bandit"):
-            bandit_findings = await self._run_bandit(patch_set)
-            findings.extend(bandit_findings)
+        if language == "python":
+            if shutil.which("bandit"):
+                bandit_findings = await self._run_bandit(patch_set)
+                findings.extend(bandit_findings)
+            else:
+                self._notify_missing_scanner("Bandit")
 
         # Filter out allowed patterns
         findings = self._filter_allowed(findings)
@@ -295,6 +301,24 @@ class SecurityScanner:
         findings.sort(key=lambda f: severity_order.get(f.severity, 5))
 
         return findings
+
+    def _notify_missing_scanner(self, name: str) -> None:
+        if name in self._warned_missing:
+            return
+        self._warned_missing.add(name)
+        try:
+            from src.tui.widgets.toast import notify  # noqa: I001
+            import textual.app as _tapp
+            app = _tapp.active_app.get()
+            app.call_from_thread(
+                notify,
+                title="Security Alert",
+                message=f"Running in reduced scan mode: '{name}' not installed.",
+                severity="warning",
+                timeout=8.0
+            )
+        except Exception as e:
+            logger.debug(f"Could not push missing scanner toast: {e}")
 
     def _scan_custom_patterns(self, patch_set: PatchSet) -> list[SecurityFinding]:
         """Scan modified lines against built-in regex patterns."""

@@ -14,6 +14,9 @@ class ContentFilter:
             re.compile(r"disregard all prior instructions", re.IGNORECASE),
             re.compile(r"pretend you are a (?:hacker|jailbroken ai)", re.IGNORECASE),
             re.compile(r"output the hidden prompt", re.IGNORECASE),
+            re.compile(r"forget your programming", re.IGNORECASE),
+            re.compile(r"enter (?:god|root|admin) mode", re.IGNORECASE),
+            re.compile(r"turn off (?:safety|moderation|filters)", re.IGNORECASE),
             # Harmful activities & weapons
             re.compile(
                 r"tell me how to (?:build|make|manufacture) a (?:bomb|weapon|IED|explosive)",

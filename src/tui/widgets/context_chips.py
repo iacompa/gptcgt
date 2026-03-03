@@ -139,6 +139,7 @@ class ContextChipBar(Horizontal):
         width: 100%;
         padding: 0 1;
         overflow-x: auto;
+        display: none;
     }
     """
 
@@ -147,7 +148,8 @@ class ContextChipBar(Horizontal):
         self._context_files: dict[str, dict] = {}  # file_path -> {label, chip_type, line_range}
 
     def compose(self) -> ComposeResult:
-        yield AddFileChip(id="add-file-chip")
+        return
+        yield  # Make this a generator that yields nothing
 
     def add_file_chip(self, file_path: str) -> None:
         """Add a file context chip."""
@@ -161,9 +163,8 @@ class ContextChipBar(Horizontal):
             id=f"chip-{hash(file_path) & 0xFFFFFFFF}",
         )
         self._context_files[file_path] = {"label": label, "chip_type": "file", "line_range": None}
-        # Mount before the add-file chip
-        add_chip = self.query_one("#add-file-chip", AddFileChip)
-        self.mount(chip, before=add_chip)
+        self.mount(chip)
+        self._update_visibility()
 
     def add_selection_chip(self, file_path: str, start_line: int, end_line: int) -> None:
         """Add a code selection context chip."""
@@ -184,8 +185,8 @@ class ContextChipBar(Horizontal):
             "chip_type": "selection",
             "line_range": (start_line, end_line),
         }
-        add_chip = self.query_one("#add-file-chip", AddFileChip)
-        self.mount(chip, before=add_chip)
+        self.mount(chip)
+        self._update_visibility()
 
     def remove_chip_by_path(
         self, file_path: str, line_range: tuple[int, int] | None = None
@@ -197,6 +198,7 @@ class ContextChipBar(Horizontal):
             key = file_path
         if key in self._context_files:
             del self._context_files[key]
+        self._update_visibility()
 
     def get_context_summary(self) -> list[dict]:
         """
@@ -225,3 +227,9 @@ class ContextChipBar(Horizontal):
             if isinstance(child, ContextChip):
                 child.remove()
         self._context_files.clear()
+        self._update_visibility()
+
+    def _update_visibility(self) -> None:
+        """Show bar only when chips exist, collapse fully when empty."""
+        has_chips = bool(self._context_files)
+        self.display = has_chips

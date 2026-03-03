@@ -38,6 +38,8 @@ class ReflectionEngine:
         original_prompt: str,
         agent_output: str,
         failure_reason: str,
+        task_id: str = "unknown",
+        file_refs: list[str] | None = None,
     ) -> None:
         """
         Background worker that processes high-signal friction events.
@@ -61,11 +63,15 @@ class ReflectionEngine:
                 ),
             )
 
-            target_file = f".gptcgt/agents/{model_name.lower().replace(' ', '_')}.md"
-            existing_memory = ""
+            target_file = ".gptcgt/memory.json"
+            existing_memory = []
 
             if self.workspace.safe_exists(target_file):
-                existing_memory = self.workspace.safe_read(target_file)
+                try:
+                    import json
+                    existing_memory = json.loads(self.workspace.safe_read(target_file))
+                except Exception:
+                    pass
 
             # Route exclusively to the cheapest model to protect margins
             available_models = self.registry.get_available_models()
@@ -78,53 +84,30 @@ class ReflectionEngine:
             cheapest_available = sorted(available_models, key=lambda x: x.input_cost_per_mtok)[0]
             light_model = cheapest_available
 
-            # Prepare the compaction prompt — YAML-structured schema
-            system_prompt = (
-                "You are an AI Memory Compaction Engine. Your job is to extract a 'lesson learned' "
-                "from a failed or overridden AI interaction, and merge it into a persistent memory file.\n\n"
-                "OUTPUT FORMAT (STRICT):\n"
-                "```\n"
-                "---\n"
-                "agent: {agent_name}\n"
-                "last_updated: {ISO timestamp}\n"
-                "version: {increment from existing}\n"
-                "total_lessons: {count}\n"
-                "---\n"
-                "## Routing Patterns\n"
-                "- [confidence:high] When X, use Y model\n"
-                "## Known Gotchas\n"
-                "- [confidence:medium] This project uses ruff not pylint\n"
-                "## File Affinity\n"
-                "- [scope:project] src/core/config.py is always relevant for settings\n"
-                "## Failure Patterns\n"
-                "- [timestamp:{ISO}] Description of what went wrong\n"
-                "```\n\n"
-                "RULES:\n"
-                "1. If there is existing memory, merge the new lesson into the correct section.\n"
-                "2. Deduplicate — do not repeat facts already present.\n"
-                "3. Each bullet MUST have a [confidence:high|medium|low] or [scope:project|file] tag.\n"
-                "4. Keep total response UNDER 800 words.\n"
-                "5. Preserve the YAML frontmatter. Increment version. Update last_updated and total_lessons."
+            from src.core.system_prompt import SystemPromptBuilder
+            system_prompt = SystemPromptBuilder.build(
+                role_type="engineer",
+                custom_instructions=(
+                    "You are an AI Memory Compaction Engine. Your job is to extract a highly concise 'lesson learned' "
+                    "from a failed or overridden AI interaction.\n\n"
+                    "OUTPUT FORMAT: Return carefully structured JSON matching this schema:\n"
+                    "{\n"
+                    '  "failure_mode": "A 3-5 word summary of the failure",\n'
+                    '  "action_taken": "The specific instruction to avoid this next time",\n'
+                    '  "outcome": "friction_logged"\n'
+                    "}\n"
+                    "Do NOT include markdown block formatting, just the raw JSON."
+                ),
+                model_name=light_model.name
             )
 
-            from datetime import datetime
-            _default_mem = (
-                "---\nagent: " + model_name
-                + "\nlast_updated: " + datetime.now().isoformat()
-                + "\nversion: 0\ntotal_lessons: 0\n---\n"
-            )
-            _memory_block = existing_memory or _default_mem
             user_prompt = f"""
-EXISTING MEMORY:
-{_memory_block}
-
----
 FRICTION EVENT ({trigger_event}):
 Prompt: {original_prompt}
 Output: {agent_output[:1000]}... (truncated)
 Failure/Override Reason: {failure_reason}
 
-TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output only the updated file.
+TASK: Extract the lesson learned as JSON.
 """
 
             # Initialize the base agent for the LIGHT model
@@ -142,7 +125,11 @@ TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output o
                 return
 
             agent = AgentFactory.create_agent(light_model, api_key=api_key)
-            agent.config.max_tokens = 800
+            agent.config.max_tokens = 500
+            try:
+                agent.config.response_format = {"type": "json_object"}
+            except AttributeError:
+                pass
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -150,6 +137,8 @@ TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output o
             ]
 
             import asyncio
+            import json
+            import os
 
             # Using asyncio.run to execute the async chat_stream within the synchronous thread worker.
             async def _run_stream() -> str:
@@ -159,26 +148,96 @@ TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output o
                         full_compacted_memory += chunk.text
                 return full_compacted_memory
 
-            new_memory = asyncio.run(_run_stream())
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-            if new_memory:
-                self.workspace.safe_write(target_file, new_memory.strip())
-                logger.info(f"Successfully compacted memory for {model_name}.")
+            new_memory_raw = loop.run_until_complete(_run_stream())
 
-                # Emit ReflectionRetryHint so the TUI can surface the lesson and
-                # inject it into the next dispatch as a system context hint.
+            # Parse JSON
+            raw = new_memory_raw.strip()
+            if raw.startswith("```json"):
+                raw = raw[7:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+
+            try:
+                lesson_data = json.loads(raw.strip())
+            except Exception as e:
+                logger.error(f"Failed to parse reflection JSON: {e}")
+                self._clear_ui_state(model_name)
+                return
+
+            # Vectorize the lesson using litellm
+            from datetime import datetime
+
+            import litellm
+
+            embedding_model = None
+            emb_api_key = None
+            for model in available_models:
+                provider_str = model.provider.value
+                if provider_str in ["openai", "google"]:
+                    k_name = PROVIDER_KEY_MAP.get(provider_str)
+                    found_key = KeyChainManager.get_key(k_name) if k_name else None
+                    if found_key:
+                        embedding_model = "text-embedding-3-small" if provider_str == "openai" else "gemini/text-embedding-004"  # noqa: E501
+                        emb_api_key = found_key
+                        break
+
+            embedding_vector = []
+            if embedding_model and emb_api_key:
                 try:
-                    from src.core.events import ReflectionRetryHint
-                    self.app.call_from_thread(
-                        self.app.post_message,
-                        ReflectionRetryHint(
-                            model_name=model_name,
-                            lesson=new_memory.strip()[:600],  # Cap at 600 chars for UI readability
-                            trigger_event=trigger_event,
-                        ),
+                    if "openai" in embedding_model:
+                        os.environ["OPENAI_API_KEY"] = emb_api_key
+                    elif "gemini" in embedding_model:
+                        os.environ["GEMINI_API_KEY"] = emb_api_key
+
+                    response = litellm.embedding(
+                        model=embedding_model,
+                        input=[lesson_data.get("action_taken", "")]
                     )
+                    embedding_vector = response.data[0]['embedding']
                 except Exception as e:
-                    logger.debug(f"ReflectionRetryHint emit failed: {e}")
+                    logger.debug(f"Reflection embedding failed: {e}")
+
+            # Append to memory following unified schema
+            lesson_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "task_id": task_id,
+                "file_refs": file_refs or [],
+                "failure_mode": lesson_data.get("failure_mode", trigger_event),
+                "action_taken": lesson_data.get("action_taken", ""),
+                "outcome": lesson_data.get("outcome", "friction_logged"),
+                "agent": model_name,
+                "embedding": embedding_vector
+            }
+
+            existing_memory.append(lesson_entry)
+
+            # Keep only the last 50 lessons to prevent runaway file size
+            if len(existing_memory) > 50:
+                existing_memory = existing_memory[-50:]
+
+            self.workspace.safe_write(target_file, json.dumps(existing_memory, indent=2))
+            logger.info(f"Successfully compacted memory vector for {model_name}.")
+
+            # Emit ReflectionRetryHint so the TUI can surface the lesson and
+            # inject it into the next dispatch as a system context hint.
+            try:
+                from src.core.events import ReflectionRetryHint
+                self.app.call_from_thread(
+                    self.app.post_message,
+                    ReflectionRetryHint(
+                        model_name=model_name,
+                        lesson=lesson_data.get("action_taken", "")[:600],
+                        trigger_event=trigger_event,
+                    ),
+                )
+            except Exception as e:
+                logger.debug(f"ReflectionRetryHint emit failed: {e}")
 
             self._clear_ui_state(model_name)
 
@@ -216,26 +275,35 @@ TASK: Merge the new lesson into EXISTING MEMORY using the schema above. Output o
     ) -> None:
         """Proactive learning: log a successful task for routing optimization."""
         try:
-            from datetime import datetime
-            target_file = f".gptcgt/agents/{model_name.lower().replace(' ', '_')}.md"
-            existing = ""
+            target_file = ".gptcgt/memory.json"
+            existing = []
             if self.workspace.safe_exists(target_file):
-                existing = self.workspace.safe_read(target_file)
-
+                try:
+                    import json
+                    existing = json.loads(self.workspace.safe_read(target_file))
+                except Exception:
+                    pass
             hit_rate = (relevant_files_used / relevant_files_injected * 100) if relevant_files_injected > 0 else 0
 
-            log_entry = (
-                f"\n- [timestamp:{datetime.now().isoformat()}] SUCCESS: "
-                f"model={model_id}, tier={tier}, cost=${cost_usd:.4f}, "
-                f"tokens={input_tokens}→{output_tokens}, "
-                f"file_relevance_hit_rate={hit_rate:.0f}%"
-            )
+            # For successes, we don't need a vector embedding, just log telemetry
+            from datetime import datetime
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "task_id": "unknown",  # We can update this signature later if needed
+                "file_refs": [],
+                "failure_mode": "none",
+                "action_taken": f"SUCCESS: model={model_id}, tier={tier}",
+                "outcome": f"success_cost_${cost_usd:.4f}_tokens_{input_tokens}_{output_tokens}_hit_{hit_rate:.0f}%",
+                "agent": model_name,
+                "type": "telemetry"
+            }
 
-            # Append to existing, cap file at 5000 chars
-            new_memory = (existing + log_entry)[-5000:]
-            self.workspace.safe_write(target_file, new_memory)
-            logger.info(f"Proactive learning logged for {model_name}: ${cost_usd:.4f}, {hit_rate:.0f}% relevance")
+            existing.append(log_entry)
+            if len(existing) > 50:
+                existing = existing[-50:]
+
+            import json
+            self.workspace.safe_write(target_file, json.dumps(existing, indent=2))
+
         except Exception as e:
-            logger.debug(f"Proactive learning log failed: {e}")
-
-
+            logger.debug(f"Proactive learning failed: {e}")

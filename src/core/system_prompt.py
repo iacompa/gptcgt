@@ -35,6 +35,11 @@ class SystemPromptBuilder:
         """
         prompt_parts = []
 
+        # Budget allocations (approx 1 token = 4 chars)
+        # We want to keep injected context under ~16,000 chars (4000 tokens)
+        MAX_INJECTED_CHARS = 16000
+        budget_remaining = MAX_INJECTED_CHARS
+
         # 1. Base Identity
         if role_type == "engineer":
             prompt_parts.append(
@@ -44,9 +49,7 @@ class SystemPromptBuilder:
             )
 
         # 2. Configured Universal Rules (from ~/.gptcgt/config.toml)
-        ConfigManager()
-        # Universal rules are not yet a config field; this will be added when Settings supports custom system prompts  # noqa: E501
-        # For now, skip this section
+        ConfigManager.get_instance()
 
         # 3. Custom Instructions (e.g., from prompt/command overrides)
         if custom_instructions:
@@ -60,9 +63,10 @@ class SystemPromptBuilder:
 
             # Inject the User's explicit progress.md feature
             progress_path = ws.get_project_root() / "progress.md"
-            if ws.safe_exists(progress_path):
+            if ws.safe_exists(progress_path) and budget_remaining > 0:
                 progress_content = ws.safe_read(progress_path)
                 if progress_content:
+                    alloc = min(len(progress_content), 4000)
                     prompt_parts.append("\n# Active Progress Tracker (`progress.md`)")
                     prompt_parts.append(
                         "The user has defined a `progress.md` file in the project root to track development."  # noqa: E501
@@ -74,17 +78,20 @@ class SystemPromptBuilder:
                         "As you complete tasks or shift focus, use your file editing tools to update `progress.md` natively (e.g., mark items [x] or change statuses) to keep the user informed."  # noqa: E501
                     )
                     prompt_parts.append("--- CURRENT PROGRESS STATE ---")
-                    prompt_parts.append(progress_content[:2000])  # Truncate to avoid token bloat
+                    prompt_parts.append(progress_content[:alloc])  # Truncate to budget
                     prompt_parts.append("------------------------------")
+                    budget_remaining -= alloc
 
             phase_tracker = PhaseTracker(ws)
             phase_tracker.ensure_loaded()
             phase_path = ws.get_project_root() / ".gptcgt" / "phase.md"
-            if ws.safe_exists(phase_path):
+            if ws.safe_exists(phase_path) and budget_remaining > 0:
                 phase_content = ws.safe_read(phase_path)
                 if phase_content:
+                    alloc = min(len(phase_content), 3000, budget_remaining)
                     prompt_parts.append("\n# Project Status (phase.md)")
-                    prompt_parts.append(phase_content[:2000])  # Truncate to avoid token bloat
+                    prompt_parts.append(phase_content[:alloc])
+                    budget_remaining -= alloc
         except Exception:
             pass  # Workspace not initialized yet
 
@@ -92,11 +99,13 @@ class SystemPromptBuilder:
         try:
             ws = Workspace.get_instance()
             project_path = ws.get_project_root() / ".gptcgt" / "project.md"
-            if ws.safe_exists(project_path):
+            if ws.safe_exists(project_path) and budget_remaining > 0:
                 project_content = ws.safe_read(project_path)
                 if project_content:
+                    alloc = min(len(project_content), 3000, budget_remaining)
                     prompt_parts.append("\n# Project Context Map")
-                    prompt_parts.append(project_content[:2000])
+                    prompt_parts.append(project_content[:alloc])
+                    budget_remaining -= alloc
         except Exception:
             pass
 
@@ -105,8 +114,10 @@ class SystemPromptBuilder:
             from src.core.blackboard import AgentBlackboard
             bb = AgentBlackboard.get_instance()
             bb_context = bb.to_context_string()
-            if bb_context:
-                prompt_parts.append(f"\n{bb_context}")
+            if bb_context and budget_remaining > 0:
+                alloc = min(len(bb_context), 4000, budget_remaining)
+                prompt_parts.append(f"\n{bb_context[:alloc]}")
+                budget_remaining -= alloc
         except Exception:
             pass
 
@@ -114,37 +125,101 @@ class SystemPromptBuilder:
         now = datetime.now()
         prompt_parts.append(f"\n# Temporal Context\nCurrent Time: {now.isoformat()}")
 
-        # 6. Self-Reflective Compaction Memory (Friction-Driven)
-        # Check if the specific instantiated agent has a memory record of past failures/lessons
-        # We uniquely identify the "Orchestrator" vs "Arbiter" vs "gpt-4o" via their model_name
-        identity = model_name if model_name else role_type
-        memory_filename = identity.lower().replace(" ", "_") + ".md"
+        # 6. Vector Memory (Self-Reflective Compaction Memory)
         try:
             ws = Workspace.get_instance()
-            memory_path = ws.get_project_root() / ".gptcgt" / "agents" / memory_filename
+            memory_path = ws.get_project_root() / ".gptcgt" / "memory.json"
             if ws.safe_exists(memory_path):
-                memory_content = ws.safe_read(memory_path)
-                if memory_content:
-                    prompt_parts.append("\n<accumulated_learnings>")
-                    prompt_parts.append(memory_content)
-                    prompt_parts.append("</accumulated_learnings>")
-                    prompt_parts.append(
-                        "<directive>CRITICAL: You must adhere to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"  # noqa: E501
-                    )
+                import json
+                try:
+                    memory_data = json.loads(ws.safe_read(memory_path))
+                except Exception:
+                    memory_data = []
 
-                    # Phase 19: Transient UI memory injection indicators
-                    from src.core.events import AgentStatusUpdate
+                if memory_data:
+                    # Let's see if we have a task brief to search against
+                    search_query = custom_instructions or "general programming task"
                     try:
-                        import textual.app as _tapp
-                        current_app = _tapp.active_app.get()
-                        current_app.post_message(AgentStatusUpdate(
-                            agent_id="memory",
-                            model_name=identity,
-                            status="thinking",
-                            detail=f"Reading memory from {memory_filename}..."
-                        ))
-                    except Exception:
-                        pass
+                        from src.core.blackboard import AgentBlackboard
+                        bb = AgentBlackboard.get_instance()
+                        tb = bb.read("task_brief")
+                        if tb and hasattr(tb, "user_request"):
+                            search_query = tb.user_request
+                    except Exception as e:
+                        from src.core.logger import get_logger
+                        get_logger("core.system_prompt").warning(f"Failed to read task brief for memory: {e}")
+
+                    # Calculate query embedding via synchronous litellm
+                    import os  # noqa: F401
+
+                    import litellm
+
+                    from src.agents.factory import PROVIDER_KEY_MAP
+                    from src.auth.keychain import KeyChainManager
+
+                    emb_query = None
+                    provider = "openai"  # default
+                    k_name = PROVIDER_KEY_MAP.get(provider)
+                    api_key = KeyChainManager.get_key(k_name) if k_name else None
+                    if api_key:
+                        try:
+                            emb_res = litellm.embedding(
+                                model="text-embedding-3-small",
+                                input=[search_query],
+                                api_key=api_key,
+                            )
+                            emb_query = emb_res.data[0]['embedding']
+                        except Exception:
+                            pass
+
+                    # Retrieve top 3 lessons
+                    top_lessons = []
+                    if emb_query:
+                        def _cosine_sim(v1, v2):
+                            dot = sum(a * b for a, b in zip(v1, v2))
+                            mag1 = sum(a * a for a in v1) ** 0.5
+                            mag2 = sum(b * b for b in v2) ** 0.5
+                            return dot / (mag1 * mag2) if mag1 and mag2 else 0.0
+
+                        scored_lessons = []
+                        for m in memory_data:
+                            if m.get('type') == 'telemetry':
+                                continue
+                            lesson_emb = m.get('embedding')
+                            if not lesson_emb:
+                                continue
+                            score = _cosine_sim(emb_query, lesson_emb)
+                            scored_lessons.append((score, m))
+
+                        scored_lessons.sort(key=lambda x: x[0], reverse=True)
+                        top_lessons = [m for _, m in scored_lessons[:3]]
+                    else:
+                        # Fallback: Just take the 3 most recent
+                        top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]
+
+                    if top_lessons:
+                        prompt_parts.append("\n<accumulated_learnings>")
+                        for l in top_lessons:  # noqa: E741
+                            prompt_parts.append(f"- RULE: {l.get('lesson')} (Context: {l.get('trigger')})")
+                        prompt_parts.append("</accumulated_learnings>")
+                        prompt_parts.append(
+                            "<directive>CRITICAL: You must adhere to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"  # noqa: E501
+                        )
+
+                        # Transient UI memory injection indicators
+                        from src.core.events import AgentStatusUpdate
+                        identity = model_name if model_name else role_type
+                        try:
+                            import textual.app as _tapp
+                            current_app = _tapp.active_app.get()
+                            current_app.post_message(AgentStatusUpdate(
+                                agent_id="memory",
+                                model_name=identity,
+                                status="thinking",
+                                detail=f"Injected {len(top_lessons)} vector memories."
+                            ))
+                        except Exception:
+                            pass
         except Exception:
             pass
 

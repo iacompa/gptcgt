@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
         const token = createSessionToken(email);
 
-        const response = NextResponse.json({ success: true, email });
+        const response = NextResponse.json({ success: true, email, token });
 
         // Set HTTP-only cookie with the JWT
         response.cookies.set('gptcgt_session', token, {

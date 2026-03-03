@@ -28,10 +28,11 @@ class AnthropicAgent(BaseAgent):
             system_prompt=self.config.system_prompt,
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
-            tools=self.config.tools if self.config.tools else None,
+            tools=self.config.tools if (self.config.tools and self.capabilities.supports_tools) else None,
             timeout=self.config.timeout,
             api_key=api_key,
             base_url=self.config.base_url,
+            extra_headers=self.config.extra_headers,
         ):
             yield chunk
 
