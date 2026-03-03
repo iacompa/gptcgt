@@ -76,6 +76,13 @@ class ProjectContextGenerator:
             "dist",
             "build",
             ".next",
+            "test-env",
+            ".gptcgt",
+            "tmp",
+            ".tox",
+            ".pytest_cache",
+            "coverage",
+            ".ruff_cache",
         }
         for fp in self._root.rglob("*"):
             if any(ex in fp.parts for ex in EXCLUDED_DIRS):

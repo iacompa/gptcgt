@@ -9,23 +9,23 @@ identically without re-inferring intent from raw text.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import BaseModel, Field, field_validator
 
-@dataclass
-class TaskBrief:
+
+class TaskBrief(BaseModel):
     """Structured task context passed from Orchestrator to all downstream agents."""
 
     # Core intent
-    intent: str = "chat"
-    complexity: int = 5
-    user_request: str = ""
+    intent: str = Field(default="chat", min_length=1)
+    complexity: int = Field(default=5, ge=1, le=10)
+    user_request: str = Field(min_length=1)
 
     # Scout findings
-    mentioned_files: list[str] = field(default_factory=list)
-    mentioned_symbols: list[str] = field(default_factory=list)
-    relevant_files: list[dict] = field(default_factory=list)  # [{path, content}]
+    mentioned_files: list[str] = Field(default_factory=list)
+    mentioned_symbols: list[str] = Field(default_factory=list)
+    relevant_files: list[dict] = Field(default_factory=list)  # [{path, content}]
 
     # Routing decision
     selected_model_id: str = ""
@@ -33,24 +33,37 @@ class TaskBrief:
     quality_tier: str = "standard"
 
     # Memory hints from .gptcgt/agents/*.md
-    memory_hints: list[str] = field(default_factory=list)
+    memory_hints: list[str] = Field(default_factory=list)
 
     # Orchestrator directives
     reflection_hint: str | None = None
-    key_constraints: list[str] = field(default_factory=list)
+    key_constraints: list[str] = Field(default_factory=list)
+
+    # Future-proof fields
+    parent_task_id: str | None = None
+    budget_override: float | None = None
+    forbidden_patterns: list[str] = Field(default_factory=list)
 
     # Metadata
-    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
     delegation_depth: int = 0
+
+    @field_validator("intent")
+    def validate_intent(cls, v: str) -> str:
+        if not v:
+            raise ValueError("TaskBrief.intent is required")
+        return v
 
     def to_system_context(self) -> str:
         """Convert to a system prompt fragment for injection."""
-        self.validate()  # Ensure required fields before injection
         parts = [
             "# Task Brief",
             f"**Intent:** {self.intent} | **Complexity:** {self.complexity}/10",
             f"**Quality Tier:** {self.quality_tier}",
         ]
+
+        if self.budget_override is not None:
+            parts.append(f"**Spend Budget Override:** ${self.budget_override:.2f}")
 
         if self.mentioned_files:
             parts.append(f"**Key Files:** {', '.join(self.mentioned_files[:10])}")
@@ -71,13 +84,9 @@ class TaskBrief:
             for c in self.key_constraints:
                 parts.append(f"  - {c}")
 
-        return "\n".join(parts)
+        if self.forbidden_patterns:
+            parts.append("**FORBIDDEN:**")
+            for fp in self.forbidden_patterns:
+                parts.append(f"  - 🚫 {fp}")
 
-    def validate(self) -> None:
-        """Validate that required fields are populated. Raises ValueError if not."""
-        if not self.intent:
-            raise ValueError("TaskBrief.intent is required")
-        if not self.user_request:
-            raise ValueError("TaskBrief.user_request is required")
-        if not 1 <= self.complexity <= 10:
-            raise ValueError(f"TaskBrief.complexity must be 1-10, got {self.complexity}")
+        return "\n".join(parts)

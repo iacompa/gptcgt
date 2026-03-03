@@ -56,13 +56,16 @@ class Workspace:
     @classmethod
     def get_instance(cls) -> "Workspace":
         """
-        Get the singleton instance, prioritizing initialization if needed.
+        Get the singleton instance.
 
-        If not initialized, initializes with os.getcwd().
+        Raises RuntimeError if not yet initialized via Workspace(project_root).
         """
         if cls._instance is None:
-            cls(os.getcwd())
-        return cls._instance  # type: ignore
+            raise RuntimeError(
+                "Workspace has not been initialized. "
+                "Call Workspace(project_root) before using get_instance()."
+            )
+        return cls._instance
 
     @classmethod
     def reset_instance(cls) -> None:

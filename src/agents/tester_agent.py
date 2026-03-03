@@ -60,101 +60,175 @@ class TesterAgent:
     ) -> TestResult:
         """
         Full pipeline: generate tests → run in sandbox → report results.
-
-        Args:
-            diff_text: The unified diff of code changes.
-            language: Programming language of the project.
-            test_command: Command to run tests.
-            project_root: Root directory of the project.
-
-        Returns:
-            TestResult with pass/fail counts and generated test code.
-
+        Uses an adaptive loop to self-heal breaking tests and improve coverage.
         """
         result = TestResult()
-
-        # 1. Generate test code using cheapest available model
-        test_code = await self._generate_tests(diff_text, language)
-        result.generated_test_code = test_code
-
-        if not test_code:
-            logger.warning("TesterAgent: No test code generated.")
+        available = self.registry.get_available_models()
+        if not available:
+            logger.warning("TesterAgent: No API keys configured — cannot generate tests.")
             return result
 
-        # 2. Run tests in sandbox
-        try:
-            from pathlib import Path as PathLib
+        from src.core.system_prompt import SystemPromptBuilder
+        system_prompt = SystemPromptBuilder.build(
+            role_type="engineer",
+            custom_instructions=(
+                f"You are a senior test engineer. Given a code diff in {language}, "
+                "generate focused unit tests that cover the changed lines. "
+                "Output ONLY the test code. Do not output markdown codeblocks, just the raw code. "
+                "No explanations. "
+                "If test execution output is returned, read the failure or coverage report "
+                "and rewrite the test code to fix the issues."
+            ),
+            model_name="tester"
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"DIFF:\n{diff_text[:3000]}"},
+        ]
 
-            from src.core.diff_engine import FilePatch, PatchSet
-            from src.tools.sandbox import E2BSandbox
+        test_code = ""
+        max_iterations = 3
 
-            sandbox = E2BSandbox()
-            # Build a minimal PatchSet containing the generated test file
-            test_patch = FilePatch(
-                file_path=f"tests/test_generated_{hash(test_code) % 10000}.py",
-                original_content="",
-                hunks=[],
-            )
-            test_patch_set = PatchSet(
-                patches=[test_patch],
-                agent_id="tester_agent",
-                model_name="tester",
-                raw_response=test_code,
-            )
-            verification = await sandbox.verify_patch(
-                test_patch_set,
-                PathLib(project_root),
-                language,
-                test_command=test_command,
-            )
-            if verification and verification.test_result:
-                result.passed = verification.test_result.passed
-                result.failed = verification.test_result.failed
-                result.failure_details = [
-                    f.get("message", str(f))
-                    for f in (verification.test_result.failures or [])
-                ]
-        except Exception as e:
-            logger.error(f"TesterAgent sandbox execution failed: {e}")
-            result.errors = 1
-            result.failure_details.append(str(e))
+        # Inject coverage if using pytest
+        dynamic_test_cmd = test_command
+        if language == "python" and "pytest" in test_command:
+            dynamic_test_cmd = f"pip install pytest-cov -q && {test_command} --cov --cov-report=term-missing"
+
+        from pathlib import Path as PathLib
+
+        from src.core.diff_engine import FilePatch, Hunk, PatchSet
+        from src.tools.sandbox import E2BSandbox
+
+        sandbox = E2BSandbox()
+
+        for iteration in range(max_iterations):
+            test_code = await self._generate_tests_multi_turn(messages, language, available)
+            if not test_code:
+                logger.warning(f"TesterAgent: No test code generated on iteration {iteration}.")
+                break
+
+            # Strip backticks if returned
+            test_code = test_code.replace("```python", "").replace("```", "").strip()
+
+            result.generated_test_code = test_code
+
+            # 2. Run tests in sandbox
+            try:
+                test_patch = FilePatch(
+                    file_path=f"tests/test_generated_{hash(test_code) % 10000}.py",
+                    is_new_file=True,
+                    hunks=[Hunk(
+                        start_line=1,
+                        end_line=1,
+                        original_lines=[],
+                        modified_lines=test_code.splitlines(),
+                        status="approved"
+                    )],
+                )
+                test_patch_set = PatchSet(
+                    patches=[test_patch],
+                    agent_id="tester_agent",
+                    model_name="tester",
+                    raw_response=test_code,
+                )
+                verification = await sandbox.verify_patch(
+                    test_patch_set,
+                    PathLib(project_root),
+                    language,
+                    test_command=dynamic_test_cmd,
+                )
+
+                if verification and verification.test_result:
+                    tr = verification.test_result
+                    result.passed = tr.passed
+                    result.failed = tr.failed
+                    result.errors = tr.errors
+                    result.failure_details.clear()
+
+                    # Surface full stderr/raw output
+                    if tr.raw_output and (result.failed > 0 or result.errors > 0):
+                        result.failure_details.append(tr.raw_output[:2000])
+                    else:
+                        result.failure_details = [
+                            f.get("message", str(f)) if isinstance(f, dict) else str(f)
+                            for f in (tr.failures or [])
+                        ]
+
+                    # Adaptive Loop decision
+                    if result.failed > 0 or result.errors > 0:
+                        logger.info(f"TesterAgent Loop {iteration}: {result.failed}F {result.errors}E. Self-healing...")
+                        messages.append({"role": "assistant", "content": test_code})
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                f"The test run failed. Here is the output:\n{tr.raw_output[:2000]}\n"
+                                "Please FIX the code to pass and improve coverage. RETURN ONLY THE RAW CODE."
+                            )
+                        })
+                        continue
+                    else:
+                        logger.info(f"TesterAgent Loop {iteration}: All tests passed!")
+                        break
+
+            except Exception as e:
+                logger.error(f"TesterAgent sandbox execution failed: {e}")
+                result.errors = 1
+                result.failure_details.append(str(e))
+                break
 
         # 3. Update tester memory
-        await self._update_memory(diff_text, result)
+        if result.failed > 0 or result.errors > 0:
+            await self._update_memory(diff_text, result)
 
         return result
 
-    async def _generate_tests(self, diff_text: str, language: str) -> str:
-        """Use cheapest model to generate targeted tests for the diff."""
+    async def _generate_tests_multi_turn(self, messages: list[dict], language: str, available_models: list) -> str:
+        """Use configured tester model, then fallback to cheapest model to generate targeted tests."""
         try:
-            available = self.registry.get_available_models()
-            if not available:
-                logger.warning("TesterAgent: No API keys configured — cannot generate tests.")
+            if not available_models:
+                logger.warning("TesterAgent: No models available to generate tests.")
                 return ""
 
-            cheapest = sorted(available, key=lambda x: x.input_cost_per_mtok)[0]
+            from src.core.config import ConfigManager
+            config = ConfigManager()
+            tester_model_id = config.user.tester_model
+
+            selected_model = None
+
+            # 1. Explicit tester override
+            if tester_model_id:
+                for m in available_models:
+                    if m.id == tester_model_id:
+                        selected_model = m
+                        break
+                if not selected_model:
+                    logger.warning(f"Configured tester model {tester_model_id} not available. Falling back.")
+
+            # 2. Fallback to cheapest
+            if not selected_model:
+                selected_model = sorted(available_models, key=lambda x: x.input_cost_per_mtok)[0]
 
             from src.agents.factory import PROVIDER_KEY_MAP, AgentFactory
             from src.auth.keychain import KeyChainManager
+            from src.core.model_registry import Provider
 
-            key_name = PROVIDER_KEY_MAP.get(cheapest.provider.value)
+            key_name = PROVIDER_KEY_MAP.get(selected_model.provider.value)
             api_key = KeyChainManager.get_key(key_name) if key_name else None
+  # noqa: W293
+            # Support Custom models without keys
             if not api_key:
-                return ""
+                if selected_model.provider == Provider.CUSTOM and not getattr(selected_model, "api_key_required", False):  # noqa: E501
+                    pass  # Keep going
+                else:
+                    logger.warning(f"TesterAgent: Missing key for {selected_model.id}")
+                    return ""
 
-            agent = AgentFactory.create_agent(cheapest, api_key=api_key)
-            agent.config.max_tokens = self.MAX_TEST_GEN_TOKENS
-
-            system_prompt = (
-                f"You are a senior test engineer. Given a code diff in {language}, "
-                "generate focused unit tests that cover the changed lines. "
-                "Output ONLY the test code. No explanations."
+            agent = AgentFactory.create_agent(
+                selected_model,  # noqa: W291
+                api_key=api_key,  # noqa: W291
+                base_url=getattr(selected_model, "base_url", None)
             )
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"DIFF:\n{diff_text[:3000]}"},
-            ]
+            agent.config.max_tokens = self.MAX_TEST_GEN_TOKENS
 
             full_response = ""
             async for chunk in agent.chat_stream(messages):

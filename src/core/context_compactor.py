@@ -79,8 +79,11 @@ class ContextCompactor:
     def _summarize_old_messages(self, messages: list[ChatMessage]) -> str:
         """
         Compress older messages into a brief summary paragraph.
-        (In a real implementation, this would call a cheap LLM like gpt-4o-mini here).
-        For now, we build a naive textual summary.
+
+        TODO: Replace this naive text concatenation with a cheap LLM call
+        (e.g. gpt-4o-mini or gemini-flash) for true semantic compaction.
+        Current approach provides minimal token savings since it just
+        truncates content to 50 chars per message.
         """
         if not messages:
             return ""

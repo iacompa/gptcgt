@@ -115,7 +115,18 @@ class ChatPipeline:
         if await self._check_byok_daily_limit(base_url, error_callback):
             return
 
-        agent = AgentFactory.create_agent(model_def, api_key=api_key, base_url=base_url)
+        # Fetch active mode for proxy accounting headers
+        current_mode = "standard"
+        try:
+            import textual.app as _tapp
+            current_mode = _tapp.active_app.get().orchestrator.mode_manager.active_mode.value
+        except Exception:
+            pass
+
+        extra_headers = {"X-GPTCGT-Mode": current_mode}
+        agent = AgentFactory.create_agent(
+            model_def, api_key=api_key, base_url=base_url, extra_headers=extra_headers
+        )
         messages = self._build_context_messages(
             user_text, attached_files, reflection_hint, model_def, SystemPromptBuilder, ContextManager
         )
@@ -139,23 +150,111 @@ class ChatPipeline:
             agent.config.max_tokens = 1000
 
         try:
-            full_response = await self._stream_agent_response(
-                agent=agent,
-                messages=messages,
-                model_def=model_def,
-                user_text=user_text,
-                total_usage=total_usage,
-                yield_chunk_callback=yield_chunk_callback,
-                tool_call_callback=tool_call_callback,
-                thought_callback=thought_callback,
-                error_callback=error_callback,
-                cancel_event=cancel_event,
+            MAX_FAILOVER_ATTEMPTS = 2
+            failed_models: set[str] = set()
+            current_model = model_def
+
+            for attempt in range(MAX_FAILOVER_ATTEMPTS + 1):
+                try:
+                    full_response = await self._stream_agent_response(
+                        agent=agent,
+                        messages=messages,
+                        model_def=current_model,
+                        user_text=user_text,
+                        total_usage=total_usage,
+                        yield_chunk_callback=yield_chunk_callback,
+                        tool_call_callback=tool_call_callback,
+                        thought_callback=thought_callback,
+                        error_callback=error_callback,
+                        cancel_event=cancel_event,
+                    )
+                    break  # Success
+                except Exception as stream_err:
+                    from src.agents.base import ProviderException
+  # noqa: W293
+                    is_transient = False
+                    is_auth = False
+  # noqa: W293
+                    if isinstance(stream_err, ProviderException):
+                        if stream_err.error_type in ("rate_limit", "timeout", "unknown"):
+                            is_transient = True
+                        elif stream_err.error_type == "auth_error":
+                            is_auth = True
+                    else:
+                        err_str = str(stream_err).lower()
+                        is_transient = any(kw in err_str for kw in (
+                            "rate limit", "rate_limit", "ratelimit", "429",
+                            "timeout", "timed out", "connection",
+                            "temporary", "503", "502", "overloaded",
+                        ))
+                        is_auth = any(kw in err_str for kw in (
+                            "auth", "401", "403", "invalid api key",
+                            "invalid_api_key", "unauthorized",
+                        ))
+
+                    if is_auth or not is_transient or attempt == MAX_FAILOVER_ATTEMPTS:
+                        raise stream_err
+
+                    failed_models.add(current_model.id)
+                    fallback = registry.get_fallback_model(
+                        current_model.id, self.default_tier,
+                        provider_preference=current_model.provider.value,
+                        excluded=failed_models,
+                    )
+                    if not fallback:
+                        raise
+
+                    logger.warning(
+                        f"Failover: {current_model.name} failed ({stream_err}), "
+                        f"retrying with {fallback.name}"
+                    )
+                    try:
+                        import textual.app as _tapp  # noqa: I001
+                        from src.core.events import OrchestratorNarration
+                        app = _tapp.active_app.get()
+                        app.post_message(OrchestratorNarration(
+                            f"⚠️ {current_model.name} failed, retrying with {fallback.name}...",
+                            "warning",
+                        ))
+                    except Exception:
+                        pass
+
+                    current_model = fallback
+                    fb_key, fb_url = await self._resolve_api_credentials(
+                        current_model, KeyChainManager, PROVIDER_KEY_MAP, error_callback
+                    )
+                    if fb_key is None and fb_url is None:
+                        raise
+                    agent = AgentFactory.create_agent(
+                        current_model, api_key=fb_key,
+                        base_url=fb_url, extra_headers=extra_headers,
+                    )
+                    agent.config.tools = get_tool_definitions()
+                    agent.config.temperature = 0.2
+
+            await self._handle_post_stream(
+                full_response, current_model, user_text, total_usage, registry
             )
-            await self._handle_post_stream(full_response, model_def, user_text, total_usage, registry)
         except Exception as e:
-            logger.error(f"Pipeline error: {e}")
-            if error_callback:
-                await error_callback(str(e))
+            from src.agents.base import ProviderException
+  # noqa: W293
+            # Guarantee the UI spinner stops on a hard pipeline crash
+            try:
+                import textual.app as _tapp  # noqa: I001
+                from src.core.events import AgentCompleted
+                app = _tapp.active_app.get()
+                app.post_message(AgentCompleted())
+            except Exception:
+                pass
+
+            if isinstance(e, ProviderException):
+                logger.error(f"Provider error ({e.provider} - {e.error_type}): {e.message}")
+                if error_callback:
+                    await error_callback(f"Provider Error: {e.message}")
+            else:
+                logger.error(f"Pipeline error: {e}")
+                if error_callback:
+                    await error_callback(str(e))
 
     # ------------------------------------------------------------------ #
     #  Private sub-methods                                                 #
@@ -168,11 +267,48 @@ class ChatPipeline:
             if model_id_override:
                 model_def = registry.get(model_id_override)
                 if not model_def:
-                    logger.warning(f"Target model '{model_id_override}' not found in registry.")
-                    return None, f"Requested model '{model_id_override}' is not registered. Check the model ID."
+                    parts = model_id_override.split("/", 1)
+                    if len(parts) == 2:
+                        provider_str, model_name = parts
+                        from src.core.model_registry import Provider
+                        try:
+                            valid_provider = Provider(provider_str)
+                            logger.info(f"Synthesizing temporary ModelDefinition for {model_id_override}")
+                            from src.core.model_registry import ModelDefinition
+                            model_def = ModelDefinition(
+                                id=model_id_override,
+                                name=model_name.replace("-", " ").title(),
+                                provider=valid_provider,
+                                input_cost_per_mtok=0.0,
+                                output_cost_per_mtok=0.0,
+                                max_context_tokens=128000,
+                                max_output_tokens=8192,
+                                quality_tiers=["standard"],
+                            )
+                        except ValueError:
+                            return None, f"Unsupported provider '{provider_str}' in model override '{model_id_override}'."  # noqa: E501
+                    else:
+                        return None, f"Malformed model ID '{model_id_override}'. Expected 'provider/model' format."
             else:
+                # Phase 9: Auto-tiering — let complexity score pick the tier
+                effective_tier = self.default_tier
+                try:
+                    import textual.app as _tapp
+                    current_app = _tapp.active_app.get()
+                    if hasattr(current_app, "orchestrator"):
+                        mm = current_app.orchestrator.mode_manager
+                        if mm.can_auto_tier():
+                            recommended = mm.recommend_tier(complexity)
+                            if recommended != effective_tier:
+                                tier_labels = {"light": "💡 Light (fast)", "standard": "⚡ Standard", "max": "🔥 Max (reasoning)"}  # noqa: E501
+                                label = tier_labels.get(recommended.value, recommended.value)  # noqa: F841
+                                logger.info(f"Auto-tiering: complexity {complexity}/10 → {recommended.value}")
+                                effective_tier = recommended
+                except Exception as e:
+                    logger.debug(f"Auto-tiering skipped: {e}")
+
                 from src.core.router import CodingRouter
-                model_def = CodingRouter().route_task("chat", complexity, self.default_tier, role="coder")
+                model_def = CodingRouter().route_task("chat", complexity, effective_tier, role="coder")
         except ValueError as e:
             return None, str(e)
 
@@ -204,11 +340,42 @@ class ChatPipeline:
 
         key_name = PROVIDER_KEY_MAP.get(model_def.provider.value)
         api_key = KeyChainManager.get_key(key_name) if key_name else None
+  # noqa: W293
+        # Extract explicitly defined base_url for custom/local endpoints
+        base_url = getattr(model_def, "base_url", None)
+  # noqa: W293
+        # Strict validation of base_url
+        if base_url:
+            import urllib.parse
+            try:
+                res = urllib.parse.urlparse(base_url)
+                if res.scheme not in ("http", "https") or not res.netloc:
+                    if error_callback:
+                        await error_callback(f"Invalid custom base_url: '{base_url}'. Must include valid scheme (http/https) and host.")  # noqa: E501
+                    return None, None
+            except Exception:
+                if error_callback:
+                    await error_callback(f"Malformed custom base_url: '{base_url}'")
+                return None, None
+
         if key_name and not api_key:
+            from src.core.model_registry import Provider
+  # noqa: W293
+            # If CUSTOM provider and it explicitly says api_key_required=False, allow it.
+            if model_def.provider == Provider.CUSTOM:
+                if not getattr(model_def, "api_key_required", False):
+                    return None, base_url
+                else:
+                    if error_callback:
+                        await error_callback(f"Missing API key for custom endpoint '{model_def.id}'. Either provide a key, or set 'api_key_required = false' in your config.")  # noqa: E501
+                    return None, None
+  # noqa: W293
+            # Normal provider failure
             if error_callback:
                 await error_callback(f"Missing API key for {model_def.provider.value}.")
             return None, None
-        return api_key, None
+  # noqa: W293
+        return api_key, base_url
 
     async def _check_byok_daily_limit(self, base_url, error_callback) -> bool:
         """Return True if the daily BYOK limit has been reached (should abort pipeline)."""
@@ -238,17 +405,44 @@ class ChatPipeline:
     def _build_context_messages(
         self, user_text, attached_files, reflection_hint, model_def, SystemPromptBuilder, ContextManager
     ) -> list[dict]:
-        """Assemble system prompt + history + reflection hint into a message list."""
+        """
+        Assemble system prompt + history + reflection hint into a message list.  # noqa: D213
+
+        Uses ContextCompactor for semantic summarization of old messages
+        before ContextManager applies hard token budget truncation.
+        """
         context_mgr = ContextManager(model_def.id)
         history = self.chat_store.get_recent_messages(count=50)
 
         system_prompt = SystemPromptBuilder.build(model_name=model_def.name)
 
+        # --- Semantic compaction layer ---
+        # Summarize old messages so ContextManager has less to truncate
+        from src.core.context_compactor import ContextCompactor
+        compactor = ContextCompactor(max_tokens=getattr(model_def, "max_context_tokens", 100_000))
+        keep_full = 20  # keep last 20 messages at full fidelity
+        compacted_history = list(history)
+        summary_prefix = []
+
+        conversational = [m for m in history if m.role.value in ("user", "agent")]
+        if len(conversational) > keep_full:
+            to_summarize = conversational[:-keep_full]
+            summary_text = compactor._summarize_old_messages(to_summarize)
+            if summary_text:
+                summary_prefix = [{"role": "user", "content": f"[Earlier summary: {summary_text}]"}]
+            # Keep only recent messages for the history_dicts
+            summarized_ids = {id(m) for m in to_summarize}
+            compacted_history = [m for m in history if id(m) not in summarized_ids]
+
         history_dicts = []
-        for m in history:
+        for m in compacted_history:
             d = m.to_dict()
             d["role"] = ROLE_TO_LITELLM.get(d["role"], "user")
             history_dicts.append(d)
+
+        # Prepend summary if we compacted
+        if summary_prefix:
+            history_dicts = summary_prefix + history_dicts
 
         # Inject reflection lesson if present (from ReflectionEngine via ChatPanel)
         effective_system_prompt = system_prompt
@@ -347,6 +541,7 @@ class ChatPipeline:
                 original_prompt=user_text,
                 agent_output=iteration_text,
                 failure_reason="User manually halted the generation stream.",
+                task_id="abort_event",
             )
         except Exception:
             pass
@@ -411,6 +606,24 @@ class ChatPipeline:
 
         import time
         start_handoff = time.monotonic()
+
+        try:
+            import textual.app
+
+            from src.core.events import SubTaskDelegated
+            # We don't have the explicit parent ID inside the nested pipeline, so we use 'Orchestrator' or previous agent  # noqa: E501
+            _tui_app = textual.app.active_app.get()
+            _tui_app.post_message(
+                SubTaskDelegated(
+                    parent_agent_id="agent",
+                    child_model_name=target_id,
+                    instruction=instruction,
+                    depth=self._delegation_depth + 1
+                )
+            )
+        except Exception:
+            pass
+
         sub_pipeline = ChatPipeline(self.chat_store, self.default_tier, _delegation_depth=self._delegation_depth + 1)
         child_response_chunks: list[str] = []
 
@@ -422,7 +635,7 @@ class ChatPipeline:
                 raise RuntimeError(f"Delegation token cap ({MAX_DELEGATION_TOKENS}) exceeded.")
             # Enforce wall-clock cap
             if time.monotonic() - start_handoff > MAX_DELEGATION_WALL_CLOCK_SEC:
-                raise RuntimeError(f"Delegation wall-clock cap ({MAX_DELEGATION_WALL_CLOCK_SEC}s) exceeded.")
+                raise RuntimeError(f"Delegation wall-clock cap ({MAX_DELEGATION_WALL_CLOCK_SEC}) exceeded.")
             if yield_chunk_callback:
                 await yield_chunk_callback(text)
 
@@ -491,6 +704,9 @@ class ChatPipeline:
                 )
             )
             self.cost_tracker.finish_task()
+
+            # Phase 9: Per-task budget enforcement
+            self._check_task_budget(cost, total_usage, model_def)
 
         patch_set = self.diff_extractor.extract(
             full_response, agent_id="orchestrator", model_name=model_def.name
@@ -602,3 +818,53 @@ class ChatPipeline:
                 {"role": "tool", "name": fn_name, "tool_call_id": tc.get("id"), "content": result}
             )
         return cmd_msgs
+
+    def _check_task_budget(self, task_cost: float, usage: dict, model_def) -> None:
+        """Check per-task budget limits and emit BudgetExceeded if exceeded."""
+        try:
+            import textual.app as _tapp  # noqa: I001
+            from src.core.events import BudgetExceeded
+
+            current_app = _tapp.active_app.get()
+            config = getattr(current_app, "config", None)
+            if not config:
+                return
+
+            # Update status bar task cost
+            try:
+                status_bar = current_app.query_one("#status-bar")
+                status_bar.task_cost = task_cost
+            except Exception:
+                pass
+
+            total_tokens = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
+
+            max_spend = getattr(config.user, "max_spend_per_task", 2.0)
+            if task_cost >= max_spend:
+                msg = f"Task budget exceeded: ${task_cost:.3f} >= ${max_spend:.2f}"
+                current_app.post_message(BudgetExceeded(
+                    limit_type="task_spend",
+                    limit_value=max_spend,
+                    current_value=task_cost,
+                    task_description=model_def.name,
+                ))
+                logger.warning(msg)
+                raise RuntimeError(msg)
+
+            # Check per-task token limit
+            max_tokens = getattr(config.user, "max_tokens_per_task", 500_000)
+            if total_tokens >= max_tokens:
+                msg = f"Task token limit exceeded: {total_tokens} >= {max_tokens}"
+                current_app.post_message(BudgetExceeded(
+                    limit_type="task_tokens",
+                    limit_value=float(max_tokens),
+                    current_value=float(total_tokens),
+                    task_description=model_def.name,
+                ))
+                logger.warning(msg)
+                raise RuntimeError(msg)
+                logger.warning(f"Token budget exceeded: {total_tokens:,} >= {max_tokens:,}")
+
+        except Exception as e:
+            logger.debug(f"Task budget check skipped: {e}")
+

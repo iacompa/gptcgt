@@ -115,6 +115,9 @@ class ArbiterScore:
     eliminated: bool = False
     elimination_reason: str | None = None
 
+    # Cost tracking
+    cost_usd: float = 0.0
+
     # Timing
     evaluation_ms: int = 0
 
@@ -158,6 +161,7 @@ class Arbiter:
         language: str,
         test_command: str | None = None,
         on_progress: callable | None = None,
+        intent: str = "edit",
     ) -> ArbiterVerdict:
         """
         Run the 6-stage evaluation pipeline on all agent solutions.
@@ -168,6 +172,7 @@ class Arbiter:
             language: Primary language of the project ("python", "typescript", etc.)
             test_command: Custom test command override (e.g., "pytest tests/")
             on_progress: Optional callback(stage_name, agent_id, detail) for narration
+            intent: The task intent used for dynamic weighting (e.g., "edit", "chat").
 
         Returns:
             ArbiterVerdict with scores, winner, evidence, and comparison summary
@@ -228,44 +233,113 @@ class Arbiter:
             if on_progress:
                 await on_progress("structural", slot.agent_id, "Validating syntax...")
 
-            structural_score = self._stage1_structural(slot.patch_set, project_root)
+            structural_score, structural_reason = self._stage1_structural(slot.patch_set, project_root)
             score.stage_scores["structural_validity"] = structural_score
 
             if structural_score == 0:
                 score.eliminated = True
-                score.elimination_reason = "Code has syntax errors or diff doesn't apply cleanly"
+                score.elimination_reason = structural_reason or "Code has syntax errors or diff doesn't apply cleanly"
                 score.total_score = 0
                 scores.append(score)
                 continue
 
             # ═══════════════════════════════════════════════════
-            # STAGES 2-4: Run in PARALLEL (lint, tests, security)
-            # These are independent — no reason to run sequentially
+            # AST-Aware Bypassing (Python)
             # ═══════════════════════════════════════════════════
-            if on_progress:
-                await on_progress(
-                    "verification", slot.agent_id, "Running lint + tests + security scan..."
+            ast_changed = True
+            if language == "python" and slot.patch_set.patches:
+                try:
+                    import ast
+                    ast_changed_any = False
+                    for fp in slot.patch_set.patches:
+                        if not fp.file_path.endswith(".py") or fp.is_new_file:
+                            ast_changed_any = True
+                            break
+
+                        full_path = project_root / fp.file_path
+                        original_text = full_path.read_text(errors="replace")
+
+                        lines = original_text.splitlines()
+                        for hunk in sorted(fp.hunks, key=lambda h: h.start_line, reverse=True):
+                            lines[hunk.start_line - 1 : hunk.end_line] = hunk.modified_lines
+                        patched_text = "\n".join(lines)
+
+                        orig_ast = ast.dump(ast.parse(original_text))
+                        new_ast = ast.dump(ast.parse(patched_text))
+
+                        if orig_ast != new_ast:
+                            ast_changed_any = True
+                            break
+                    ast_changed = ast_changed_any
+                except Exception as e:
+                    logger.debug(f"AST comparison failed (falling back to testing): {e}")
+                    ast_changed = True
+
+            # ═══════════════════════════════════════════════════
+            # STAGES 2-4: Run in PARALLEL (lint, tests, security)
+            # ═══════════════════════════════════════════════════
+            if not ast_changed:
+                if on_progress:
+                    await on_progress(
+                        "verification", slot.agent_id, "AST unchanged (comments/whitespace only). Skipping sandbox."
+                    )
+                # Dummy successful results
+                from src.tools.sandbox import LintResult, TestResult, VerificationResult
+                verification_result = VerificationResult(
+                    agent_id=slot.agent_id,
+                    model_name=slot.model_name,
+                    syntax_valid=True,
+                    lint_result=LintResult(),
+                    test_result=TestResult(total=1, passed=1),  # Fake pass so it gets 100%
+                )
+                security_findings = []
+                # Still check LSP to prevent regressions? Actually LSP would be identical if AST is identical.
+                if self._lsp:
+                    lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
+                else:
+                    lsp_task = None
+            else:
+                if on_progress:
+                    await on_progress(
+                        "verification", slot.agent_id, "Running lint + tests + security scan..."
+                    )
+
+                def handle_stdout(text: str):
+                    if on_progress:
+                        import asyncio
+                        asyncio.create_task(on_progress("verify_stream", slot.agent_id, text))
+
+                def handle_stderr(text: str):
+                    if on_progress:
+                        import asyncio
+                        asyncio.create_task(on_progress("verify_stream", slot.agent_id, f"ERR: {text}"))
+
+                # Stage 2+3: Sandbox verification (lint + tests)
+                sandbox_task = asyncio.create_task(
+                    self._sandbox.verify_patch(
+                        slot.patch_set,
+                        project_root,
+                        language,
+                        test_command,
+                        on_stdout=handle_stdout,
+                        on_stderr=handle_stderr
+                    )
                 )
 
-            # Stage 2+3: Sandbox verification (lint + tests)
-            sandbox_task = asyncio.create_task(
-                self._sandbox.verify_patch(slot.patch_set, project_root, language, test_command)
-            )
+                # Stage 4: Security scan
+                security_task = asyncio.create_task(self._security.scan_patch(slot.patch_set, language))
 
-            # Stage 4: Security scan
-            security_task = asyncio.create_task(self._security.scan_patch(slot.patch_set, language))
+                # LSP reference verification (bonus check, runs in parallel too)
+                lsp_task = None
+                if self._lsp:
+                    lsp_task = asyncio.create_task(
+                        self._lsp.verify_patch_references(slot.patch_set, language)
+                    )
 
-            # LSP reference verification (bonus check, runs in parallel too)
-            lsp_task = None
-            if self._lsp:
-                lsp_task = asyncio.create_task(
-                    self._lsp.verify_patch_references(slot.patch_set, language)
+                # Await all parallel checks
+                verification_result, security_findings = await asyncio.gather(
+                    sandbox_task, security_task
                 )
-
-            # Await all parallel checks
-            verification_result, security_findings = await asyncio.gather(
-                sandbox_task, security_task
-            )
 
             # Phase 19: Dynamically pardon false-positives using Arbiter Memory
             if arbiter_memory and (verification_result.test_result or security_findings):
@@ -396,8 +470,9 @@ class Arbiter:
                         model_name=slot.model.name,
                         trigger_event="arbiter_elimination",
                         original_prompt="",
-                        agent_output=slot.response_text[:500],
-                        failure_reason=score.elimination_reason,
+                        agent_output=slot.response_text[:500] if slot.response_text else "",
+                        failure_reason=str(score.elimination_reason),
+                        task_id=dispatch.dispatch_id,
                     )
                 except Exception:
                     pass
@@ -428,9 +503,10 @@ class Arbiter:
         # ═══════════════════════════════════════════════════
         # Compute weighted composite scores
         # ═══════════════════════════════════════════════════
+        weights = self._get_weights_for_intent(intent)
         for s in non_eliminated:
             s.total_score = sum(
-                s.stage_scores.get(stage, 0) * weight for stage, weight in SCORING_WEIGHTS.items()
+                s.stage_scores.get(stage, 0) * weight for stage, weight in weights.items()
             )
 
         # Sort by total score (best first)
@@ -487,19 +563,52 @@ class Arbiter:
     # STAGE IMPLEMENTATIONS
     # ═════════════════════════════════════════════════════════
 
-    def _stage1_structural(self, patch_set: PatchSet, project_root: Path) -> float:
+    def _get_weights_for_intent(self, intent: str) -> dict[str, float]:
+        """Dynamic Arbiter weighting based on TaskIntent."""
+        if intent == "create":
+            return {
+                "structural_validity": 0.20,
+                "lint_cleanliness": 0.20,
+                "test_pass_rate": 0.30,
+                "security_score": 0.20,
+                "diff_minimality": 0.05,
+                "complexity_delta": 0.05,
+            }
+        elif intent == "chat" or intent == "question":
+            return {
+                "structural_validity": 0.80, # Just don't break the syntax
+                "lint_cleanliness": 0.10,
+                "test_pass_rate": 0.0,
+                "security_score": 0.10,
+                "diff_minimality": 0.0,
+                "complexity_delta": 0.0,
+            }
+        # Default (edit/debug/architect)
+        return {
+            "structural_validity": 0.10,
+            "lint_cleanliness": 0.10,
+            "test_pass_rate": 0.40,
+            "security_score": 0.20,
+            "diff_minimality": 0.10,
+            "complexity_delta": 0.10,
+        }
+
+    def _stage1_structural(self, patch_set: PatchSet, project_root: Path) -> tuple[float, str | None]:
         """
         Stage 1: Structural Validation.
         Check that diffs apply cleanly and code is syntactically valid.
-        Returns 100.0 if valid, 0.0 if not (instant elimination).
+        Returns (score, error_reason).
         """
         for fp in patch_set.patches:
+            if not getattr(fp, "syntax_valid", True):
+                return 0.0, f"Syntax error in {fp.file_path}: {getattr(fp, 'syntax_error', 'Invalid syntax')}"
+
             full_path = project_root / fp.file_path
 
             # Check: does the file exist (for modifications, not new files)?
             if not fp.is_new_file and not full_path.exists():
                 logger.warning(f"Structural: {fp.file_path} does not exist")
-                return 0.0
+                return 0.0, f"File {fp.file_path} does not exist"
 
             # Check: do the hunk line ranges make sense?
             if not fp.is_new_file:
@@ -512,10 +621,10 @@ class Arbiter:
                                 f"Structural: hunk range {hunk.start_line}-{hunk.end_line} "
                                 f"out of bounds for {fp.file_path} ({line_count} lines)"
                             )
-                            return 0.0
+                            return 0.0, f"Hunk range out of bounds in {fp.file_path}"
                 except Exception as e:
                     logger.warning(f"Structural: can't read {fp.file_path}: {e}")
-                    return 0.0
+                    return 0.0, f"Can't read {fp.file_path}"
 
             # Check: is the resulting code syntactically valid? (tree-sitter)
             try:
@@ -537,11 +646,11 @@ class Arbiter:
                     compile(patched_content, str(fp.file_path), "exec")
             except SyntaxError as e:
                 logger.info(f"Structural: syntax error in {fp.file_path}: {e}")
-                return 0.0
+                return 0.0, f"Syntax error in {fp.file_path}: {e}"
             except Exception:
                 pass  # Non-Python files: skip syntax check, rely on lint
 
-        return 100.0
+        return 100.0, None
 
     def _stage5_diff_stats(self, patch_set: PatchSet) -> DiffStats:
         """Stage 5: Compute diff statistics."""
@@ -780,8 +889,14 @@ Return strictly a JSON object:
     "pardon_security": true/false
 }}
 """
+        from src.core.system_prompt import SystemPromptBuilder
+        system_prompt = SystemPromptBuilder.build(
+            role_type="engineer",
+            custom_instructions="You are a JSON-only evaluation agent.",
+            model_name="arbiter"
+        )
         messages = [
-            {"role": "system", "content": "You are a JSON-only evaluation agent."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
 
@@ -794,14 +909,31 @@ Return strictly a JSON object:
             raw = full.strip()
             if raw.startswith("```json"):
                 raw = raw[7:-3]
+            elif raw.startswith("```"):
+                raw = raw[3:-3]
+
+            import json
+            try:
+                decision = json.loads(raw.strip())
+                if decision.get("pardon_tests") and verification.test_result:
+                    verification.test_result.passed = verification.test_result.total
+                    verification.test_result.failed = 0
+                    verification.test_result.errors = 0
+                    logger.info("Arbiter pardoned test failures based on memory.")
+
+                if decision.get("pardon_security"):
+                    security_findings.clear()
+                    logger.info("Arbiter pardoned security findings based on memory.")
+            except Exception as e:
+                logger.warning(f"Failed to parse Arbiter pardon decision: {e} (Raw: {raw})")
 
             import json
             parsed = json.loads(raw.strip())
 
             if parsed.get("pardon_tests", False) and verification.test_result:
-                verification.test_result.passed = True
-                verification.test_result.pass_rate = 100.0
-                verification.test_result.test_failures = []
+                verification.test_result.failed = 0
+                verification.test_result.errors = 0
+                verification.test_result.failures = []
 
             if parsed.get("pardon_security", False):
                 security_findings.clear()

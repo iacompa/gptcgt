@@ -27,22 +27,32 @@ class FileTreePanel(Vertical):
 
     DEFAULT_CSS = """
     FileTreePanel {
-        border-right: solid $secondary;
+        border-right: none;
         width: 100%;
         height: 100%;
         background: $background;
     }
     .tree-header {
-        padding: 1 2;
+        padding: 0 1;
         background: $surface;
         color: $primary;
         text-style: bold;
         border-bottom: solid $secondary;
         width: 100%;
     }
-    #recent-files-tree, #project-files-tree {
+    #recent-files-tree {
         background: $background;
-        padding: 1 1;
+        padding: 0 0;
+        height: auto;
+        min-height: 3;
+        max-height: 10;
+        scrollbar-size: 1 1;
+    }
+    #project-files-tree {
+        background: $background;
+        padding: 0 0;
+        height: 1fr;
+        scrollbar-size: 1 1;
     }
     """
 
@@ -52,6 +62,10 @@ class FileTreePanel(Vertical):
         self.indicators: dict[Path, str] = {}
 
     def compose(self) -> ComposeResult:
+        # Security badge — visible proof the workspace is jailed
+        root_name = self.workspace.get_project_root().name
+        yield Label(f"🔒 Sandboxed: {root_name}", classes="tree-header", id="sandbox-badge")
+
         yield Label("Recently Modified", classes="tree-header")
         self.recent_tree = Tree("Recent Files", id="recent-files-tree")
         self.recent_tree.root.expand()
@@ -68,6 +82,9 @@ class FileTreePanel(Vertical):
         """Build the trees on mount."""
         self._build_project_tree()
         self._build_recent_tree()
+        # Toast on first load so users know they're safe
+        root_name = self.workspace.get_project_root().name
+        self.app.notify(f"🔒 Workspace locked to '{root_name}' — AI cannot access other folders", timeout=5)
 
     def _build_project_tree(self) -> None:
         """Populate the project tree using Workspace safely."""

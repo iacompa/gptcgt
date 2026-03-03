@@ -36,25 +36,11 @@ class LiteLLMClient:
         api_key: str | None = None,
         base_url: str | None = None,
         extra_headers: dict | None = None,
+        **extra_kwargs,
     ) -> AsyncGenerator[AgentResponse, None]:
         """
+        # noqa: D200
         Stream a completion from litellm.
-
-        Args:
-            model: Full LiteLLM model string (e.g., 'anthropic/claude-3-opus-20240229')
-            messages: List of OpenAI-format message dicts
-            system_prompt: Optional system prompt to prepend
-            temperature: Sampling temperature
-            max_tokens: Max output tokens
-            tools: Optional array of JSON schema tool definitions
-            timeout: Request timeout in seconds
-            api_key: The provider API key. Must be resolved before calling.
-            base_url: Optional custom endpoint
-            extra_headers: Optional dict of custom HTTP headers
-
-        Yields:
-            AgentResponse chunks containing text deltas and eventually finish reasons.
-
         """
         # Inject system prompt as first message if provided
         request_messages = messages.copy()
@@ -65,14 +51,24 @@ class LiteLLMClient:
             else:
                 request_messages.insert(0, {"role": "system", "content": system_prompt})
 
+        # If a custom base URL (like our managed API proxy) is provided, LiteLLM requires
+        # the 'openai/' prefix so it knows to send the request as a standard OpenAI
+        # /v1/chat/completions payload to that proxy, rather than the native provider's format.
+        if base_url and not model.startswith("openai/"):
+            # Strip native provider prefixes if they exist (e.g., 'anthropic/claude...' -> 'openai/claude...')
+            pure_model = model.split("/")[-1] if "/" in model else model
+            model = f"openai/{pure_model}"
+
         kwargs = {
             "model": model,
             "messages": request_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
+            "stream_options": {"include_usage": True},
             "timeout": timeout,
             "api_key": api_key,
+            **extra_kwargs,
         }
 
         if tools:
@@ -90,7 +86,7 @@ class LiteLLMClient:
 
         import asyncio
 
-        max_retries = 5
+        max_retries = 2
         base_wait = 2
 
         for attempt in range(max_retries):
@@ -158,37 +154,39 @@ class LiteLLMClient:
             except litellm.RateLimitError as e:
                 if attempt == max_retries - 1:
                     logger.error(f"Rate limit exceeded (final attempt): {e}")
-                    yield AgentResponse(
-                        error=f"Rate limit exceeded after {max_retries} retries: {str(e)}",
-                        is_streaming=False,
+                    from src.agents.base import ProviderException
+                    raise ProviderException(
+                        error_type="rate_limit",
+                        message=f"Rate limit exceeded after {max_retries} retries: {str(e)}",
+                        provider=model.split("/")[0] if "/" in model else "unknown"
                     )
-                    break
 
                 wait_time = base_wait * (2**attempt)
                 logger.warning(
                     f"Rate limit exceeded, retrying in {wait_time}s... (Attempt {attempt + 1}/{max_retries})"  # noqa: E501
                 )
-
-                # yield a status message indicating the retry
-                yield AgentResponse(
-                    text=f"\n[Rate limit hit. Retrying in {wait_time}s...]\n", is_streaming=True
-                )
                 await asyncio.sleep(wait_time)
             except litellm.AuthenticationError as e:
                 logger.error(f"Authentication failed: {e}")
-                yield AgentResponse(
-                    error=f"Authentication failed. Check your API key. ({str(e)})",
-                    is_streaming=False,
+                from src.agents.base import ProviderException
+                raise ProviderException(
+                    error_type="auth_error",
+                    message=f"Authentication failed. Check your API key. ({str(e)})",
+                    provider=model.split("/")[0] if "/" in model else "unknown"
                 )
-                break
             except litellm.ContextWindowExceededError as e:
                 logger.error(f"Context window exceeded: {e}")
-                yield AgentResponse(
-                    error=f"Context window exceeded. Please clear chat or trim files. ({str(e)})",
-                    is_streaming=False,
+                from src.agents.base import ProviderException
+                raise ProviderException(
+                    error_type="context_window_exceeded",
+                    message=f"Context window exceeded. Please clear chat or trim files. ({str(e)})",
+                    provider=model.split("/")[0] if "/" in model else "unknown"
                 )
-                break
             except Exception as e:
                 logger.exception(f"Unexpected litellm error: {e}")
-                yield AgentResponse(error=f"Model error: {str(e)}", is_streaming=False)
-                break
+                from src.agents.base import ProviderException
+                raise ProviderException(
+                    error_type="unknown",
+                    message=f"Model error: {str(e)}",
+                    provider=model.split("/")[0] if "/" in model else "unknown"
+                )

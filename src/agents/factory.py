@@ -8,9 +8,12 @@ from __future__ import annotations
 
 from src.agents.anthropic import AnthropicAgent
 from src.agents.base import AgentConfig, BaseAgent
+from src.agents.cohere import CohereAgent
 from src.agents.custom import CustomAgent
 from src.agents.deepseek import DeepSeekAgent
 from src.agents.google import GoogleAgent
+from src.agents.groq import GroqAgent
+from src.agents.mistral import MistralAgent
 from src.agents.openai import OpenAIAgent
 from src.agents.openrouter import OpenRouterAgent
 from src.agents.xai import XAIAgent
@@ -24,6 +27,10 @@ PROVIDER_KEY_MAP = {
     Provider.DEEPSEEK.value: "DEEPSEEK_API_KEY",
     Provider.XAI.value: "XAI_API_KEY",
     Provider.OPENROUTER.value: "OPENROUTER_API_KEY",
+    Provider.MISTRAL.value: "MISTRAL_API_KEY",
+    Provider.COHERE.value: "COHERE_API_KEY",
+    Provider.GROQ.value: "GROQ_API_KEY",
+    Provider.CUSTOM.value: "CUSTOM_API_KEY",
 }
 
 
@@ -36,6 +43,7 @@ class AgentFactory:
         system_prompt: str = "",
         api_key: str | None = None,
         base_url: str | None = None,
+        extra_headers: dict | None = None,
     ) -> BaseAgent:
         """Create and return the correctly typed Agent."""
         config = AgentConfig(
@@ -44,6 +52,7 @@ class AgentFactory:
             system_prompt=system_prompt,
             api_key=api_key,
             base_url=base_url,
+            extra_headers=extra_headers,
             # Tools will be injected later by the command pipeline
         )
 
@@ -59,6 +68,12 @@ class AgentFactory:
             return XAIAgent(config)
         elif model_def.provider == Provider.OPENROUTER:
             return OpenRouterAgent(config)
+        elif model_def.provider == Provider.MISTRAL:
+            return MistralAgent(config)
+        elif model_def.provider == Provider.COHERE:
+            return CohereAgent(config)
+        elif model_def.provider == Provider.GROQ:
+            return GroqAgent(config)
         elif model_def.provider == Provider.CUSTOM:
             return CustomAgent(config)
         else:

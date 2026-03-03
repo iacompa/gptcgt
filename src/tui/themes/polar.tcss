@@ -34,7 +34,7 @@ Screen {
 .diff-context { color: #656D76; }
 
 /* Layout */
-#app-grid { layout: horizontal; height: 100%; }
+#app-grid { layout: horizontal; height: 1fr; }
 #left-panel-container { width: 1fr; min-width: 20; }
 #code-viewer { width: 2fr; min-width: 30; }
 #right-panel { width: 1fr; min-width: 25; }

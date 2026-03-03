@@ -154,9 +154,21 @@ class ParallelDispatcher:
             global_base_url = "https://api.gptcgt.ai/proxy/v1"
             use_managed = True
 
+        # Fetch active mode for proxy routing headers
+        current_mode = "standard"
+        try:
+            import textual.app as _tapp
+            current_app = _tapp.active_app.get()
+            if hasattr(current_app, "orchestrator"):
+                current_mode = current_app.orchestrator.mode_manager.active_mode.value
+        except Exception:
+            pass
+
+        extra_headers = {"X-GPTCGT-Mode": current_mode}
+
         slots: list[AgentSlot] = []
         for i, model in enumerate(models):
-            agent_id = f"agent-{chr(97 + i)}"  # agent-a, agent-b, agent-c
+            agent_id = f"Coder {i + 1}"
 
             if use_managed:
                 api_key = global_api_key
@@ -169,7 +181,9 @@ class ParallelDispatcher:
                     logger.warning(f"No API key for {model.provider.value}, skipping {model.name}")
                     continue
 
-            agent = AgentFactory.create_agent(model, api_key=api_key, base_url=base_url)
+            agent = AgentFactory.create_agent(
+                model, api_key=api_key, base_url=base_url, extra_headers=extra_headers
+            )
             slots.append(AgentSlot(agent_id=agent_id, model=model, agent=agent))
 
         if len(slots) < 2:
@@ -271,7 +285,27 @@ class ParallelDispatcher:
                 content_parts: list[str] = []
                 final_chunk: AgentResponse | None = None
 
-                async for chunk in slot.agent.chat_stream(messages):
+                import asyncio
+                agen = slot.agent.chat_stream(messages)
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(anext(agen), timeout=45.0)
+                    except StopAsyncIteration:
+                        break
+                    except asyncio.TimeoutError:
+                        error_msg = f"Agent watchdog triggered: No response for 45s from {slot.model.name}"
+                        logger.error(error_msg)
+                        slot.status = "failed"
+                        slot.error = error_msg
+                        slot.end_time = time.time()
+                        await queue.put({
+                            "type": "agent_error",
+                            "agent_id": slot.agent_id,
+                            "model_name": slot.model.name,
+                            "error": error_msg,
+                        })
+                        return
+
                     if chunk.error:
                         slot.status = "failed"
                         slot.error = chunk.error

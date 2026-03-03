@@ -22,7 +22,6 @@ class CreditService:
 
         remaining = row["credits_remaining"]
         overage = row["overage_enabled"]
-        row["plan"]
 
         if remaining >= cost:
             return {
@@ -114,9 +113,9 @@ class CreditService:
             "overage_enabled": row["overage_enabled"],
         }
 
-    def find_affordable_mode(self, credits: int) -> Optional[str]:  # noqa: F821
+    def find_affordable_mode(self, credits: int) -> Optional[str]:
         """Find the best mode the user can afford."""
-        for mode in ["standard", "battle", "ensemble", "scout"]:
+        for mode in ["architect", "ensemble", "battle", "standard", "scout"]:
             if self.CREDIT_COSTS[mode] <= credits:
                 return mode
         return None

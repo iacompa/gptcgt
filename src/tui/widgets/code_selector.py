@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
-from textual.events import Click
+from textual.events import MouseDown, MouseMove, MouseUp
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Static
@@ -34,10 +34,10 @@ class CodeLineWidget(Horizontal):
         width: auto;
         min-width: 100%;
         height: auto;
-        padding: 0 1;
+        padding: 0;
     }
     .code-line-number {
-        width: 6;
+        width: auto;
         height: 100%;
         color: $text-muted;
     }
@@ -57,6 +57,7 @@ class CodeLineWidget(Horizontal):
         content: str,
         highlighted_content: str,
         annotation: CodeAnnotation | None = None,
+        line_number_digits: int = 2,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -64,10 +65,18 @@ class CodeLineWidget(Horizontal):
         self._raw_content = content
         self._highlighted_content = highlighted_content
         self._annotation = annotation
+        self._line_number_digits = max(1, line_number_digits)
+        self._mouse_down_pos: tuple[int, int] | None = None
+        self._mouse_dragged = False
 
     def compose(self) -> ComposeResult:
         """Render the line with gutter number, annotation, and content."""
-        yield Static(f"{self.line_number:4} │ ", classes="code-line-number")
+        number = Static(
+            f"{self.line_number:>{self._line_number_digits}}│",
+            classes="code-line-number",
+        )
+        number.styles.width = self._line_number_digits + 1
+        yield number
         self._annotation_gutter = AnnotationGutter(self._annotation)
         yield self._annotation_gutter
         # Convert ANSI escape sequences to Rich Text objects for safe rendering
@@ -91,15 +100,47 @@ class CodeLineWidget(Horizontal):
             self.add_class("code-line-selected")
             if hasattr(self, "content_static"):
                 t = Text.from_ansi(self._highlighted_content)
-                t.stylize("on #264F78")
+                # Use the app's theme-aware primary color for selection highlight.
+                # Force white text so it's readable on both dark and light themes.
+                try:
+                    primary = self.app.get_css_variables().get("primary", "#264F78")
+                    t.stylize(f"on {primary} bold white")
+                except Exception:
+                    t.stylize("on #264F78 bold white")
                 self.content_static.update(t)
         else:
             self.remove_class("code-line-selected")
             if hasattr(self, "content_static"):
                 self.content_static.update(Text.from_ansi(self._highlighted_content))
 
-    def on_click(self, event: Click) -> None:
-        """Handle click events -- post to parent for selection logic."""
+    def on_mouse_down(self, event: MouseDown) -> None:
+        if event.button != 1:
+            return
+        self._mouse_down_pos = (event.screen_x, event.screen_y)
+        self._mouse_dragged = False
+        event.stop()
+
+    def on_mouse_move(self, event: MouseMove) -> None:
+        if self._mouse_down_pos is None:
+            return
+        sx, sy = self._mouse_down_pos
+        if abs(event.screen_x - sx) > 1 or abs(event.screen_y - sy) > 0:
+            self._mouse_dragged = True
+        event.stop()
+
+    def on_mouse_up(self, event: MouseUp) -> None:
+        """Handle click-like release events without triggering on drag."""
+        if event.button != 1:
+            self._mouse_down_pos = None
+            self._mouse_dragged = False
+            return
+        if self._mouse_down_pos is None:
+            return
+        if self._mouse_dragged:
+            self._mouse_down_pos = None
+            self._mouse_dragged = False
+            event.stop()
+            return
         self.post_message(
             CodeLineClicked(
                 line_number=self.line_number,
@@ -107,6 +148,8 @@ class CodeLineWidget(Horizontal):
                 ctrl_held=event.ctrl,
             )
         )
+        self._mouse_down_pos = None
+        self._mouse_dragged = False
         event.stop()
 
 

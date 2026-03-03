@@ -10,13 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pygments import highlight
-from pygments.formatters import TerminalFormatter
 from pygments.lexers import TextLexer, get_lexer_by_name
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Collapsible, Static
 
 from src.core.logger import get_logger
+from src.tui.widgets.syntax_colors import build_terminal_formatter
 
 logger = get_logger("tui.collapsible_code")
 
@@ -66,8 +66,7 @@ class CollapsibleCodeBlock(Vertical):
         except Exception:
             lexer = TextLexer()
 
-        bg_style = "light" if getattr(self.app, "theme", "midnight") == "polar" else "dark"
-        formatter = TerminalFormatter(bg=bg_style)
+        formatter = build_terminal_formatter(getattr(self.app, "theme", "midnight"))
         highlighted = highlight(self._code, lexer, formatter)
 
         title = f"Code: {self._language}" if self._language else "Code"

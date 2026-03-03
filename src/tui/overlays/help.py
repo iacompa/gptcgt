@@ -72,8 +72,9 @@ class HelpOverlay(ModalScreen):
         ("Settings", "Ctrl+T", "Cycle themes"),
         ("Settings", "Ctrl+? / F1", "This help screen"),
         ("Slash Commands", "/help", "Show this help"),
-        ("Slash Commands", "/setup", "Re-run onboarding wizard"),
+        ("Slash Commands", "/new", "Start a fresh chat session"),
         ("Slash Commands", "/clear", "Clear chat display"),
+        ("Slash Commands", "/setup", "Re-run onboarding wizard"),
         ("Slash Commands", "/status", "Check AI provider health"),
         ("Slash Commands", "/version", "Show application version"),
         ("Slash Commands", "/login", "Sign in for managed credits"),
@@ -82,11 +83,11 @@ class HelpOverlay(ModalScreen):
         ("Slash Commands", "/billing", "Manage your subscription"),
         ("Slash Commands", "/mode X", "Switch mode (scout/standard/ensemble/architect)"),
         ("Slash Commands", "/tier X", "Switch tier (light/standard/max)"),
-        ("Slash Commands", "/cost", "Show today's cost summary"),
+        ("Slash Commands", "/cost", "Show session & daily cost summary"),
+        ("Slash Commands", "/context", "Show context window usage stats"),
+        ("Slash Commands", "/compact", "Compact older context into summary"),
+        ("Slash Commands", "/export", "Export session as markdown file"),
         ("Slash Commands", "/history", "Show task history"),
-        ("Slash Commands", "/compact", "Compact AI context window"),
-        ("Slash Commands", "/context", "Show context usage breakdown"),
-        ("Slash Commands", "/export", "Export chat as markdown"),
     ]
 
     def compose(self) -> ComposeResult:
