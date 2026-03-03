@@ -1,0 +1,279 @@
+file,score_1_to_10,lines,ruff_issue_count,key_signals,improvement
+CONTRIBUTING.md,7.8,65,0,clean_static_signals,Keep stable; preserve with tests
+LICENSE,7.6,21,0,clean_static_signals,Keep stable; preserve with tests
+README.md,7.8,65,0,clean_static_signals,Keep stable; preserve with tests
+api/Dockerfile,8.0,22,0,clean_static_signals,Keep stable; preserve with tests
+api/__init__.py,8.0,1,0,clean_static_signals,Keep stable; preserve with tests
+api/config.py,8.0,36,0,clean_static_signals,Keep stable; preserve with tests
+api/database.py,8.0,27,0,clean_static_signals,Keep stable; preserve with tests
+api/fly.toml,8.0,18,0,clean_static_signals,Keep stable; preserve with tests
+api/main.py,7.9,68,1,ruff=1; I001:1,Run formatter + lint autofix
+api/middleware/auth.py,7.9,87,1,ruff=1; E501:1,Run formatter + lint autofix
+api/middleware/rate_limit.py,8.0,61,0,clean_static_signals,Keep stable; preserve with tests
+api/migrations/001_initial_schema.sql,8.0,115,0,clean_static_signals,Keep stable; preserve with tests
+api/migrations/002_billing_moderation.sql,8.0,35,0,clean_static_signals,Keep stable; preserve with tests
+api/migrations/003_tos_tracking.sql,8.0,5,0,clean_static_signals,Keep stable; preserve with tests
+api/migrations/004_api_key_hashes.sql,8.0,8,0,clean_static_signals,Keep stable; preserve with tests
+api/migrations/run_migration.py,8.0,56,0,clean_static_signals,Keep stable; preserve with tests
+api/requirements.txt,8.0,15,0,clean_static_signals,Keep stable; preserve with tests
+api/routes/__init__.py,8.0,1,0,clean_static_signals,Keep stable; preserve with tests
+api/routes/api_keys.py,8.0,140,0,clean_static_signals,Keep stable; preserve with tests
+api/routes/auth.py,7.9,168,1,ruff=1; E501:1,Run formatter + lint autofix
+api/routes/billing.py,7.9,167,1,ruff=1; E501:1,Run formatter + lint autofix
+api/routes/proxy.py,8.0,117,0,clean_static_signals,Keep stable; preserve with tests
+api/routes/team.py,7.2,128,9,ruff=9; W293:7; I001:1; W291:1,Run formatter + lint autofix
+api/routes/usage.py,8.0,65,0,clean_static_signals,Keep stable; preserve with tests
+api/routes/users.py,8.0,89,0,clean_static_signals,Keep stable; preserve with tests
+api/scripts/01_migration_teams_rbac.py,6.6,129,13,ruff=13; W293:8; W291:2; I001:1,Fix correctness lint issues first | Run formatter + lint autofix
+api/services/encryption.py,8.0,52,0,clean_static_signals,Keep stable; preserve with tests
+api/services/moderation.py,8.0,95,0,clean_static_signals,Keep stable; preserve with tests
+create_tables.py,7.5,35,1,ruff=1; I001:1,Run formatter + lint autofix
+proxy/Dockerfile,8.0,21,0,clean_static_signals,Keep stable; preserve with tests
+proxy/config.py,8.0,32,0,clean_static_signals,Keep stable; preserve with tests
+proxy/content_filter.py,8.0,61,0,clean_static_signals,Keep stable; preserve with tests
+proxy/database.py,8.0,53,0,clean_static_signals,Keep stable; preserve with tests
+proxy/fly.toml,8.0,18,0,clean_static_signals,Keep stable; preserve with tests
+proxy/litellm_config.yaml,8.0,17,0,clean_static_signals,Keep stable; preserve with tests
+proxy/main.py,6.9,286,4,ruff=4; E402:2; I001:1; E722:1,Fix correctness lint issues first | Run formatter + lint autofix
+proxy/metering.py,8.0,144,0,clean_static_signals,Keep stable; preserve with tests
+proxy/requirements.txt,8.0,12,0,clean_static_signals,Keep stable; preserve with tests
+pyproject.toml,7.8,82,0,clean_static_signals,Keep stable; preserve with tests
+run.sh,7.8,4,0,clean_static_signals,Keep stable; preserve with tests
+run_migration.py,7.6,12,0,clean_static_signals,Keep stable; preserve with tests
+scripts/build_binary.sh,7.8,15,0,clean_static_signals,Keep stable; preserve with tests
+scripts/publish_pypi.sh,7.8,10,0,clean_static_signals,Keep stable; preserve with tests
+src/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/__init__.py,8.2,12,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/anthropic.py,8.2,50,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/base.py,8.2,143,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/cohere.py,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/custom.py,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/deepseek.py,8.2,65,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/factory.py,8.2,80,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/google.py,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/groq.py,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/health.py,8.2,72,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/litellm_client.py,8.2,192,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/mistral.py,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/openai.py,8.2,81,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/openrouter.py,8.2,58,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/tester_agent.py,8.2,266,0,clean_static_signals,Keep stable; preserve with tests
+src/agents/xai.py,8.2,45,0,clean_static_signals,Keep stable; preserve with tests
+src/api/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/auth/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/auth/auth_manager.py,8.2,170,0,clean_static_signals,Keep stable; preserve with tests
+src/auth/device_flow.py,8.2,72,0,clean_static_signals,Keep stable; preserve with tests
+src/auth/key_validator.py,8.2,88,0,clean_static_signals,Keep stable; preserve with tests
+src/auth/keychain.py,8.2,146,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/cost_breakdown.py,8.2,275,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/credits.py,8.2,121,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/overage.py,8.2,88,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/spending_caps.py,8.2,103,0,clean_static_signals,Keep stable; preserve with tests
+src/billing/stripe_service.py,8.0,334,2,ruff=2; W293:2,Run formatter + lint autofix
+src/core/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/core/agent_bus.py,8.2,152,0,clean_static_signals,Keep stable; preserve with tests
+src/core/arbiter.py,7.4,981,0,size=981L,Split into smaller modules
+src/core/architect.py,8.2,172,0,clean_static_signals,Keep stable; preserve with tests
+src/core/autonomous.py,7.7,615,0,size=615L,Extract helper functions/components
+src/core/blackboard.py,8.2,150,0,clean_static_signals,Keep stable; preserve with tests
+src/core/chat_pipeline.py,7.4,870,0,size=870L,Split into smaller modules
+src/core/chat_store.py,8.2,248,0,clean_static_signals,Keep stable; preserve with tests
+src/core/commands.py,7.9,535,0,size=535L,Extract helper functions/components
+src/core/config.py,7.3,265,0,pytest_error_path,Fix config path override contract for tests/sandbox
+src/core/context_compactor.py,8.2,105,0,clean_static_signals,Keep stable; preserve with tests
+src/core/context_manager.py,8.2,192,0,clean_static_signals,Keep stable; preserve with tests
+src/core/crash_recovery.py,8.2,212,0,clean_static_signals,Keep stable; preserve with tests
+src/core/dag.py,8.2,138,0,clean_static_signals,Keep stable; preserve with tests
+src/core/dag_nodes.py,7.9,480,0,size=480L,Extract helper functions/components
+src/core/diff_engine.py,8.2,363,0,clean_static_signals,Keep stable; preserve with tests
+src/core/elo_tracker.py,8.2,214,0,clean_static_signals,Keep stable; preserve with tests
+src/core/events.py,7.9,477,0,size=477L,Extract helper functions/components
+src/core/init.py,8.2,104,0,clean_static_signals,Keep stable; preserve with tests
+src/core/intent_analyzer.py,8.2,173,0,clean_static_signals,Keep stable; preserve with tests
+src/core/logger.py,8.2,258,0,clean_static_signals,Keep stable; preserve with tests
+src/core/mcp_client.py,8.2,387,0,clean_static_signals,Keep stable; preserve with tests
+src/core/memory.py,8.2,46,0,clean_static_signals,Keep stable; preserve with tests
+src/core/mode_manager.py,8.2,141,0,clean_static_signals,Keep stable; preserve with tests
+src/core/model_registry.py,8.2,379,0,clean_static_signals,Keep stable; preserve with tests
+src/core/orchestrator.py,8.2,169,0,clean_static_signals,Keep stable; preserve with tests
+src/core/parallel_dispatcher.py,7.9,464,0,size=464L,Extract helper functions/components
+src/core/phase_tracker.py,8.2,390,0,clean_static_signals,Keep stable; preserve with tests
+src/core/project_context.py,8.2,249,0,clean_static_signals,Keep stable; preserve with tests
+src/core/quality_tiers.py,8.2,113,0,clean_static_signals,Keep stable; preserve with tests
+src/core/reflection_engine.py,8.2,309,0,clean_static_signals,Keep stable; preserve with tests
+src/core/router.py,8.2,280,0,clean_static_signals,Keep stable; preserve with tests
+src/core/security.py,7.9,555,0,size=555L,Extract helper functions/components
+src/core/system_prompt.py,8.2,226,0,clean_static_signals,Keep stable; preserve with tests
+src/core/task_brief.py,8.2,92,0,clean_static_signals,Keep stable; preserve with tests
+src/core/task_tracker.py,8.2,200,0,clean_static_signals,Keep stable; preserve with tests
+src/core/workspace.py,8.2,238,0,clean_static_signals,Keep stable; preserve with tests
+src/data/models.json,8.2,306,0,clean_static_signals,Keep stable; preserve with tests
+src/services/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/services/analytics.py,8.2,50,0,clean_static_signals,Keep stable; preserve with tests
+src/services/email.py,8.2,57,0,clean_static_signals,Keep stable; preserve with tests
+src/services/monitoring.py,8.2,38,0,clean_static_signals,Keep stable; preserve with tests
+src/services/registry.py,8.2,276,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/__init__.py,8.2,15,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/filesystem.py,8.2,170,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/handoff.py,8.2,69,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/lsp.py,7.9,498,0,size=498L,Extract helper functions/components
+src/tools/mcp_client.py,8.2,147,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/repo_map.py,8.2,331,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/sandbox.py,7.0,565,10,ruff=10; W293:9; I001:1; size=565L,Run formatter + lint autofix | Extract helper functions/components
+src/tools/tool_registry.py,8.2,142,0,clean_static_signals,Keep stable; preserve with tests
+src/tools/tree_sitter_utils.py,8.2,240,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/app.py,7.1,1457,0,size=1457L,Split into smaller modules
+src/tui/overlays/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/command_palette.py,8.2,145,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/help.py,8.2,127,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/layout_editor.py,8.2,127,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/mode_picker.py,8.2,225,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/onboarding.py,7.9,432,0,size=432L,Extract helper functions/components
+src/tui/overlays/project_setup.py,8.2,110,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/receipt.py,8.2,127,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/recovery.py,8.2,80,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/session_browser.py,8.2,161,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/overlays/settings.py,7.6,764,1,ruff=1; W293:1; size=764L,Run formatter + lint autofix | Extract helper functions/components
+src/tui/overlays/tier_selector.py,8.2,143,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/panels/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/panels/activity_feed.py,8.2,179,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/panels/battle_view.py,8.2,138,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/panels/chat.py,7.1,1348,0,size=1348L,Split into smaller modules
+src/tui/panels/code_viewer.py,7.4,850,0,size=850L,Split into smaller modules
+src/tui/panels/file_tree.py,8.2,286,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/panels/leaderboard.py,8.2,78,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/ember.tcss,8.2,268,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/midnight.tcss,8.2,269,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/neon.tcss,8.2,268,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/polar.tcss,8.2,271,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/themes/slate.tcss,8.2,268,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/__init__.py,8.2,1,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/active_agents_bar.py,8.2,94,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/annotations.py,8.2,193,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/arbiter_verdict_panel.py,8.2,159,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/architect_approval_panel.py,8.2,133,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/code_selector.py,8.2,242,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/collapsible_code.py,8.2,206,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/context_chips.py,8.2,235,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/context_menu.py,8.2,20,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/cost_summary.py,8.2,53,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/hunk_editor.py,8.2,139,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/menu.py,7.9,421,0,size=421L,Extract helper functions/components
+src/tui/widgets/menu_bar.py,8.2,226,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/panel_resizer.py,8.2,146,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/quick_actions.py,8.2,166,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/status_bar.py,8.2,167,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/syntax_colors.py,8.2,17,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/task_panel.py,8.2,92,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/thought_block.py,8.2,57,0,clean_static_signals,Keep stable; preserve with tests
+src/tui/widgets/toast.py,8.2,173,0,clean_static_signals,Keep stable; preserve with tests
+test_intent.py,7.7,7,1,ruff=1; I001:1,Run formatter + lint autofix
+test_mount.py,7.4,15,2,ruff=2; I001:1; F841:1,Fix correctness lint issues first | Run formatter + lint autofix
+test_theme.py,7.8,15,0,clean_static_signals,Keep stable; preserve with tests
+test_theme_swap.py,7.7,31,1,ruff=1; E501:1,Run formatter + lint autofix
+tests/test_agent_adapters.py,7.8,58,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_any_model_id.py,7.8,32,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_app_header.py,7.8,24,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_architect_two_phase.py,7.8,68,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_auth_security.py,7.8,71,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_autonomous_runner.py,6.6,63,7,ruff=7; W293:5; F401:2,Fix correctness lint issues first | Run formatter + lint autofix
+tests/test_chat_panel.py,7.8,91,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_chat_pipeline.py,7.8,73,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_chat_store.py,7.8,207,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_code_viewer.py,7.8,27,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_commands.py,7.8,102,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_config.py,7.8,50,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_context_menus.py,7.8,80,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_cost_breakdown.py,7.8,84,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_crash_recovery.py,7.8,77,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_custom_provider.py,7.8,125,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_dag_trace.py,7.8,112,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_diff_engine.py,7.8,95,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_e2e_pipeline.py,7.8,300,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_elo_tracker.py,7.8,65,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_failover.py,7.8,127,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_file_ref_security.py,7.8,77,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_help.py,7.8,16,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_key_validator.py,7.8,62,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_layout_persistence.py,6.9,65,0,pytest_error_path,Fix config path override contract for tests/sandbox
+tests/test_logger.py,7.8,111,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_mcp_client.py,7.8,37,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_menu_bar.py,7.8,109,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_model_registry.py,7.8,49,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_onboarding.py,7.8,30,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_orchestration_pipeline.py,7.8,200,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_overage.py,7.8,59,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_panel_resizer.py,7.8,229,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_phase_tracker.py,7.8,137,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_project_init.py,7.8,97,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_proxy_billing.py,7.8,94,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_quality_tiers.py,7.8,42,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_router_elo_feedback.py,7.8,73,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_router_intents.py,7.8,83,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_self_healing_contract.py,7.8,50,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_slash_commands.py,7.8,113,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_spending_cap_enforcement.py,7.8,86,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_task_tracker.py,7.8,47,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_tester_agent_contract.py,7.8,121,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_toast.py,7.8,54,0,clean_static_signals,Keep stable; preserve with tests
+tests/test_tui_layout_regressions.py,7.0,50,6,ruff=6; W293:3; W291:1; I001:1,Fix correctness lint issues first | Run formatter + lint autofix
+tests/test_workspace.py,7.8,126,0,clean_static_signals,Keep stable; preserve with tests
+web/app/acceptable-use/page.tsx,8.2,51,0,clean_static_signals,Keep stable; preserve with tests
+web/app/api/auth/signin/route.ts,8.2,43,0,clean_static_signals,Keep stable; preserve with tests
+web/app/api/auth/signout/route.ts,8.2,9,0,clean_static_signals,Keep stable; preserve with tests
+web/app/api/usage/route.ts,8.2,30,0,clean_static_signals,Keep stable; preserve with tests
+web/app/auth/callback/route.ts,8.2,4,0,clean_static_signals,Keep stable; preserve with tests
+web/app/auth/page.tsx,8.2,118,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/account/page.tsx,8.2,115,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/billing/page.tsx,8.2,210,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/keys/page.tsx,8.2,161,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/layout.tsx,8.2,31,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/page.tsx,8.2,80,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/team/page.tsx,8.2,128,0,clean_static_signals,Keep stable; preserve with tests
+web/app/dashboard/usage/page.tsx,8.2,155,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/autonomous/page.tsx,8.2,77,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/commands/page.tsx,8.2,93,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/config/page.tsx,8.2,110,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/costs/page.tsx,8.2,67,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/custom-models/page.tsx,8.2,70,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/elo-arena/page.tsx,8.2,61,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/faq/page.tsx,8.2,81,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/getting-started/page.tsx,8.2,80,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/keys/page.tsx,8.2,74,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/layout.tsx,8.2,50,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/modes/page.tsx,8.2,74,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/page.tsx,8.2,60,0,clean_static_signals,Keep stable; preserve with tests
+web/app/docs/security/page.tsx,8.2,104,0,clean_static_signals,Keep stable; preserve with tests
+web/app/globals.css,8.0,13,0,clean_static_signals,Keep stable; preserve with tests
+web/app/layout.tsx,8.2,76,0,clean_static_signals,Keep stable; preserve with tests
+web/app/legal/aup/page.tsx,8.2,37,0,clean_static_signals,Keep stable; preserve with tests
+web/app/legal/layout.tsx,8.2,11,0,clean_static_signals,Keep stable; preserve with tests
+web/app/legal/privacy/page.tsx,8.2,41,0,clean_static_signals,Keep stable; preserve with tests
+web/app/legal/terms/page.tsx,8.2,43,0,clean_static_signals,Keep stable; preserve with tests
+web/app/page.tsx,8.2,34,0,clean_static_signals,Keep stable; preserve with tests
+web/app/pricing/page.tsx,8.2,134,0,clean_static_signals,Keep stable; preserve with tests
+web/app/privacy/page.tsx,8.2,74,0,clean_static_signals,Keep stable; preserve with tests
+web/app/support/page.tsx,8.2,81,0,clean_static_signals,Keep stable; preserve with tests
+web/app/terms/page.tsx,8.2,61,0,clean_static_signals,Keep stable; preserve with tests
+web/components/credit-meter.tsx,8.2,41,0,clean_static_signals,Keep stable; preserve with tests
+web/components/footer.tsx,8.2,18,0,clean_static_signals,Keep stable; preserve with tests
+web/components/hero-animation.tsx,8.2,169,0,clean_static_signals,Keep stable; preserve with tests
+web/components/nav.tsx,8.2,59,0,clean_static_signals,Keep stable; preserve with tests
+web/components/pricing-table.tsx,8.2,61,0,clean_static_signals,Keep stable; preserve with tests
+web/components/usage-chart.tsx,8.2,39,0,clean_static_signals,Keep stable; preserve with tests
+web/lib/api-server.ts,8.2,33,0,clean_static_signals,Keep stable; preserve with tests
+web/lib/api.ts,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+web/lib/auth.ts,8.2,47,0,clean_static_signals,Keep stable; preserve with tests
+web/next-env.d.ts,7.2,5,0,generated_file,Keep stable; preserve with tests
+web/next.config.js,8.2,12,0,clean_static_signals,Keep stable; preserve with tests
+web/package-lock.json,7.2,6830,0,generated_file,Keep stable; preserve with tests
+web/package.json,7.8,35,0,clean_static_signals,Keep stable; preserve with tests
+web/postcss.config.js,8.2,6,0,clean_static_signals,Keep stable; preserve with tests
+web/public/favicon.svg,7.8,22,0,clean_static_signals,Keep stable; preserve with tests
+web/public/logo.svg,7.8,30,0,clean_static_signals,Keep stable; preserve with tests
+web/tailwind.config.ts,8.2,19,0,clean_static_signals,Keep stable; preserve with tests
+web/tsconfig.json,7.8,39,0,clean_static_signals,Keep stable; preserve with tests
+web/tsconfig.tsbuildinfo,7.2,0,0,generated_file,Keep stable; preserve with tests
