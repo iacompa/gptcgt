@@ -8,7 +8,7 @@ from api.config import settings
 from api.database import close_db_pool, init_db_pool
 from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
-from api.routes import api_keys, auth, billing, usage, users
+from api.routes import api_keys, auth, billing, proxy, usage, users, team
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
@@ -45,6 +45,7 @@ app.add_middleware(AuthMiddleware)
 app.include_router(billing.router, prefix="/billing")
 app.include_router(auth.router, prefix="/auth")
 app.include_router(users.router, prefix="/user")
+app.include_router(team.router, prefix="/team")
 app.include_router(api_keys.router, prefix="/api_keys")
 from fastapi.responses import JSONResponse  # noqa: E402
 
@@ -59,6 +60,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(usage.router, prefix="/usage")
+app.include_router(proxy.router, prefix="/proxy")
 
 
 @app.get("/health")

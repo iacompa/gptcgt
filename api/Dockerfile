@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY api/ /app/api/
 COPY src/ /app/src/
 
+ENV PYTHONPATH=/app
 EXPOSE 8000
 
-# Start FastAPI using uvicorn
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start FastAPI using uvicorn, but run migrations first
+CMD ["sh", "-c", "python api/scripts/01_migration_teams_rbac.py && uvicorn api.main:app --host 0.0.0.0 --port 8000"]
