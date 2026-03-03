@@ -26,10 +26,10 @@ export default function PrivacyPolicyPage() {
                             <span><strong className="font-semibold text-white">Billing Details:</strong> If you use our Managed Credits (Pro Tier), our payment processor (Stripe) securely collects and processes your payment method. We only store your <strong>Country</strong> and <strong>ZIP/Postal Code</strong> on our servers for tax and fraud-prevention purposes.</span>
                         </li>
                         <li className="flex gap-x-3">
-                            <span><strong className="font-semibold text-white">Usage Data (Telemetry):</strong> We collect aggregated, anonymous telemetry—specifically <strong>Token Consumption counts</strong> and basic CLI model choices (e.g., "Script ran using Claude 3.5 Sonnet"). <strong className="text-indigo-400">We do not collect the contents of your code, your prompts, or your AI responses.</strong></span>
+                            <span><strong className="font-semibold text-white">Usage Data (Telemetry):</strong> We collect aggregated, anonymous telemetry—specifically <strong>Token Consumption counts</strong> and basic CLI model choices (e.g., &quot;Script ran using Claude 3.5 Sonnet&quot;). <strong className="text-indigo-400">We do not collect the contents of your code, your prompts, or your AI responses.</strong></span>
                         </li>
                         <li className="flex gap-x-3">
-                            <span><strong className="font-semibold text-white">API Keys:</strong> Under the "Bring Your Own Keys" (BYOK) model, your provider API keys (OpenAI, Anthropic, etc.) are <strong>stored exclusively on your local machine</strong> using your operating system's secure keychain. They are never transmitted to or stored on our servers.</span>
+                            <span><strong className="font-semibold text-white">API Keys:</strong> Under the &quot;Bring Your Own Keys&quot; (BYOK) model, your provider API keys (OpenAI, Anthropic, etc.) are <strong>stored exclusively on your local machine</strong> using your operating system&apos;s secure keychain. They are never transmitted to or stored on our servers.</span>
                         </li>
                     </ul>
 
@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
 
                     <h2 className="mt-16 text-2xl font-bold tracking-tight text-white">3. Third-Party Services</h2>
                     <p className="mt-6">
-                        We integrate with third-party AI providers. When you submit a prompt, you are subject to that specific provider's privacy policy and terms of service. We currently support:
+                        We integrate with third-party AI providers. When you submit a prompt, you are subject to that specific provider&apos;s privacy policy and terms of service. We currently support:
                     </p>
                     <ul className="mt-4 list-disc space-y-2 pl-8">
                         <li>OpenAI (ChatGPT models)</li>

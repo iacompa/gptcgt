@@ -605,7 +605,7 @@ class SettingsScreen(ModalScreen):
                 "DEEPSEEK_API_KEY": "deepseek",
                 "OPENROUTER_API_KEY": "openrouter",
             }
-            
+
             if var_name == "E2B_API_KEY":
                 stat_label.update("✅ Valid Sandbox Key")
                 KeyChainManager.set_key(var_name, key_val)

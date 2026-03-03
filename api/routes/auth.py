@@ -152,7 +152,10 @@ async def _sync_user(workos_user_id: str, email: str):
 
             await pool.execute(
                 """
-                INSERT INTO users (workos_user_id, email, plan, credits_remaining, credits_monthly, team_id, team_role, billing_access)
+                INSERT INTO users (
+                    workos_user_id, email, plan, credits_remaining,
+                    credits_monthly, team_id, team_role, billing_access
+                )
                 VALUES ($1, $2, 'free', 0, 0, $3, 'owner', true)
                 """,
                 workos_user_id,

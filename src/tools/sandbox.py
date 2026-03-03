@@ -297,10 +297,11 @@ class E2BSandbox:
         This provides Zero-Retention execution for Pro/Team users without needing a local E2B key.
         """
         import httpx
+
         from src.core.config import ConfigManager
-        
+
         files_to_upload = self._collect_files_for_sandbox(patch_set, project_root)
-        
+
         # Apply patches locally in-memory to the files dictionary before transmission
         for fp in patch_set.patches:
             if str(fp.file_path) in files_to_upload:
@@ -314,21 +315,21 @@ class E2BSandbox:
 
         tools = LANGUAGE_TOOLS.get(language, LANGUAGE_TOOLS.get("python"))
         test_cmd = test_command or tools.get("test_runner", "pytest")
-        
+
         payload = {
             "files": files_to_upload,
             "language": language,
             "command": test_cmd
         }
-        
+
         config = ConfigManager()
         base_url = config.user.api_base_url or "https://gptcgt.ai/api"
         # The proxy exposes /v1/sandbox/execute
         url = f"{base_url}/v1/sandbox/execute"
-        
+
         if on_stdout:
             on_stdout(f"🚀 Sending {len(files_to_upload)} files to Zero-Retention Sandbox Proxy...\n")
-            
+
         try:
             async with httpx.AsyncClient(timeout=65.0) as client:
                 resp = await client.post(
@@ -338,12 +339,12 @@ class E2BSandbox:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                
+
             if on_stdout and data.get("stdout"):
                 on_stdout(data["stdout"])
             if on_stderr and data.get("stderr"):
                 on_stderr(data["stderr"])
-                
+
             # Parse test results
             result.test_result = self._parse_test_output(
                 data.get("stdout", ""),
@@ -355,7 +356,7 @@ class E2BSandbox:
             if on_stderr:
                 on_stderr(f"❌ Proxy Execution Error: {str(e)}\n")
             raise e
-            
+
         return result
 
     async def _verify_with_sandbox(
