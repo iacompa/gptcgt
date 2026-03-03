@@ -17,7 +17,7 @@ class CheckoutRequest(BaseModel):
 
 
 class CreditPurchaseRequest(BaseModel):
-    credit_amount: int  # Any amount between 100 and 10000
+    credit_amount: int  # Any amount between 100 and 50000
 
 
 class CheckoutResponse(BaseModel):
@@ -32,6 +32,9 @@ class BillingStatusResponse(BaseModel):
     current_period_end: Optional[str] = None
     overage_enabled: bool
     spending_cap: Optional[int] = None
+    team_role: str
+    allocated_quota: Optional[int] = None
+    billing_access: bool
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
@@ -64,9 +67,9 @@ async def purchase_credits(request: Request, body: CreditPurchaseRequest):
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if body.credit_amount < 100 or body.credit_amount > 10000:
+    if body.credit_amount < 100 or body.credit_amount > 50000:
         raise HTTPException(
-            status_code=400, detail="Credit amount must be between 100 and 10000."
+            status_code=400, detail="Credit amount must be between 100 and 50000."
         )
 
     pool = get_pool()
@@ -115,9 +118,12 @@ async def get_status(request: Request):
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            """SELECT plan, credits_remaining, credits_monthly,
-               subscription_status, current_period_end, overage_enabled, spending_cap
-               FROM users WHERE workos_user_id = $1""",
+            """SELECT u.plan, u.credits_remaining, u.credits_monthly,
+               u.subscription_status, u.current_period_end, u.overage_enabled, u.spending_cap,
+               u.team_role, u.allocated_quota, u.billing_access, t.shared_credits_remaining
+               FROM users u
+               LEFT JOIN teams t ON u.team_id = t.id
+               WHERE u.workos_user_id = $1""",
             user_id,
         )
         if not row:
@@ -127,14 +133,20 @@ async def get_status(request: Request):
     if row["current_period_end"]:
         period_end = row["current_period_end"].isoformat()
 
+    # Use team wallet balance if available, fall back to personal credits
+    effective_credits = row["shared_credits_remaining"] if row["shared_credits_remaining"] is not None else (row["credits_remaining"] or 0)
+
     return BillingStatusResponse(
         plan=row["plan"] or "free",
-        credits_remaining=row["credits_remaining"] or 0,
+        credits_remaining=effective_credits,
         credits_monthly=row["credits_monthly"] or 0,
         subscription_status=row["subscription_status"] or "none",
         current_period_end=period_end,
         overage_enabled=row["overage_enabled"] or False,
         spending_cap=row["spending_cap"],
+        team_role=row["team_role"] or "owner",
+        allocated_quota=row["allocated_quota"],
+        billing_access=row["billing_access"] if row["billing_access"] is not None else True
     )
 
 
