@@ -1,7 +1,9 @@
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import re
 from pathlib import Path
+
+from src.core.chat_store import MessageRole  # noqa: F401
 
 from rich.text import Text
 from textual import on
@@ -13,6 +15,8 @@ from textual.message import Message
 from textual.widgets import Label, Static, TextArea
 
 from src.core.events import (
+    AgentCompleted,
+    AgentDispatched,
     AgentStatusUpdate,
     ArbiterVerdictReady,
     ContextModified,
@@ -24,6 +28,7 @@ from src.core.events import (
     ParallelDispatchComplete,
     ParallelDispatchStarted,
     ReflectionRetryHint,
+    SubTaskDelegated,
     TaskReceived,
 )
 from src.core.logger import get_logger
@@ -50,8 +55,9 @@ def apply_brand_colors(text: str) -> str:
             return w
         return f"[{color}]{w}[/{color}]"
 
-    # Skip processing if it looks like there are markup tags to avoid nesting errors
-    if "[" in text and "]" in text:
+    # Skip if text already contains Rich markup tags (e.g. [bold], [#color], [/foo])
+    # but allow plain brackets like JSON arrays or markdown links
+    if re.search(r'\[/?[a-z#]', text):
         return text
 
     return re.sub(r'\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b', replacer, text, flags=re.IGNORECASE)  # noqa: E501
@@ -105,6 +111,26 @@ logger = get_logger("tui.chat")
 _SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
+class SmoothScroll(VerticalScroll):
+    """
+    VerticalScroll with controlled 3-line wheel increments (no jitter).  # noqa: D213
+
+    Overrides the *internal* Textual scroll handlers and calls
+    prevent_default() so the base VerticalScroll never fires its
+    own default scroll — this eliminates the 'scroll 3, bounce 2' glitch.
+    """
+
+    def _on_mouse_scroll_down(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.scroll_relative(y=3, animate=False)
+
+    def _on_mouse_scroll_up(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.scroll_relative(y=-3, animate=False)
+
+
 class ChatMessage(Static):
     """Renders a single chat message (User, Agent, System)."""
 
@@ -112,6 +138,7 @@ class ChatMessage(Static):
     ChatMessage {
         width: 100%;
         height: auto;
+        layout: vertical;
         margin-bottom: 1;
         padding: 0;
     }
@@ -119,41 +146,53 @@ class ChatMessage(Static):
     .msg-user {
         align: right top;
         width: 100%;
-        padding: 0 1;
+        height: auto;
+        padding: 0;
     }
     .msg-user-inner {
         background: $primary;
         color: $background;
         padding: 1 2;
         width: auto;
-        max-width: 78%;
+        max-width: 85%;
+        height: auto;
+        min-height: 1;
         border: blank;
+        overflow-x: hidden;
     }
     .msg-user > .msg-header {
         content-align: right middle;
         color: $background;
         text-style: bold;
         margin-bottom: 0;
-        width: auto;
+        width: 100%;
     }
     /* ── Agent bubble: left-aligned ────────────────────── */
     .msg-agent {
         align: left top;
         width: 100%;
-        padding: 0 1;
+        height: auto;
+        padding: 0;
     }
     .msg-agent-inner {
         background: $surface;
         padding: 1 2;
         width: auto;
-        max-width: 90%;
-        border-left: thick $primary;
+        max-width: 85%;
+        height: auto;
+        min-height: 1;
+        overflow-x: hidden;
+    }
+    .msg-content {
+        width: 100%;
+        height: auto;
+        overflow: hidden;
     }
     .msg-agent > .msg-header {
         content-align: left middle;
         text-style: bold;
         margin-bottom: 0;
-        width: auto;
+        width: 100%;
     }
     /* ── System message ────────────────────────────────── */
     .msg-system {
@@ -204,8 +243,7 @@ class ChatMessage(Static):
             self.add_class("msg-user")
             with _V(classes="msg-user-inner"):
                 yield Label(f"[bold]You[/bold]  [dim]{self.time_str}[/dim]", classes="msg-header")
-                content_label = Label(apply_brand_colors(self.content))
-                content_label.styles.width = "auto"
+                content_label = Label(apply_brand_colors(self.content), classes="msg-content")
                 yield content_label
         else:
             self.add_class("msg-agent")
@@ -224,8 +262,7 @@ class ChatMessage(Static):
                         if block.is_code:
                             yield CollapsibleCodeBlock(language=block.language, code=block.content)
                         else:
-                            label = Label(apply_brand_colors(block.content))
-                            label.styles.width = "auto"
+                            label = Label(apply_brand_colors(block.content), classes="msg-content")
                             yield label
 
 
@@ -237,10 +274,10 @@ class ChatMessage(Static):
 
         if not self.content:
             # First chunk incoming — mount streaming label inside inner container
-            inner = next((c for c in self.children if "msg-agent-inner" in c.classes), self)
-            self._current_streaming_label = Label("")
+            self._inner = next((c for c in self.children if "msg-agent-inner" in c.classes), self)
+            self._current_streaming_label = Label("", classes="msg-content")
             self._streaming_labels.append(self._current_streaming_label)
-            inner.mount(self._current_streaming_label)
+            self._inner.mount(self._current_streaming_label)
 
     def append_chunk(self, chunk: str) -> None:
         if not self.is_mounted:
@@ -255,9 +292,10 @@ class ChatMessage(Static):
         for event_type, data in events:
             if event_type == "text":
                 if self._current_streaming_label is None:
-                    self._current_streaming_label = Label("")
+                    self._current_streaming_label = Label("", classes="msg-content")
                     self._streaming_labels.append(self._current_streaming_label)
-                    self.mount(self._current_streaming_label)
+                    inner = getattr(self, '_inner', self)
+                    inner.mount(self._current_streaming_label)
 
                 self._current_streaming_text += data
                 self._current_streaming_label.update(apply_brand_colors(self._current_streaming_text))
@@ -269,7 +307,8 @@ class ChatMessage(Static):
             elif event_type == "code_end":
                 lang = data["language"]
                 code_text = data["full_code"]
-                self.mount(CollapsibleCodeBlock(language=lang, code=code_text))
+                inner = getattr(self, '_inner', self)
+                inner.mount(CollapsibleCodeBlock(language=lang, code=code_text))
                 self._current_streaming_text = ""
 
     def finalize_streaming(self) -> None:
@@ -284,9 +323,10 @@ class ChatMessage(Static):
         for event_type, data in events:
             if event_type == "text":
                 if self._current_streaming_label is None:
-                    self._current_streaming_label = Label("")
+                    self._current_streaming_label = Label("", classes="msg-content")
                     self._streaming_labels.append(self._current_streaming_label)
-                    self.mount(self._current_streaming_label)
+                    inner = getattr(self, '_inner', self)
+                    inner.mount(self._current_streaming_label)
 
                 self._current_streaming_text += data
                 self._current_streaming_label.update(apply_brand_colors(self._current_streaming_text))
@@ -294,7 +334,8 @@ class ChatMessage(Static):
             elif event_type == "code_end":
                 lang = data["language"]
                 code_text = data["full_code"]
-                self.mount(CollapsibleCodeBlock(language=lang, code=code_text))
+                inner = getattr(self, '_inner', self)
+                inner.mount(CollapsibleCodeBlock(language=lang, code=code_text))
                 self._current_streaming_text = ""
 
     def append_thought(self, title: str, content: str) -> None:
@@ -316,8 +357,8 @@ class AgentStreamBox(Static):
 
     DEFAULT_CSS = """
     AgentStreamBox {
-        width: 90%;
-        margin-right: 10;
+        width: 99%;
+        margin-right: 0;
         height: auto;
         min-height: 5;
         border: blank;
@@ -458,21 +499,23 @@ class ChatPanel(Vertical):
     }
     #chat-scroll {
         height: 1fr;
+        min-height: 0;
         width: 100%;
         overflow-y: scroll;
         overflow-x: hidden;
-        padding: 1 1;
+        padding: 0 1;
+        scrollbar-size: 1 1;
     }
     #chat-input-container {
         height: auto;
-        min-height: 5;
+        min-height: 3;
         max-height: 15;
         border-top: none;
         background: transparent;
-        padding: 1 2;
+        padding: 0 1;
     }
     #chat-input-header {
-        display: block;
+        display: none;
         height: 1;
         color: $text-muted;
         padding: 0 2;
@@ -480,16 +523,17 @@ class ChatPanel(Vertical):
         border-top: solid $secondary;
     }
     #chat-input {
-        min-height: 3;
+        min-height: 1;
         height: auto;
-        max-height: 10;
+        max-height: 8;
         background: $surface;
         margin-bottom: 0;
-        border: blank;
-        padding: 1 2;
+        border: solid $secondary;
+        padding: 0 1;
+        overflow-x: hidden;
     }
     #chat-input-hint {
-        display: block;
+        display: none;
         height: 1;
         color: $text-muted;
         padding: 0 2;
@@ -510,6 +554,15 @@ class ChatPanel(Vertical):
         text-style: bold;
         color: $accent;
     }
+    #chat-header {
+        width: 100%;
+        background: $surface;
+        color: $primary;
+        text-style: bold;
+        padding: 0 1;
+        border-bottom: solid $secondary;
+        height: auto;
+    }
     """
 
     def __init__(self, *args, **kwargs):
@@ -520,13 +573,16 @@ class ChatPanel(Vertical):
             str, dict[str, AgentStreamBox]
         ] = {}  # dispatch_id -> {agent_id -> box}
         self._pending_reflection_hint: str | None = None  # stores latest lesson for next dispatch
+        self._stream_start_time: float | None = None
+        self._streaming_timer = None
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll(id="chat-scroll") as scroll:
+        yield Label("💬 Chat", id="chat-header")
+        with SmoothScroll(id="chat-scroll") as scroll:
             self.scroll_container = scroll
 
         with Vertical(id="chat-input-container"):
-            yield Label("⚡ Standard │ Mode: Standard │ 5 cr", id="chat-input-header")
+            yield Label("🤖 Ready", id="chat-input-header")
             self.context_chips = ContextChipBar(id="context-chips")
             yield self.context_chips
             self.input_area = ChatInput(id="chat-input")
@@ -540,6 +596,72 @@ class ChatPanel(Vertical):
             self.input_area.theme = "github_light" if getattr(self.app, "theme", "") == "polar" else "vscode_dark"
         if hasattr(self.app, "chat_store"):
             self._load_session_history()
+        # Populate header with model/mode info so it's never blank
+        self._populate_header_on_boot()
+
+
+
+    def _populate_header_on_boot(self) -> None:
+        """Hide the header on startup to save space."""
+        try:
+            if self._header():
+                self._header().display = False
+        except Exception:
+            pass
+
+    # ── Context-aware header bar ──────────────────────────
+
+    def _header(self) -> Label:
+        return self.query_one("#chat-input-header", Label)
+
+    def set_header_idle(self, model_name: str = "") -> None:
+        """Show model name when idle."""
+        if self._streaming_timer:
+            self._streaming_timer.stop()
+            self._streaming_timer = None
+        if model_name:
+            self._header().display = True
+            text = f"🤖 {model_name}"
+            self._header().update(text)
+        else:
+            self._header().display = False
+
+    def set_header_streaming(self, model_name: str = "") -> None:
+        """Show live elapsed timer during generation."""
+        self._header().display = True
+        import time
+        self._stream_start_time = time.monotonic()
+        self._stream_model_name = model_name
+        self._header().update(f"⏳ {model_name} thinking..." if model_name else "⏳ Thinking...")
+        # Start a periodic timer to update elapsed time
+        if self._streaming_timer:
+            self._streaming_timer.stop()
+        self._streaming_timer = self.set_interval(0.5, self._tick_streaming_header)
+
+    def _tick_streaming_header(self) -> None:
+        """Timer callback to update elapsed time."""
+        import time
+        if self._stream_start_time is None:
+            return
+        elapsed = time.monotonic() - self._stream_start_time
+        name = getattr(self, "_stream_model_name", "")
+        prefix = f"⏳ {name} " if name else "⏳ "
+        self._header().update(f"{prefix}thinking... ({elapsed:.1f}s)")
+
+    def set_header_complete(self, duration_s: float, token_count: int = 0, cost: float = 0.0) -> None:
+        """Show per-message stats after response completes."""
+        if self._streaming_timer:
+            self._streaming_timer.stop()
+            self._streaming_timer = None
+        self._stream_start_time = None
+
+        parts = [f"✓ {duration_s:.1f}s"]
+        if token_count > 0:
+            parts.append(f"{token_count:,} tokens")
+        if cost > 0:
+            parts.append(f"${cost:.4f}")
+        self._header().display = True
+        self._header().update(" · ".join(parts))
 
     def _load_session_history(self) -> None:
         """Load messages from the active session."""
@@ -636,11 +758,24 @@ class ChatPanel(Vertical):
         # Check for API keys
         from src.auth.keychain import KeyChainManager
 
-        if not KeyChainManager.has_any_keys() and not self.app.config.user.setup_completed:
-            self._append_message(
-                "system", "⚠️ No API keys configured. Add a key in Settings (Ctrl+,) or run /setup"
-            )
-            return
+        # Bypass key check if using managed credits proxy
+        is_managed = False
+        try:
+            import textual.app as _tapp
+            if getattr(_tapp.active_app.get(), "auth_manager", None):
+                is_managed = _tapp.active_app.get().auth_manager.use_managed_credits
+        except Exception:
+            pass
+
+        if not is_managed and not KeyChainManager.has_any_keys() and not self.app.config.user.setup_completed:
+            user_config = getattr(self.app.config, "user", None)
+            has_custom = bool(getattr(user_config, "custom_models", [])) if user_config else False
+  # noqa: W293
+            if not has_custom:
+                self._append_message(
+                    "system", "⚠️ No API keys configured. Add a key in Settings (Ctrl+,) or run /setup"
+                )
+                return
 
         # Render user message
         from datetime import datetime
@@ -690,15 +825,16 @@ class ChatPanel(Vertical):
         # Emit properly structured task received event
         self.post_message(TaskReceived(task_str=clean_text, attached_files=file_paths))
 
-        # Show animated thinking spinner before first AI token
-        self._start_thinking_spinner()
-
         # Clear context chips after sending
         self.context_chips.clear_all()
 
     def _start_thinking_spinner(self) -> None:
-        """Mount an animated spinner pill in the chat. Removed on first token."""
+        """Mount an animated spinner pill in the chat only while waiting for model output."""
         from textual.widgets import Static
+
+        # Idempotent start: avoid stacked timers/labels that cause rapid flicker.
+        self._stop_thinking_spinner()
+
         self._spinner_label = Static("⠋ Thinking...", classes="transient-pill")
         self._spinner_frame = 0
         self.scroll_container.mount(self._spinner_label)
@@ -731,23 +867,232 @@ class ChatPanel(Vertical):
             pass
 
     def _handle_slash_command(self, cmd: str) -> None:
-        parts = cmd.split()
-        base = parts[0].lower()
-        logger.debug(f"Handling slash command: {base}")
-
+        """Argument-aware slash command dispatch via CommandRegistry."""
         from src.core.commands import CommandRegistry
 
         registry = CommandRegistry()
-        if registry.execute(base):
-            return
+        command, args = registry.resolve_slash(cmd)
 
-        if base == "/setup":
-            self.app.action_push_onboarding()
-        else:
+        if command is None:
+            # Unknown command — suggest closest match
+            all_slashes = [c.slash for c in registry.get_slash_commands() if c.slash]
+            parts = cmd.split()
+            base = parts[0].lower() if parts else cmd
+            import difflib
+            matches = difflib.get_close_matches(base, all_slashes, n=3, cutoff=0.4)
+            suggestion = f" Did you mean: {', '.join(matches)}?" if matches else ""
             self._append_message(
                 "system",
-                f"Unknown command: {base}. Type /help or use the Command Palette (Ctrl+Shift+P).",
+                f"Unknown command: {base}.{suggestion} Type /help for all commands.",
             )
+            return
+
+        logger.debug(f"Slash dispatch: {command.id} with args={args}")
+
+        # Commands handled directly by ChatPanel (need panel/app context or args)
+        PANEL_HANDLED = {"chat.export", "chat.compact", "chat.cost", "chat.context", "chat.mode", "chat.auto"}
+
+        if command.id in PANEL_HANDLED:
+            getattr(self, f"_slash_{command.id.split('.')[-1]}")(args)
+        elif command.id == "chat.new":
+            command.action()
+            self._append_message("system", "✨ New session started.")
+        else:
+            # Delegate to registry action
+            if not registry.execute(command.slash or command.id):
+                self._append_message("system", f"Command failed: {command.id}")
+
+    # ── Concrete slash command handlers ──────────────────
+
+    def _slash_export(self, args: list[str]) -> None:
+        """Export current session as timestamped markdown to project root."""
+        try:
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
+            session_id = self.app.chat_store.current_session_id
+            md_content = self.app.chat_store.export_session(session_id, format="markdown")
+            from datetime import datetime
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_path = ws.get_project_root() / f"chat_export_{ts}.md"
+            out_path.write_text(md_content)
+            self._append_message("system", f"📤 Exported to {out_path.name}")
+        except Exception as e:
+            self._append_message("system", f"Export failed: {e}")
+
+    def _slash_auto(self, args: list[str]) -> None:
+        """Start autonomous mode: /auto <goal>."""
+        if not args:
+            self._append_message(
+                "system",
+                "🚀 **Autonomous Mode**\n"
+                "Usage: `/auto <goal>`\n"
+                "Example: `/auto Build a todo app with authentication`\n\n"
+                "The AI agents will collaborate to plan, code, test, and review your project."
+            )
+            return
+
+        goal = " ".join(args)
+        self._append_message(
+            "system",
+            f"🚀 **Autonomous Mode Started**\n"
+            f"Goal: {goal}\n\n"
+            f"Agents will plan → code → test → review in a loop.\n"
+            f"Watch the Activity Feed for inter-agent conversation.\n"
+            f"Type `/auto stop` to cancel."
+        )
+
+        # Check for stop/pause/resume commands
+        if goal.lower() in ("stop", "cancel"):
+            if hasattr(self, "_autonomous_runner") and self._autonomous_runner:
+                self._autonomous_runner.pause()
+                self._append_message("system", "⏸️ Autonomous mode paused.")
+            else:
+                self._append_message("system", "No autonomous session running.")
+            return
+
+        if goal.lower() == "resume":
+            if hasattr(self, "_autonomous_runner") and self._autonomous_runner:
+                self._autonomous_runner.resume()
+                self._append_message("system", "▶️ Autonomous mode resumed.")
+            else:
+                self._append_message("system", "No autonomous session to resume.")
+            return
+
+        # Start autonomous runner in background
+        import asyncio  # noqa: I001
+        from src.core.agent_bus import AgentMessageBus
+        from src.core.autonomous import AutonomousRunner
+
+        bus = AgentMessageBus()
+        self._autonomous_runner = AutonomousRunner(bus=bus)
+
+        async def narration_cb(text, ntype="info"):
+            self._append_message("system", text)
+
+        async def error_cb(err):
+            self._append_message("system", f"❌ Autonomous error: {err}")
+
+        cancel_event = asyncio.Event()
+
+        async def _run():
+            await self._autonomous_runner.run(
+                goal=goal,
+                narration_callback=narration_cb,
+                error_callback=error_cb,
+                cancel_event=cancel_event,
+            )
+            self._append_message("system", "✅ Autonomous mode finished.")
+
+        self.app.run_worker(_run(), name="autonomous-runner", exclusive=True)
+
+    def _slash_cost(self, args: list[str]) -> None:
+        """Show session/daily cost summary."""
+        try:
+            cost_str = ""
+            if hasattr(self.app, "status_bar"):
+                sb = self.app.status_bar
+                session = getattr(sb, "session_cost", 0.0)
+                daily = getattr(sb, "daily_total", 0.0)
+                budget = getattr(sb, "budget", 0.0)
+                cost_str = (
+                    f"💰 Session: ${session:.4f} │ "
+                    f"Today: ${daily:.4f} │ "
+                    f"Budget: ${budget:.2f}"
+                )
+            else:
+                cost_str = "💰 Cost tracking not available."
+            self._append_message("system", cost_str)
+        except Exception as e:
+            self._append_message("system", f"Cost lookup failed: {e}")
+
+    def _slash_context(self, args: list[str]) -> None:
+        """Show context window budget stats for active model."""
+        try:
+            from src.core.model_registry import ModelRegistry, QualityTier
+            registry = ModelRegistry()
+            tier = QualityTier.STANDARD
+            if hasattr(self.app, "tier_manager"):
+                tier = QualityTier(self.app.tier_manager.active_tier.value)
+            model = registry.get_default_for_tier(tier)
+            if model:
+                msg_count = len(self.app.chat_store.get_session_messages() or [])
+                self._append_message(
+                    "system",
+                    f"📊 Model: {model.name} │ "
+                    f"Context: {model.max_context_tokens:,} tokens │ "
+                    f"Messages in session: {msg_count}",
+                )
+            else:
+                self._append_message("system", "📊 No model configured for current tier.")
+        except Exception as e:
+            self._append_message("system", f"Context lookup failed: {e}")
+
+    def _slash_mode(self, args: list[str]) -> None:
+        """Switch operation mode: /mode scout|standard|ensemble|battle|architect."""
+        from src.core.mode_manager import ModeManager, OperationMode
+
+        valid_modes = {m.value: m for m in OperationMode}
+        if not args:
+            current = ModeManager().active_mode.value
+            modes_list = ", ".join(valid_modes.keys())
+            self._append_message(
+                "system",
+                f"🎯 Current mode: {current}. Available: {modes_list}",
+            )
+            return
+
+        name = args[0].lower()
+        if name not in valid_modes:
+            modes_list = ", ".join(valid_modes.keys())
+            self._append_message("system", f"Unknown mode '{name}'. Available: {modes_list}")
+            return
+
+        ModeManager().set_mode(valid_modes[name])
+        self._append_message("system", f"🎯 Mode switched to: {name}")
+        # Update status bar if available
+        if hasattr(self.app, "_update_status_bar"):
+            self.app._update_status_bar()
+
+    def _slash_compact(self, args: list[str]) -> None:
+        """Compact context into a single summary to save tokens."""
+        self._append_message("system", "📦 Context compaction running...")
+  # noqa: W293
+        try:
+            messages = self.app.chat_store.get_session_messages() or []
+            if len(messages) < 10:
+                self._append_message("system", "📦 Session too short to compact (< 10 messages).")
+                return
+  # noqa: W293
+            from src.core.context_compactor import ContextCompactor  # noqa: I001
+            from src.core.chat_store import ChatMessage, MessageRole
+            import uuid
+            from datetime import datetime
+  # noqa: W293
+            compactor = ContextCompactor()
+            old_msgs = [m for m in messages if m.role.value in ("user", "agent")]
+  # noqa: W293
+            if len(old_msgs) > 20:
+                summary = compactor._summarize_old_messages(old_msgs[:-20])
+                summary_msg = ChatMessage(
+                    id=str(uuid.uuid4()),
+                    role=MessageRole.SYSTEM,
+                    content=f"[Context Summary] {summary}",
+                    timestamp=datetime.now()
+                )
+  # noqa: W293
+                # Hard reset memory: keep last 20 messages and prepend summary
+                self.app.chat_store.truncate_history(keep_count=20, summary_msg=summary_msg)
+  # noqa: W293
+                self._append_message(
+                    "system",
+                    f"📦 Compacted {len(old_msgs) - 20} older messages into a summary. "
+                    f"Context truncated in memory."
+                )
+                self._load_session_history()
+            else:
+                self._append_message("system", "📦 Not enough messages to compact yet.")
+        except Exception as e:
+            self._append_message("system", f"Compaction failed: {e}")
 
     def _append_message(
         self, role: str, content: str, name: str = "", time_str: str = ""
@@ -818,12 +1163,52 @@ class ChatPanel(Vertical):
             status_pill.styles.margin = (0, 0, 1, 0)
             self.scroll_container.mount(status_pill)
             self.scroll_container.scroll_end(animate=False)
-        elif event.status == "completed":
+        elif event.status in {"completed", "error", "failed", "cancelled"}:
+            self._stop_thinking_spinner()
             try:
                 existing = self.query_one("#transient-status")
                 existing.remove()
             except Exception as e:
                 logger.debug(f"Transient status cleanup failed: {e}")
+
+    @on(AgentDispatched)
+    def on_agent_dispatched(self, event: AgentDispatched) -> None:
+        """Start waiting spinner only when an agent actually starts an LLM request."""
+        # Parallel mode has its own streaming UI; avoid spinner noise there.
+        if event.agent_name.lower() == "orchestrator":
+            return
+        self._start_thinking_spinner()
+
+    @on(AgentCompleted)
+    def on_agent_completed(self, event: AgentCompleted) -> None:
+        """Always stop spinner when generation ends, including error-only responses."""
+        self._stop_thinking_spinner()
+        # Also clear any lingering transient status pill
+        try:
+            existing = self.query_one("#transient-status")
+            existing.remove()
+        except Exception:
+            pass
+
+    @on(SubTaskDelegated)
+    def on_sub_task_delegated(self, event: SubTaskDelegated) -> None:
+        """Render recursive delegation visually in the chat UI."""
+        from textual.widgets import Label
+
+        # Indent based on depth (max depth limit is 3, but UI could show more theoretically)
+        indent = "  " * event.depth
+        depth_indicator = "↳" * event.depth
+
+        instruction_preview = event.instruction[:50] + ("..." if len(event.instruction) > 50 else "")
+        delegation_msg = Label(
+            f"{indent}[bold #d2a8ff]{depth_indicator} Swarm Handoff[/bold #d2a8ff] "
+            f"[dim]Delegating to [bold]{event.child_model_name}[/bold][/dim]\n"
+            f"{indent}  [italic dim]'{instruction_preview}'[/italic dim]",
+            classes="delegation-pill"
+        )
+        delegation_msg.styles.margin = (0, 0, 1, 0)
+        self.scroll_container.mount(delegation_msg)
+        self.scroll_container.scroll_end(animate=False)
 
     @on(ParallelDispatchStarted)
     def on_parallel_dispatch_started(self, event: ParallelDispatchStarted) -> None:

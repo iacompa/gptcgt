@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from pygments import highlight
-from pygments.formatters import TerminalFormatter
 from pygments.lexers import TextLexer, get_lexer_for_filename
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -21,8 +20,23 @@ from textual.widgets import Button, Label, Static
 from src.core.diff_engine import FilePatch, MultiAgentPatchSet, PatchEngine, PatchSet
 from src.core.logger import get_logger
 from src.tui.widgets.code_selector import CodeLineClicked, CodeLineWidget, SelectionManager
+from src.tui.widgets.syntax_colors import build_terminal_formatter
 
 logger = get_logger("tui.code_viewer")
+
+
+class SmoothScroll(VerticalScroll):
+    """VerticalScroll with controlled 3-line wheel increments (no jitter)."""
+
+    def _on_mouse_scroll_down(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.scroll_relative(y=3, animate=False)
+
+    def _on_mouse_scroll_up(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.scroll_relative(y=-3, animate=False)
 
 
 
@@ -39,12 +53,14 @@ class CodeView(Vertical):
         width: 100%;
         overflow-x: auto;
         overflow-y: auto;
+        scrollbar-size: 1 1;
     }
     #code-diff-view {
         width: 100%;
         height: 1fr;
         overflow-x: auto;
         overflow-y: auto;
+        scrollbar-size: 1 1;
     }
     #selection-indicator {
         dock: top;
@@ -79,7 +95,7 @@ class CodeView(Vertical):
 
     def compose(self) -> ComposeResult:
         yield Static("", id="selection-indicator", classes="selection-mode-indicator")
-        yield VerticalScroll(id="code-lines-scroll")
+        yield SmoothScroll(id="code-lines-scroll")
         yield Static("", id="code-diff-view")
 
     def on_mount(self) -> None:
@@ -153,8 +169,7 @@ class CodeView(Vertical):
         except Exception:
             lexer = TextLexer()
 
-        bg_style = "light" if getattr(self.app, "theme", "midnight") == "polar" else "dark"
-        formatter = TerminalFormatter(bg=bg_style)
+        formatter = build_terminal_formatter(getattr(self.app, "theme", "midnight"))
         highlighted = highlight(self.content, lexer, formatter)
 
         raw_lines = self.content.splitlines()
@@ -165,6 +180,9 @@ class CodeView(Vertical):
         while len(highlighted_lines) < len(raw_lines):
             highlighted_lines.append("")
 
+        # Keep line-number gutter tight for small files while preserving alignment.
+        line_digits = max(2, len(str(len(raw_lines) if raw_lines else 1)))
+
         # Create per-line widgets
         for i, (raw, hl) in enumerate(zip(raw_lines, highlighted_lines), 1):
             widget = CodeLineWidget(
@@ -172,6 +190,7 @@ class CodeView(Vertical):
                 content=raw,
                 highlighted_content=hl,
                 annotation=self.annotation_manager.get_annotation(i),
+                line_number_digits=line_digits,
                 classes="code-line",
             )
             self._line_widgets.append(widget)
@@ -324,55 +343,60 @@ class CodeViewerPanel(Vertical):
         background: $surface;
         color: $primary;
         text-style: bold;
-        padding: 1 2;
-        border-bottom: none;
+        padding: 0 1;
+        border-bottom: solid $secondary;
         height: auto;
     }
     .hidden {
         display: none;
     }
     #code-action-bar {
-        height: auto;
-        padding: 1;
-        background: transparent;
-        border-bottom: none;
+        display: none;
+        height: 1;
+        padding: 0;
+        background: $surface;
         width: 100%;
         layout: horizontal;
+        align: left middle;
     }
     .action-group {
-        width: 1fr;
-        height: auto;
-        padding: 0 1;
-        margin-right: 1;
+        width: auto;
+        height: 1;
+        padding: 0;
+        margin: 0;
+        layout: horizontal;
     }
     #multi-agent-controls {
-        border-right: none;
+        margin-right: 1;
     }
     .action-label {
-        width: 100%;
-        content-align: center middle;
+        width: auto;
+        content-align: left middle;
         text-style: bold;
         color: $primary;
-        margin-bottom: 0;
+        margin: 0 1 0 0;
+        height: 1;
     }
     .button-row {
-        height: auto;
-        width: 100%;
+        height: 1;
+        width: auto;
         layout: horizontal;
-        align: center middle;
+        align: left middle;
     }
     .button-row Button {
-        min-width: 4;
-        width: 1fr;
-        height: 3;
-        margin: 0 1;
+        min-width: 3;
+        width: auto;
+        height: 1;
+        margin: 0 0 0 0;
+        padding: 0 1;
         content-align: center middle;
+        border: none;
     }
     #multi-agent-controls .button-row Button {
-        max-width: 24;
+        max-width: 12;
     }
     #diff-controls .button-row Button {
-        width: 1fr;
+        width: auto;
     }
     """
 
@@ -467,6 +491,9 @@ class CodeViewerPanel(Vertical):
         header = self.query_one("#code-file-header", Label)
         header.update(f"📄 {path.name}  [dim]({path})[/dim]")
 
+        # Hide action bar when browsing files (no diff)
+        self.query_one("#code-action-bar").display = False
+
         cv = self.query_one("#code-view", CodeView)
         cv.is_diff = False
         cv.filepath = str(path)
@@ -477,6 +504,7 @@ class CodeViewerPanel(Vertical):
         self.multi_patch_set = None
         self.current_patch_idx = 0
         self.current_hunk_idx = 0
+        self.query_one("#code-action-bar").display = True
         self.query_one("#diff-controls").remove_class("hidden")
         self.query_one("#multi-agent-controls").add_class("hidden")
         self._refresh_diff_view()
@@ -489,6 +517,7 @@ class CodeViewerPanel(Vertical):
         self.patch_set = mps.patch_sets[self.agent_idx]
         self.current_patch_idx = 0
         self.current_hunk_idx = 0
+        self.query_one("#code-action-bar").display = True
         self.query_one("#diff-controls").remove_class("hidden")
         self.query_one("#multi-agent-controls").remove_class("hidden")
         self._update_agent_label()
@@ -625,6 +654,7 @@ class CodeViewerPanel(Vertical):
         for fp in modified:
             self.post_message(PatchApplied(filepath=fp))
 
+        self.query_one("#code-action-bar").display = False
         self.query_one("#diff-controls").add_class("hidden")
         self.query_one("#multi-agent-controls").add_class("hidden")
         self.query_one("#code-view").is_diff = False

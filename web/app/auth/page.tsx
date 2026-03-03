@@ -29,6 +29,11 @@ export default function AuthPage() {
                 return;
             }
 
+            // Store the JWT so client-side fetchAPI can attach it as Bearer token
+            if (data.token) {
+                localStorage.setItem("gptcgt_access_token", data.token);
+            }
+
             // Force a hard redirect so the browser sends the new cookie
             window.location.href = "/dashboard";
         } catch (err) {

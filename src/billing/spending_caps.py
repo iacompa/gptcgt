@@ -2,6 +2,13 @@ import time
 
 
 class SpendingCapService:
+    """
+    Server-side spending cap enforcement (API backend only).  # noqa: D204
+
+    This service is used by the gptcgt API server to enforce per-user spending caps.
+    It requires a PostgreSQL connection pool (asyncpg) and is NOT used in the desktop TUI app.
+    """
+
     _cap_warned_users: dict[str, float] = {}  # user_id -> timestamp of last warning
     _CAP_WARN_COOLDOWN = 86400  # 24 hours in seconds
 

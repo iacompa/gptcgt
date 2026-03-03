@@ -31,7 +31,11 @@ class UserConfig:
     # Defaults
     default_quality_tier: str = "standard"
     default_operation_mode: str = "standard"
-    layout_order: str = "files_code_chat"
+  # noqa: W293
+    # Layout State
+    panel_positions: dict = field(default_factory=lambda: {"files": "left", "code": "center", "chat": "right"})
+    panel_sizes: dict = field(default_factory=lambda: {"files": 0.2, "code": 0.6, "chat": 0.2})
+    visible_panels: dict = field(default_factory=lambda: {"files": True, "code": True, "chat": True})
 
     # Models
     coder_model: str = ""
@@ -41,6 +45,7 @@ class UserConfig:
     scout_model: str = ""
     tester_model: str = ""
     openrouter_active_models: list[str] = field(default_factory=list)
+    custom_models: list[dict] = field(default_factory=list)
 
     # Privacy
     telemetry_enabled: bool = False
@@ -58,6 +63,15 @@ class UserConfig:
     monthly_spending_cap: float | None = None
     daily_spending_warning: float = 5.0
     daily_spend_limit: float = 10.0  # BYOK daily hard stop limit
+    max_spend_per_task: float = 2.0  # USD cap per individual task/iteration
+    max_tokens_per_task: int = 500_000  # Token cap per task
+
+    # Autonomous
+    allow_auto_tiering: bool = True  # Let agents pick their own model tier
+    max_autonomous_iterations: int = 50  # Hard cap on autonomous loop
+
+    # Integrations
+    mcp_servers: list = field(default_factory=list)  # MCP server configs
 
     # Behavior
     confirm_before_apply: bool = True
@@ -98,7 +112,12 @@ class ConfigManager:
     """
     Loads, saves, and merges global + project configs.
     Project settings override global settings where both define the same key.
+
+    Singleton: use ConfigManager.get_instance() for shared access.
+    Use ConfigManager(project_root) for explicit first initialization.
     """
+
+    _instance: "ConfigManager | None" = None
 
     def __init__(self, project_root: Path | None = None) -> None:
         self.GLOBAL_PATH = Path.home() / ".gptcgt" / "global.toml"
@@ -107,6 +126,19 @@ class ConfigManager:
         self._project_root = project_root or Path.cwd()
         self.project_path = self._project_root / ".gptcgt" / "config.toml"
         self._load()
+        ConfigManager._instance = self
+
+    @classmethod
+    def get_instance(cls) -> "ConfigManager":
+        """Return the singleton instance, creating with defaults if needed."""
+        if cls._instance is None:
+            cls()
+        return cls._instance  # type: ignore
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton (primarily for testing)."""
+        cls._instance = None
 
     def _load(self) -> None:
         """Load global config, then project config as override."""

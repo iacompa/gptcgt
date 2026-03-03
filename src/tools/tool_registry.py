@@ -69,16 +69,33 @@ AGENT_TOOLS: list[dict] = [
     },
 ]
 
+_handoff_tool = DelegateToAgentTool()
+
 _DISPATCH = {
     "glob_files": glob_files,
     "grep_search": grep_search,
     "read_file": read_file,
-    "DelegateToAgent": DelegateToAgentTool()._execute
+    "DelegateToAgent": _handoff_tool._execute
 }
 
 
 def execute_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     """Execute a tool, return result as string for the LLM."""
+    if "__" in tool_name:
+        server_name = tool_name.split("__")[0]
+        try:
+            from src.core.config import ConfigManager
+            from src.tools.mcp_client import MCPManager
+            c = ConfigManager().user
+            mcp_servers = getattr(c, "mcp_servers", [])
+            target_server = next((s for s in mcp_servers if s.get("name") == server_name), None)
+            if target_server:
+                logger.info(f"MCP Tool: {tool_name}({arguments})")
+                return MCPManager.call_tool(target_server, tool_name, arguments)
+        except Exception as e:
+            logger.error(f"MCP Tool error: {e}")
+            return json.dumps({"error": str(e)})
+
     func = _DISPATCH.get(tool_name)
     if not func:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
@@ -90,18 +107,36 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> str:
         logger.error(f"Tool error {tool_name}: {e}")
         return json.dumps({"error": str(e)})
 
+_mcp_cache = None
 
 def get_tool_definitions() -> list[dict]:
+    global _mcp_cache
     tools = AGENT_TOOLS.copy()
 
-    handoff = DelegateToAgentTool()
     tools.append({
         "type": "function",
         "function": {
-            "name": handoff.name,
-            "description": handoff.description,
-            "parameters": handoff.parameters,
+            "name": _handoff_tool.name,
+            "description": _handoff_tool.description,
+            "parameters": _handoff_tool.parameters,
         }
     })
 
+    if _mcp_cache is None:
+        _mcp_cache = []
+        try:
+            from src.core.config import ConfigManager
+            c = ConfigManager().user
+            mcp_servers = getattr(c, "mcp_servers", [])
+            if mcp_servers:
+                from src.tools.mcp_client import MCPManager
+                for s in mcp_servers:
+                    if s.get("enabled", True):
+                        discovered = MCPManager.discover(s)
+                        _mcp_cache.extend(discovered)
+        except Exception as e:
+            logger.error(f"Failed to load MCP tools: {e}")
+            _mcp_cache = []
+
+    tools.extend(_mcp_cache)
     return tools

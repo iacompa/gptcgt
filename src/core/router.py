@@ -19,17 +19,6 @@ logger = get_logger("core.router")
 
 
 @dataclass
-class RoutingSignals:
-    """Signals used by the router to make model decisions."""
-
-    intent: str
-    complexity: int
-    file_count: int
-    is_retry: bool = False
-    previous_failures: int = 0
-
-
-@dataclass
 class RoutingOutcome:
     """Records the outcome of a routing decision."""
 
@@ -136,7 +125,7 @@ class CodingRouter:
         # are passed directly as parameters; no side effects from construction.
 
         from src.core.config import ConfigManager
-        config = ConfigManager()
+        config = ConfigManager.get_instance()
 
         explicit_model_str = None
         if role:

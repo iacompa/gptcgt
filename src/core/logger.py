@@ -56,6 +56,10 @@ class GptcgtFormatter(logging.Formatter):
         if record.exc_text:
             base_log += "\n" + record.exc_text
 
+        # Final string-level redaction catch-all (catches leaks in tracebacks)
+        for pattern, replacement in SensitiveDataFilter.PATTERNS:
+            base_log = pattern.sub(replacement, base_log)
+
         return base_log
 
 
@@ -184,6 +188,8 @@ class LogBuffer(logging.Handler):
 
 def setup_logging(project_path: Path, debug: bool = False) -> None:
     """Initialize the logging system. Call once at app startup."""
+    global _last_log_dir  # noqa: PLW0603
+
     # Create logs directory securely
     log_dir = project_path / ".gptcgt" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -198,9 +204,15 @@ def setup_logging(project_path: Path, debug: bool = False) -> None:
     # Root logger setup
     root_logger = logging.getLogger("gptcgt")
 
-    # Avoid duplicate handlers if setup_logging is called multiple times
-    if root_logger.handlers:
+    # Allow re-initialization when project_path changes (tests, workspace switch)
+    if root_logger.handlers and getattr(setup_logging, "_last_log_dir", None) == str(log_dir):
         return
+    # Remove stale file handlers from a previous project_path
+    for h in list(root_logger.handlers):
+        if isinstance(h, (RotatingFileHandler, TimedRotatingFileHandler)):
+            h.close()
+            root_logger.removeHandler(h)
+    setup_logging._last_log_dir = str(log_dir)
 
     final_debug = debug or os.environ.get("GPTCGT_DEBUG", "").lower() in ["1", "true", "yes"]
     root_logger.setLevel(logging.DEBUG if final_debug else logging.INFO)

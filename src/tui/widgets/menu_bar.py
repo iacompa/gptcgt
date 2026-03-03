@@ -76,7 +76,8 @@ class MenuBar(Horizontal):
         # This will be dynamically populated/updated or static based on app state
         # In a real app we'd inject dependencies or use app state
 
-        gptcgt_colored = "[#34D399]gpt[/#34D399][#A78BFA]c[/#A78BFA][#60A5FA]g[/#60A5FA][#FB923C]t[/#FB923C]"
+        # Match exact brand colors from AnimatedWelcome in chat.py
+        gptcgt_colored = "[#34D399]gpt[/#34D399][#FB923C]c[/#FB923C][#60A5FA]g[/#60A5FA][#A78BFA]t[/#A78BFA]"
 
         gptcgt_menu = [
             MenuItem(f"About {gptcgt_colored}", action="about"),

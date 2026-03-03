@@ -152,18 +152,24 @@ class EloTracker:
                 winner_elo = cursor.fetchone()[0]
 
                 # For multiple losers, process as individual 1v1 matches against the winner
+                winner_elo_delta = 0.0
                 for loser_id in loser_ids:
                     cursor.execute("SELECT elo_rating FROM models WHERE id = ?", (loser_id,))
                     loser_elo = cursor.fetchone()[0]
 
                     # Calculate new ELOs
-                    new_winner_elo, new_loser_elo = self._calculate_elo(winner_elo, loser_elo)
+                    new_winner_elo_from_this, new_loser_elo = self._calculate_elo(winner_elo, loser_elo)
+
+                    # Accumulate delta for winner
+                    winner_elo_delta += (new_winner_elo_from_this - winner_elo)
 
                     # Update loser ELO immediately
                     cursor.execute("UPDATE models SET elo_rating = ? WHERE id = ?", (new_loser_elo, loser_id))
 
-                    # Prepare winner ELO for next iteration (or final update)
-                    winner_elo = new_winner_elo
+                # Apply average delta to avoid massive inflation in multi-way matches
+                if loser_ids:
+                    # Divide by dampening factor to prevent hyper-inflation when beating 3+ models
+                    winner_elo += winner_elo_delta / max(1.0, len(loser_ids) * 0.75)
 
                 # Final winner ELO update
                 cursor.execute("UPDATE models SET elo_rating = ? WHERE id = ?", (winner_elo, winner_id))

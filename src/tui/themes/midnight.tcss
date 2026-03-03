@@ -2,7 +2,9 @@
 
 /* Background */
 Screen { 
-    background: $background; 
+    background: $background;
+    scrollbar-size: 1 1;
+    overflow: hidden;
 }
 .panel { background: $panel; }
 .panel-active { background: $surface; }
@@ -34,10 +36,10 @@ Screen {
 .diff-context { color: $text-muted; }
 
 /* Layout */
-#app-grid { layout: horizontal; height: 100%; }
-#left-panel-container { width: 1fr; min-width: 20; }
-#code-viewer { width: 2fr; min-width: 30; }
-#right-panel { width: 1fr; min-width: 25; }
+#app-grid { layout: horizontal; height: 1fr; }
+#left-panel-container { min-width: 15; }
+#code-viewer { min-width: 15; }
+#right-panel { min-width: 15; }
 
 /* Status Bar */
 #status-bar { dock: bottom; height: 1; background: $panel; color: $text; }
@@ -68,14 +70,14 @@ CodeLineWidget {
 
 .code-line-selected {
     background: $primary 20%;
-    color: $text;
+    color: white;
 }
 
 .selection-mode-indicator {
-    background: $success;
+    background: $primary 30%;
     color: $text;
     text-align: center;
-    border-bottom: solid $secondary;
+    border-bottom: solid $primary;
     height: 1;
     content-align: center middle;
 }
@@ -84,7 +86,6 @@ ContextChipBar {
     background: $background;
     border-bottom: solid $secondary;
     padding: 0 1;
-    height: 3;
 }
 
 ContextChip {
@@ -109,17 +110,8 @@ ContextChip:hover {
     color: #FF7B72;
 }
 
-AddFileChip {
-    color: $primary;
-    border: blank;
-    background: transparent;
-    padding: 0 1;
-}
+/* Scrollbar styling */
 
-AddFileChip:hover {
-    background: $surface;
-    text-style: bold;
-}
 
 /* --- Canvas Mode: Collapsible Code --- */
 CollapsibleCodeBlock {
@@ -275,4 +267,3 @@ QuickActionButton:hover {
 .arbiter-cherry-pick-button { margin: 0 1; }
 .arbiter-timing { color: #484F58; margin-top: 1; }
 .arbiter-confidence-badge { text-style: bold; }
-

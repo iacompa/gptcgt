@@ -14,6 +14,16 @@ from src.auth.keychain import KeyChainManager
 class OpenAIAgent(BaseAgent):
     """Agent implementation for OpenAI models."""
 
+    @property
+    def capabilities(self):
+        from src.agents.base import ProviderCapabilities
+        caps = ProviderCapabilities(max_context=self.config.max_tokens or 128000)
+        # o1 models do not support streaming or tools currently
+        if self.config.model_id.startswith("openai/o1"):
+            caps.supports_streaming = False
+            caps.supports_tools = False
+        return caps
+
     async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[AgentResponse, None]:
         api_key = self.config.api_key or KeyChainManager.get_key("OPENAI_API_KEY")
         if not api_key:
@@ -29,6 +39,8 @@ class OpenAIAgent(BaseAgent):
             "api_key": api_key,
             "base_url": self.config.base_url,
         }
+        if self.config.extra_headers:
+            kwargs["extra_headers"] = self.config.extra_headers
 
         if self.config.model_id.startswith("openai/o3") or self.config.model_id.startswith(
             "openai/o1"

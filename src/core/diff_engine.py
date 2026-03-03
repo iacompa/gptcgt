@@ -33,6 +33,8 @@ class FilePatch:
     hunks: list[Hunk] = field(default_factory=list)
     is_new_file: bool = False
     is_deleted: bool = False
+    syntax_valid: bool = True
+    syntax_error: str | None = None
 
     @property
     def pending_count(self) -> int:
@@ -96,21 +98,58 @@ class DiffExtractor:
         if patches:
             ps.patches = patches
             logger.info(f"Extracted {len(patches)} file(s) from unified diffs")
+            self._validate_syntax(ps)
             return ps
 
         patches = self._extract_search_replace(text)
         if patches:
             ps.patches = patches
             logger.info(f"Extracted {len(patches)} file(s) from search/replace")
+            self._validate_syntax(ps)
             return ps
 
         patches = self._extract_code_blocks(text)
         if patches:
             ps.patches = patches
             logger.info(f"Extracted {len(patches)} file(s) from code blocks")
+            self._validate_syntax(ps)
             return ps
 
         return ps
+
+    def _validate_syntax(self, patch_set: PatchSet) -> None:
+        """Dry-runs patches against existing files to catch AST syntax errors."""
+        import ast
+        ws = Workspace.get_instance()
+
+        for fp in patch_set.patches:
+            if not str(fp.file_path).endswith(".py"):
+                continue
+
+            if fp.is_deleted:
+                continue
+
+            try:
+                if fp.is_new_file:
+                    content = ""
+                    if fp.hunks:
+                        content = "\n".join(fp.hunks[0].modified_lines)
+                else:
+                    content = ws.safe_read(fp.file_path)
+                    lines = content.splitlines()
+                    # Apply hunks bottom up for dry run
+                    for hunk in sorted(fp.hunks, key=lambda h: h.start_line, reverse=True):
+                        lines[hunk.start_line - 1 : hunk.end_line] = hunk.modified_lines
+                    content = "\n".join(lines)
+
+                ast.parse(content)
+            except SyntaxError as e:
+                fp.syntax_valid = False
+                # E.g. "invalid syntax (<unknown>, line 45)"
+                fp.syntax_error = f"{e.msg} (line {e.lineno})"
+                logger.warning(f"AST validation failed for patch on {fp.file_path}: {fp.syntax_error}")
+            except Exception as e:
+                logger.debug(f"AST validation skipped dynamically for {fp.file_path}: {e}")
 
     def _extract_unified(self, text: str) -> list[FilePatch]:
         patches = []

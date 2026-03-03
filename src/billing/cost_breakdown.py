@@ -108,6 +108,7 @@ class CostBreakdownTracker:
         self._today: DailySpend = DailySpend(date=date.today())
         self._current_task: TaskCostBreakdown | None = None
         self._task_history: list[TaskCostBreakdown] = []
+        self._session_start_idx: int = 0  # Track where this session starts in history
 
         # Local JSON state
         import os
@@ -185,10 +186,15 @@ class CostBreakdownTracker:
         return self._today
 
     def get_monthly_spend(self) -> float:
-        return sum(t.total_cost for t in self._task_history)
+        today = date.today()
+        return sum(
+            t.total_cost for t in self._task_history
+            if hasattr(t, '_recorded_date') and t._recorded_date
+            and t._recorded_date.month == today.month and t._recorded_date.year == today.year
+        ) or self._today.total_cost  # fallback to today if no date metadata
 
     def get_session_spend(self) -> float:
-        return sum(t.total_cost for t in self._task_history)
+        return sum(t.total_cost for t in self._task_history[self._session_start_idx:])
 
     def get_model_ranking(self) -> list[dict]:
         # Based on today only for now in local state

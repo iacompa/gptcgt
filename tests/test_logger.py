@@ -1,6 +1,6 @@
-import logging
+import logging  # noqa: I001
 import shutil
-
+import sys
 import pytest
 
 from src.core.logger import (
@@ -62,6 +62,16 @@ def test_structured_data_appended():
     assert "model=claude" in formatted
     assert "test.component" in formatted
     assert "INFO" in formatted
+
+def test_formatter_redacts_exceptions():
+    formatter = GptcgtFormatter()
+    try:
+        raise ValueError("Failed with token sk-ant-api03-abcdefgh12345678abcd")
+    except ValueError as e:  # noqa: F841
+        record = logging.LogRecord("test", logging.ERROR, "test.py", 1, "Error occurred", (), sys.exc_info())
+        formatted = formatter.format(record)
+        assert "sk-ant-api03-abcdefgh...abcd" in formatted
+        assert "sk-ant-api03-abcdefgh12345678abcd" not in formatted
 
 
 def test_log_buffer_stores_500_entries(clean_log_dir):
