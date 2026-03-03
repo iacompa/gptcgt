@@ -28,7 +28,7 @@ class StripeService:
         stripe.api_key = settings.stripe_secret_key
 
     async def create_checkout_session(
-        self, db_pool, workos_user_id: str, email: str, plan: str, annual: bool = False
+        self, db_pool, workos_user_id: str, email: str, plan: str, annual: bool = False, quantity: int = 1
     ) -> dict:
         """Create a Checkout Session for a new subscription."""
         try:
@@ -46,7 +46,7 @@ class StripeService:
 
             session_params = {
                 "payment_method_types": ["card"],
-                "line_items": [{"price": price_id, "quantity": 1}],
+                "line_items": [{"price": price_id, "quantity": quantity}],
                 "mode": "subscription",
                 "success_url": services.stripe.success_url,
                 "cancel_url": services.stripe.cancel_url,

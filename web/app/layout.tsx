@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Footer } from "@/components/footer";
 
+import { getSession } from "@/lib/auth";
+
 export const metadata = {
     title: "gptcgt - Multi-Model AI Coding Terminal",
     description: "Run multiple AIs on your code. Pick the best solution with proof. Terminal-native, provider-agnostic, with transparent cost tracking.",
@@ -12,11 +14,14 @@ export const metadata = {
     },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await getSession();
+    const isAuthenticated = !!session?.user;
+
     return (
         <html lang="en" className="dark">
             <body className="font-sans bg-gray-950 text-gray-100 antialiased">
@@ -36,13 +41,26 @@ export default function RootLayout({
                                 <nav className="hidden md:ml-6 md:flex md:space-x-4">
                                     <Link href="/pricing" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Pricing</Link>
                                     <Link href="/docs" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Docs</Link>
-                                    <Link href="/dashboard" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
+                                    {isAuthenticated && (
+                                        <Link href="/dashboard" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</Link>
+                                    )}
                                 </nav>
                             </div>
-                            <div>
-                                <Link href="/auth" className="bg-white text-black px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors">
-                                    Sign In
-                                </Link>
+                            <div className="flex items-center gap-4">
+                                {isAuthenticated ? (
+                                    <>
+                                        <Link href="/dashboard" className="text-sm font-medium hover:text-gray-300 transition-colors">
+                                            Dashboard
+                                        </Link>
+                                        <Link href="/api/auth/signout" className="bg-gray-800 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors">
+                                            Sign Out
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <Link href="/auth" className="bg-white text-black px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors">
+                                        Sign In
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </div>
