@@ -229,16 +229,23 @@ class StripeService:
             await track_async(workos_user_id, "subscription_started", {"plan": plan})
         elif action_type == "credits":
             amount = int(session.get("metadata", {}).get("amount", "0"))
-            await db_pool.execute(
-                """
-                UPDATE users
-                SET stripe_customer_id = $1, credits_remaining = credits_remaining + $2
-                WHERE workos_user_id = $3
-                """,
-                customer_id,
-                amount,
-                workos_user_id,
+            
+            # Fetch the user's team workspace
+            user_team_row = await db_pool.fetchrow(
+                "SELECT team_id FROM users WHERE workos_user_id = $1", workos_user_id
             )
+            
+            if user_team_row and user_team_row["team_id"]:
+                # Deposit the purchased credits into the Team Wallet
+                await db_pool.execute(
+                    """
+                    UPDATE teams
+                    SET shared_credits_remaining = shared_credits_remaining + $1
+                    WHERE id = $2
+                    """,
+                    amount,
+                    user_team_row["team_id"],
+                )
 
     async def _handle_subscription_update(self, db_pool, subscription: dict) -> None:
         """Update subscription status (e.g. past_due, active)."""
