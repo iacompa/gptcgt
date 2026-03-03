@@ -1,0 +1,284 @@
+[
+  {
+    "file": "tests/test_agent_adapters.py",
+    "status": "fail",
+    "seconds": 0.33,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_agent_adapters.py:3: in <module>\n    from src.agents.base import AgentConfig\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_agent_adapters.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_any_model_id.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_any_model_id.py:4: in <module>\n    from src.core.chat_pipeline import ChatPipeline\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_any_model_id.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_app_header.py",
+    "status": "fail",
+    "seconds": 0.39,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_app_header.py:3: in <module>\n    from src.tui.app import GptcgtApp\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_app_header.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.17s"
+  },
+  {
+    "file": "tests/test_architect_two_phase.py",
+    "status": "fail",
+    "seconds": 0.29,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_architect_two_phase.py:8: in <module>\n    from src.core.blackboard import AgentBlackboard\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_architect_two_phase.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.09s"
+  },
+  {
+    "file": "tests/test_auth_security.py",
+    "status": "fail",
+    "seconds": 0.47,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_auth_security.py:6: in <module>\n    from api.services.encryption import _get_key\nE   ModuleNotFoundError: No module named 'api'\n=========================== short test summary info ============================\nERROR tests/test_auth_security.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.24s"
+  },
+  {
+    "file": "tests/test_autonomous_runner.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_autonomous_runner.py:16: in <module>\n    from src.core.agent_bus import AgentMessageBus\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_autonomous_runner.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_chat_panel.py",
+    "status": "fail",
+    "seconds": 0.39,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_chat_panel.py:4: in <module>\n    from src.core.events import AgentCompleted, AgentDispatched\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_chat_panel.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.17s"
+  },
+  {
+    "file": "tests/test_chat_pipeline.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_chat_pipeline.py:5: in <module>\n    from src.core.chat_pipeline import ChatPipeline\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_chat_pipeline.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_chat_store.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_chat_store.py:9: in <module>\n    from src.core.chat_store import ChatMessage, ChatStore, MessageRole\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_chat_store.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_code_viewer.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_code_viewer.py:5: in <module>\n    from src.core.workspace import Workspace\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_code_viewer.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_commands.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_commands.py:3: in <module>\n    from src.core.commands import Command, CommandRegistry, register_default_commands\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_commands.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_config.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_config.py:5: in <module>\n    from src.core.config import ConfigManager\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_config.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_context_menus.py",
+    "status": "fail",
+    "seconds": 0.38,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_context_menus.py:5: in <module>\n    from src.tui.panels.chat import ChatPanel\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_context_menus.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.17s"
+  },
+  {
+    "file": "tests/test_cost_breakdown.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_cost_breakdown.py:9: in <module>\n    from src.billing.cost_breakdown import CostBreakdownTracker, ModelUsage\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_cost_breakdown.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_crash_recovery.py",
+    "status": "fail",
+    "seconds": 0.29,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_crash_recovery.py:5: in <module>\n    from src.core.crash_recovery import CrashRecoveryManager, PendingDiffProtector, RecoverableState\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_crash_recovery.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_custom_provider.py",
+    "status": "fail",
+    "seconds": 0.29,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_custom_provider.py:4: in <module>\n    from src.core.chat_pipeline import ChatPipeline\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_custom_provider.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_dag_trace.py",
+    "status": "fail",
+    "seconds": 0.29,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_dag_trace.py:6: in <module>\n    from src.core.dag import DAGEngine, DAGNode, TaskState\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_dag_trace.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_diff_engine.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_diff_engine.py:4: in <module>\n    from src.core.diff_engine import DiffExtractor\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_diff_engine.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_e2e_pipeline.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_e2e_pipeline.py:18: in <module>\n    from src.core.chat_pipeline import ChatPipeline\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_e2e_pipeline.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_elo_tracker.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_elo_tracker.py:5: in <module>\n    from src.core.elo_tracker import EloTracker\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_elo_tracker.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_failover.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_failover.py:5: in <module>\n    from src.core.model_registry import ModelDefinition, ModelRegistry, Provider, QualityTier\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_failover.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_file_ref_security.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_file_ref_security.py:6: in <module>\n    from src.core.workspace import Workspace, WorkspaceEscapeError\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_file_ref_security.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_help.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_help.py:3: in <module>\n    from src.tui.overlays.help import HelpOverlay\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_help.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_key_validator.py",
+    "status": "pass",
+    "seconds": 1.96,
+    "tail": "......                                                                   [100%]\n6 passed in 1.34s"
+  },
+  {
+    "file": "tests/test_layout_persistence.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "tests/test_layout_persistence.py:3: in <module>\n    from src.core.config import UserConfig  # noqa: F401\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_layout_persistence.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_logger.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_logger.py:6: in <module>\n    from src.core.logger import (\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_logger.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_mcp_client.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_mcp_client.py:3: in <module>\n    from src.tools.mcp_client import MCPManager\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_mcp_client.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_menu_bar.py",
+    "status": "fail",
+    "seconds": 0.38,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_menu_bar.py:4: in <module>\n    from src.tui.widgets.menu import DropdownMenu, MenuItemWidget\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_menu_bar.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.16s"
+  },
+  {
+    "file": "tests/test_model_registry.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_model_registry.py:1: in <module>\n    from src.core.model_registry import ModelRegistry, Provider, QualityTier\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_model_registry.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_onboarding.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_onboarding.py:3: in <module>\n    from src.core.config import ConfigManager\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_onboarding.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_orchestration_pipeline.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_orchestration_pipeline.py:15: in <module>\n    from src.core.chat_pipeline import ChatPipeline\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_orchestration_pipeline.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_overage.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_overage.py:3: in <module>\n    from src.billing.overage import OverageManager\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_overage.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_panel_resizer.py",
+    "status": "fail",
+    "seconds": 0.38,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_panel_resizer.py:7: in <module>\n    from src.tui.widgets.panel_resizer import PanelResizer\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_panel_resizer.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.16s"
+  },
+  {
+    "file": "tests/test_phase_tracker.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_phase_tracker.py:5: in <module>\n    from src.core.phase_tracker import PhaseTracker\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_phase_tracker.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_project_init.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_project_init.py:6: in <module>\n    from src.core.init import ProjectInitializer\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_project_init.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_proxy_billing.py",
+    "status": "fail",
+    "seconds": 0.42,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_proxy_billing.py:6: in <module>\n    from proxy.main import proxy_completions\nE   ModuleNotFoundError: No module named 'proxy'\n=========================== short test summary info ============================\nERROR tests/test_proxy_billing.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.21s"
+  },
+  {
+    "file": "tests/test_quality_tiers.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_quality_tiers.py:3: in <module>\n    from src.core.quality_tiers import TIER_CONFIGS, QualityTier, QualityTierManager\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_quality_tiers.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_router_elo_feedback.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_router_elo_feedback.py:7: in <module>\n    from src.core.elo_tracker import EloTracker\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_router_elo_feedback.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_router_intents.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_router_intents.py:5: in <module>\n    from src.core.model_registry import QualityTier\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_router_intents.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_self_healing_contract.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_self_healing_contract.py:5: in <module>\n    from src.tools.sandbox import TestResult as SandboxTestResult\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_self_healing_contract.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_slash_commands.py",
+    "status": "fail",
+    "seconds": 0.26,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_slash_commands.py:5: in <module>\n    from src.core.commands import Command, CommandRegistry\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_slash_commands.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_spending_cap_enforcement.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_spending_cap_enforcement.py:7: in <module>\n    from src.core.logger import SensitiveDataFilter\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_spending_cap_enforcement.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  },
+  {
+    "file": "tests/test_task_tracker.py",
+    "status": "fail",
+    "seconds": 0.28,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_task_tracker.py:3: in <module>\n    from src.core.task_tracker import SUBTASK_TEMPLATES, TaskTracker\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_task_tracker.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_tester_agent_contract.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_tester_agent_contract.py:7: in <module>\n    from src.agents.tester_agent import TesterAgent, TestResult\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_tester_agent_contract.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s"
+  },
+  {
+    "file": "tests/test_toast.py",
+    "status": "fail",
+    "seconds": 0.37,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_toast.py:4: in <module>\n    from src.tui.widgets.toast import Toast, ToastContainer, notify\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_toast.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.16s"
+  },
+  {
+    "file": "tests/test_tui_layout_regressions.py",
+    "status": "fail",
+    "seconds": 0.38,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_tui_layout_regressions.py:15: in <module>\n    from src.tui.panels.chat import ChatPanel\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_tui_layout_regressions.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.16s"
+  },
+  {
+    "file": "tests/test_workspace.py",
+    "status": "fail",
+    "seconds": 0.27,
+    "tail": "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_workspace.py:7: in <module>\n    from src.core.workspace import Workspace, WorkspaceEscapeError\nE   ModuleNotFoundError: No module named 'src'\n=========================== short test summary info ============================\nERROR tests/test_workspace.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.07s"
+  }
+]
