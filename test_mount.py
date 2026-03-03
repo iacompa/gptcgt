@@ -1,5 +1,7 @@
 import asyncio
+
 from src.tui.panels.chat import ChatPanel
+
 
 async def main():
     try:
@@ -7,7 +9,7 @@ async def main():
         for x in p.compose():
             pass
         print("Compose Success")
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
 

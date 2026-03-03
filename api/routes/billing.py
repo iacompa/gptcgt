@@ -134,7 +134,8 @@ async def get_status(request: Request):
         period_end = row["current_period_end"].isoformat()
 
     # Use team wallet balance if available, fall back to personal credits
-    effective_credits = row["shared_credits_remaining"] if row["shared_credits_remaining"] is not None else (row["credits_remaining"] or 0)
+    shared = row["shared_credits_remaining"]
+    effective_credits = shared if shared is not None else (row["credits_remaining"] or 0)
 
     return BillingStatusResponse(
         plan=row["plan"] or "free",

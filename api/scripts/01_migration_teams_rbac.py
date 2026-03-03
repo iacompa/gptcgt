@@ -5,9 +5,9 @@ import sys
 # Add the project root to the python path so imports work
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.database import init_db_pool, close_db_pool, get_pool
-from api.config import settings
 import logging
+
+from api.database import close_db_pool, get_pool, init_db_pool
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("migration")
@@ -15,7 +15,7 @@ logger = logging.getLogger("migration")
 async def run_migration():
     await init_db_pool()
     pool = get_pool()
-    
+
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
@@ -37,7 +37,7 @@ async def run_migration():
                 # 2. Add RBAC & Quota columns to users
                 logger.info("Altering 'users' table to support RBAC and Teams...")
                 await conn.execute("""
-                    ALTER TABLE users 
+                    ALTER TABLE users
                         ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES teams(id),
                         ADD COLUMN IF NOT EXISTS team_role VARCHAR(50) DEFAULT 'owner',
                         ADD COLUMN IF NOT EXISTS allocated_quota INT,
@@ -57,7 +57,7 @@ async def run_migration():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
-                
+
                 # 4. Add moderation columns to users
                 logger.info("Adding moderation columns to 'users' table...")
                 await conn.execute("""
@@ -93,32 +93,35 @@ async def run_migration():
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
-                
+
                 # 7. Data Migration: Create a 1-to-1 Team for every existing user so they don't break
                 logger.info("Migrating existing individual users into individual Teams...")
-                existing_users = await conn.fetch("SELECT id, email, stripe_customer_id, plan, credits_remaining FROM users WHERE team_id IS NULL")
-                
+                existing_users = await conn.fetch(
+                    "SELECT id, email, stripe_customer_id, plan, "
+                    "credits_remaining FROM users WHERE team_id IS NULL"
+                )
+
                 for user in existing_users:
                     # Parse out a company/team name from the email (e.g. michael@example.com -> 'example')
                     domain = user["email"].split("@")[-1].split(".")[0].capitalize()
                     team_name = f"{domain} Workspace"
-                    
+
                     # Create the Team, transfer their stripe info and remaining credits into the pooling wallet
                     team_id = await conn.fetchval("""
                         INSERT INTO teams (name, stripe_customer_id, plan, shared_credits_remaining)
                         VALUES ($1, $2, $3, $4)
                         RETURNING id
                     """, team_name, user["stripe_customer_id"], user["plan"], user["credits_remaining"] or 0)
-                    
+
                     # Link the user backwards to the Team as the Owner
                     await conn.execute("""
-                        UPDATE users 
+                        UPDATE users
                         SET team_id = $1, team_role = 'owner', billing_access = TRUE
                         WHERE id = $2
                     """, team_id, user["id"])
-                
+
                 logger.info(f"Successfully migrated {len(existing_users)} standalone users into RBAC Workspaces.")
-                
+
     except Exception as e:
         logger.error(f"Migration Failed: {e}")
         raise e

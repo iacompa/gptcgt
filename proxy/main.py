@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Dict, Optional
 
 import jwt
 
@@ -10,6 +11,7 @@ import litellm
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from litellm import acompletion
+from pydantic import BaseModel
 
 from proxy.content_filter import ContentFilter
 from proxy.database import close_db_pool, get_pool, init_db_pool
@@ -198,8 +200,6 @@ async def proxy_health():
     return {"status": "ok", "litellm_version": litellm.__version__}
 
 
-from pydantic import BaseModel
-from typing import Dict, Optional
 
 class SandboxExecuteRequest(BaseModel):
     files: Dict[str, str]
@@ -282,5 +282,5 @@ async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: st
         # 6. Immediate Cleanup
         try:
             sandbox.kill()
-        except:
+        except Exception:
             pass

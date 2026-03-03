@@ -14,7 +14,12 @@ class TestApp(App):
         keys = list(self.stylesheet.source.keys())
         for k in keys:
             del self.stylesheet.source[k]
-        self.stylesheet.add_source("Label { background: red; padding: 4; }", read_from=("test", "test"), is_default_css=False, tie_breaker=0)
+        self.stylesheet.add_source(
+            "Label { background: red; padding: 4; }",
+            read_from=("test", "test"),
+            is_default_css=False,
+            tie_breaker=0,
+        )
         self.stylesheet.reparse()
         self.stylesheet.update(self)
         self.refresh(layout=True)
