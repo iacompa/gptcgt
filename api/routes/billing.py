@@ -13,10 +13,11 @@ stripe_service = StripeService()
 class CheckoutRequest(BaseModel):
     plan: str  # "pro", "team", "enterprise"
     annual: bool = False
+    quantity: int = 1
 
 
 class CreditPurchaseRequest(BaseModel):
-    credit_amount: int  # 100, 500, or 1000
+    credit_amount: int  # Any amount between 100 and 10000
 
 
 class CheckoutResponse(BaseModel):
@@ -49,7 +50,7 @@ async def create_checkout(request: Request, body: CheckoutRequest):
             raise HTTPException(status_code=404, detail="User not found")
 
     result = await stripe_service.create_checkout_session(
-        pool, user_id, row["email"], body.plan, body.annual
+        pool, user_id, row["email"], body.plan, body.annual, body.quantity
     )
     if "error" in result:
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -63,9 +64,9 @@ async def purchase_credits(request: Request, body: CreditPurchaseRequest):
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if body.credit_amount not in (100, 500, 1000):
+    if body.credit_amount < 100 or body.credit_amount > 10000:
         raise HTTPException(
-            status_code=400, detail="Invalid credit amount. Must be 100, 500, or 1000."
+            status_code=400, detail="Credit amount must be between 100 and 10000."
         )
 
     pool = get_pool()
@@ -74,7 +75,7 @@ async def purchase_credits(request: Request, body: CreditPurchaseRequest):
         if not row:
             raise HTTPException(status_code=404, detail="User not found")
 
-    price_cents = body.credit_amount * 1  # 1 cent per credit minimum assumption to satisfy Stripe
+    price_cents = body.credit_amount * 4  # $0.04 per credit
     result = await stripe_service.create_credit_purchase_session(
         pool, user_id, body.credit_amount, price_cents
     )
