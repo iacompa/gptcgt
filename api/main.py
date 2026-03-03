@@ -8,7 +8,7 @@ from api.config import settings
 from api.database import close_db_pool, init_db_pool
 from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
-from api.routes import api_keys, auth, billing, proxy, usage, users, team
+from api.routes import api_keys, auth, billing, proxy, team, usage, users
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")

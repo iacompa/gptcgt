@@ -1,7 +1,9 @@
 import uuid
 from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+
 from api.database import get_pool
 
 router = APIRouter(tags=["team"])
@@ -44,14 +46,14 @@ async def get_team_members(request: Request):
     pool = get_pool()
     async with pool.acquire() as conn:
         req_info = await _get_requester_team_info(conn, workos_user_id)
-        
+
         # Admins and Owners can see everyone.
         if req_info["team_role"] not in ("owner", "admin"):
             raise HTTPException(status_code=403, detail="Forbidden")
 
         rows = await conn.fetch("""
             SELECT id, email, team_role, allocated_quota, credits_remaining, billing_access
-            FROM users 
+            FROM users
             WHERE team_id = $1
             ORDER BY created_at ASC
         """, req_info["team_id"])
@@ -69,7 +71,7 @@ async def update_member_quota(request: Request, body: QuotaUpdateRequest):
     pool = get_pool()
     async with pool.acquire() as conn:
         req_info = await _get_requester_team_info(conn, workos_user_id)
-        
+
         # Both Owners and Admins can update quotas.
         if req_info["team_role"] not in ("owner", "admin"):
             raise HTTPException(status_code=403, detail="Forbidden: You are not a Team Admin")
@@ -78,10 +80,10 @@ async def update_member_quota(request: Request, body: QuotaUpdateRequest):
         target_row = await conn.fetchrow("""
             SELECT team_id, team_role FROM users WHERE id = $1
         """, uuid.UUID(body.target_user_id))
-        
+
         if not target_row or target_row["team_id"] != req_info["team_id"]:
             raise HTTPException(status_code=400, detail="Target user not found on your team")
-            
+
         # Admins cannot edit the Owner's quota
         if req_info["team_role"] == "admin" and target_row["team_role"] == "owner":
             raise HTTPException(status_code=403, detail="Admins cannot modify the Owner")
@@ -106,7 +108,7 @@ async def update_member_role(request: Request, body: RoleUpdateRequest):
     pool = get_pool()
     async with pool.acquire() as conn:
         req_info = await _get_requester_team_info(conn, workos_user_id)
-        
+
         # ONLY Owners can assign Admin privileges
         if req_info["team_role"] != "owner":
             raise HTTPException(status_code=403, detail="Forbidden: Only Owners can manage roles")
@@ -114,10 +116,10 @@ async def update_member_role(request: Request, body: RoleUpdateRequest):
         target_row = await conn.fetchrow("""
             SELECT team_id, team_role FROM users WHERE id = $1
         """, uuid.UUID(body.target_user_id))
-        
+
         if not target_row or target_row["team_id"] != req_info["team_id"]:
             raise HTTPException(status_code=400, detail="Target user not found on your team")
-            
+
         if target_row["team_role"] == "owner":
             raise HTTPException(status_code=400, detail="Cannot demote the team owner")
 

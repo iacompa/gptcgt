@@ -245,12 +245,12 @@ class StripeService:
             await track_async(workos_user_id, "subscription_started", {"plan": plan})
         elif action_type == "credits":
             amount = int(session.get("metadata", {}).get("amount", "0"))
-            
+
             # Fetch the user's team workspace
             user_team_row = await db_pool.fetchrow(
                 "SELECT team_id FROM users WHERE workos_user_id = $1", workos_user_id
             )
-            
+
             if user_team_row and user_team_row["team_id"]:
                 # Deposit the purchased credits into the Team Wallet
                 await db_pool.execute(

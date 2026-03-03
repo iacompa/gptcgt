@@ -7,7 +7,7 @@ export default function SupportPage() {
             <div className="mx-auto max-w-3xl text-center">
                 <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">Support Hub</h1>
                 <p className="mt-6 text-lg leading-8 text-gray-400">
-                    We're here to help you debug the terminal, manage your account, and maximize your Multi-Model workflow.
+                    We&apos;re here to help you debug the terminal, manage your account, and maximize your Multi-Model workflow.
                 </p>
             </div>
 
