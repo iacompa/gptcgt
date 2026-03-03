@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     encryption_key: str = ""
-    cors_origins: str = "https://gptcgt.ai,http://localhost:3000"
+    cors_origins: str = "https://gptcgt.ai,https://www.gptcgt.ai,http://localhost:3000,https://gptcgt-git-main-michaelangelor20-8162s-projects.vercel.app,https://gptcgt-fv4ikb7um-michaelangelor20-8162s-projects.vercel.app"
     environment: str = "production"
 
 

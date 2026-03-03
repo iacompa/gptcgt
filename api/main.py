@@ -25,8 +25,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="GPTCGT Backend API", lifespan=lifespan)
 
-# CORS
+# Middleware execution order in Starlette: LAST added = FIRST to run.
+# CORSMiddleware MUST run first so that ALL responses (including 401s from AuthMiddleware)
+# get proper CORS headers. Without this, the browser blocks error responses as CORS violations.
 origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -34,12 +38,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Note: Starlette executes middlewares in reverse order of how they are added.
-# We add RateLimitMiddleware first so it runs AFTER AuthMiddleware
-# This way rate limiting runs *after* auth, giving it access to request.state.user_id.
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(AuthMiddleware)
 
 # Routers
 app.include_router(billing.router, prefix="/billing")
