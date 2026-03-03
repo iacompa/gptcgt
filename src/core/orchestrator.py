@@ -15,7 +15,6 @@ from src.core.chat_store import ChatStore
 from src.core.logger import get_logger
 from src.core.mode_manager import ModeManager, OperationMode
 from src.core.model_registry import QualityTier
-from src.core.project_context import ProjectContextGenerator
 from src.core.router import CodingRouter
 from src.tools.repo_map import RepoMap
 
@@ -43,403 +42,43 @@ class Orchestrator:
         cancel_event=None,
     ) -> None:
         try:
-            # 1. Start Mode Management & Cost Tracking
-            self.mode_manager.initialize_task(global_tier)
-            await narration_callback("Analyzing task intent and scope...", "info")
-
-            # 2. Intent & Relevance Analysis (using Scout/Cheap Model)
-            analysis = await self._analyze_intent_and_scope(user_input, attached_files, global_tier)
-            await narration_callback(
-                f"Determined intent: {analysis['intent']} (Complexity: {analysis['complexity']}/10)",  # noqa: E501
-                "decision",
+            from src.core.dag import DAGEngine, TaskState
+            from src.core.dag_nodes import (
+                ArchitectExecuteNode,
+                ArchitectPlanNode,
+                FinalizeNode,
+                GatherContextNode,
+                InitAnalyzeNode,
+                ParallelExecutionNode,
+                PrepareBlackboardNode,
+                RouteTaskNode,
+                StandardExecutionNode,
             )
 
-            # 3. Gather Context
-            relevant_files = []
-            if analysis["intent"] in ["question", "edit", "create", "debug"]:
-                await narration_callback("Searching codebase for relevant context...", "info")
-                relevant_files = self.repo_map.find_relevant_files(
-                    mentioned_files=analysis.get("mentioned_files", []),
-                    mentioned_symbols=analysis.get("mentioned_symbols", []),
-                )
-                if relevant_files:
-                    await narration_callback(
-                        f"Found {len(relevant_files)} relevant files.", "result"
-                    )
-                    try:
-                        import textual.app as _tapp
-
-                        from src.core.events import FileRelevanceUpdated
-
-                        _tapp.active_app.get().post_message(
-                            FileRelevanceUpdated(files=relevant_files)
-                        )
-                    except Exception as e:
-                        logger.debug(f"Could not post FileRelevanceUpdated to UI: {e}")
-
-            # 4. Route to Model
-            provider_family = None
-            if self.mode_manager.active_mode.name.startswith("SINGLE_MODEL_"):
-                provider_family = self.mode_manager.active_mode.value.replace("single_model_", "")
-
-            selected_model = self.router.route_task(
-                analysis["intent"], analysis["complexity"], global_tier, provider_family, role="orchestrator"
-            )
-            if model_selected_callback:
-                await model_selected_callback(selected_model.name)
-            await narration_callback(
-                f"Routed to {selected_model.name} based on complexity and tier.", "routing"
+            state = TaskState(
+                user_input=user_input,
+                attached_files=attached_files,
+                global_tier=global_tier,
+                narration_callback=narration_callback,
+                yield_chunk_callback=yield_chunk_callback,
+                tool_call_callback=tool_call_callback,
+                thought_callback=thought_callback,
+                error_callback=error_callback,
+                model_selected_callback=model_selected_callback,
+                cancel_event=cancel_event,
             )
 
-            # 5. Build Project Context if needed
-            from src.core.workspace import Workspace
+            engine = DAGEngine(InitAnalyzeNode())
+            engine.register_node(GatherContextNode())
+            engine.register_node(RouteTaskNode())
+            engine.register_node(PrepareBlackboardNode())
+            engine.register_node(ArchitectPlanNode())
+            engine.register_node(ArchitectExecuteNode())
+            engine.register_node(StandardExecutionNode())
+            engine.register_node(ParallelExecutionNode())
+            engine.register_node(FinalizeNode())
 
-            ws = Workspace.get_instance()
-            gptcgt_dir = ws.get_project_root() / ".gptcgt"
-            if not (gptcgt_dir / "project.md").exists():
-                pcg = ProjectContextGenerator()
-                pcg.generate_and_save()
-
-            # 5.5. Create TaskBrief and populate Blackboard
-            from src.core.blackboard import AgentBlackboard
-            from src.core.task_brief import TaskBrief
-            task_brief = TaskBrief(
-                intent=analysis["intent"],
-                complexity=analysis.get("complexity", 5),
-                user_request=user_input[:500],
-                mentioned_files=analysis.get("mentioned_files", []),
-                mentioned_symbols=analysis.get("mentioned_symbols", []),
-                selected_model_id=selected_model.id,
-                selected_model_name=selected_model.name,
-                quality_tier=global_tier.value,
-            )
-            bb = AgentBlackboard.get_instance()
-            bb.clear()  # Fresh blackboard per task cycle
-            bb.write("task_brief", task_brief.to_system_context(), author="orchestrator")
-            bb.write("relevant_files", [str(f) for f in relevant_files], author="scout")
-
-            # 2-Phase Architect Mode: plan → execute
-            is_architect_task = (
-                analysis["intent"] == "architect"
-                and analysis.get("complexity", 5) >= 7
-            )
-            if is_architect_task:
-                await narration_callback("🏗️ Architect Mode: Phase 1 — Generating plan...", "info")
-                from src.core.chat_pipeline import ChatPipeline
-                plan_pipeline = ChatPipeline(self.chat_store, global_tier)
-
-                plan_text = ""
-
-                async def capture_plan(chunk: str):
-                    nonlocal plan_text
-                    plan_text += chunk
-                    await yield_chunk_callback(chunk)
-
-                await plan_pipeline.process_message(
-                    user_text=(
-                        f"You are in ARCHITECT MODE (Phase 1: Planning Only).\n"
-                        f"Generate a detailed implementation plan for: {user_input}\n"
-                        f"Output ONLY the plan with numbered steps, files to modify, and rationale.\n"
-                        f"Do NOT write any code yet."
-                    ),
-                    attached_files=attached_files if attached_files else None,
-                    model_id_override=selected_model.id,
-                    yield_chunk_callback=capture_plan,
-                    tool_call_callback=tool_call_callback,
-                    thought_callback=thought_callback,
-                    error_callback=error_callback,
-                    cancel_event=cancel_event,
-                    complexity=analysis.get("complexity", 5),
-                )
-                bb.write("architect_plan", plan_text, author="architect")
-
-                await narration_callback("🏗️ Architect Mode: Phase 2 — Executing plan...", "info")
-                exec_pipeline = ChatPipeline(self.chat_store, global_tier)
-                await exec_pipeline.process_message(
-                    user_text=(
-                        f"You are in ARCHITECT MODE (Phase 2: Constrained Execution).\n"
-                        f"Execute ONLY the following approved plan — do not deviate:\n\n"
-                        f"{plan_text[:3000]}\n\n"
-                        f"Original request: {user_input}"
-                    ),
-                    attached_files=attached_files if attached_files else None,
-                    model_id_override=selected_model.id,
-                    yield_chunk_callback=yield_chunk_callback,
-                    tool_call_callback=tool_call_callback,
-                    thought_callback=thought_callback,
-                    error_callback=error_callback,
-                    cancel_event=cancel_event,
-                    complexity=analysis.get("complexity", 5),
-                )
-
-            # 6. Execute via Pipeline (standard / single-model)
-            is_standard = (
-                not is_architect_task
-                and (
-                    self.mode_manager.active_mode in (
-                        OperationMode.STANDARD,
-                        OperationMode.SCOUT,
-                    ) or self.mode_manager.active_mode.name.startswith("SINGLE_MODEL_")
-                )
-            )
-            if is_standard:
-                await narration_callback(
-                    f"Executing task in {self.mode_manager.active_mode.name} mode...", "info"
-                )
-
-                from src.core.events import AgentStatusUpdate
-                try:
-                    import textual.app as _tapp
-                    _tui_app = _tapp.active_app.get()
-                    _tui_app.post_message(AgentStatusUpdate(
-                        agent_id="orch",
-                        model_name=selected_model.name,
-                        status="thinking",
-                        detail="Cross-referencing memory...",
-                    ))
-                except Exception:
-                    pass
-
-                from src.core.chat_pipeline import ChatPipeline
-
-                pipeline = ChatPipeline(self.chat_store, global_tier)
-
-                # Inject any pending reflection lesson as a system-level context hint.
-                # The ReflectionEngine writes a lesson after user aborts; ChatPanel
-                # stores it in _pending_reflection_hint. We inject it once here and
-                # clear it so it's not repeated. This closes the ARCH-REFLECT loop.
-                reflection_hint: str | None = None
-                try:
-                    import textual.app as _tapp
-
-                    from src.tui.panels.chat import ChatPanel
-                    _chat = _tapp.active_app.get().query_one(ChatPanel)
-                    if _chat._pending_reflection_hint:
-                        reflection_hint = _chat._pending_reflection_hint
-                        _chat._pending_reflection_hint = None  # consume it
-                except Exception:
-                    pass
-
-                response_text = ""
-
-                async def intercept_yield(chunk: str):
-                    nonlocal response_text
-                    response_text += chunk
-                    await yield_chunk_callback(chunk)
-
-                # P0 Fix: Inject scout-discovered relevant files into pipeline context
-                merged_files = list(attached_files) if attached_files else []
-                if relevant_files:
-                    ws = Workspace.get_instance()
-                    for rf in relevant_files[:10]:  # Cap at 10 to protect token budget
-                        rf_path = str(rf)
-                        if not any(af.get("path") == rf_path for af in merged_files):
-                            try:
-                                content = ws.safe_read(rf_path)
-                                if content:
-                                    merged_files.append({"path": rf_path, "content": content[:4000]})
-                            except Exception:
-                                pass
-
-                await pipeline.process_message(
-                    user_text=user_input,
-                    attached_files=merged_files if merged_files else None,
-                    model_id_override=selected_model.id,
-                    yield_chunk_callback=intercept_yield,
-                    tool_call_callback=tool_call_callback,
-                    thought_callback=thought_callback,
-                    error_callback=error_callback,
-                    cancel_event=cancel_event,
-                    complexity=analysis.get("complexity", 5),
-                    reflection_hint=reflection_hint,
-                )
-
-                # Mid-task model escalation: detect confusion → auto-retry with MAX
-                confusion_signals = [
-                    "I'm not sure", "I don't know", "I cannot determine",
-                    "I'm unable to", "beyond my capabilities",
-                ]
-                is_confused = (
-                    len(response_text.strip()) < 50
-                    or any(sig.lower() in response_text.lower() for sig in confusion_signals)
-                )
-                if is_confused and global_tier != QualityTier.MAX:
-                    try:
-                        max_model = self.router.route_task(
-                            analysis["intent"], 10, QualityTier.MAX, role="coder"
-                        )
-                        if max_model.id != selected_model.id:
-                            await narration_callback(
-                                f"⚡ Escalating to {max_model.name} (confusion detected)", "routing"
-                            )
-                            escalation_pipeline = ChatPipeline(self.chat_store, QualityTier.MAX)
-                            await escalation_pipeline.process_message(
-                                user_text=user_input,
-                                attached_files=merged_files if merged_files else None,
-                                model_id_override=max_model.id,
-                                yield_chunk_callback=yield_chunk_callback,
-                                tool_call_callback=tool_call_callback,
-                                thought_callback=thought_callback,
-                                error_callback=error_callback,
-                                cancel_event=cancel_event,
-                                complexity=10,
-                                reflection_hint=reflection_hint,
-                            )
-                    except Exception as esc_err:
-                        logger.debug(f"Escalation skipped: {esc_err}")
-
-                self._extract_annotations_from_response(response_text)
-            else:
-                await narration_callback(
-                    f"Executing task in {self.mode_manager.active_mode.name} mode...", "info"
-                )
-
-
-                import textual.app as _tapp
-
-                from src.core.arbiter import Arbiter
-                from src.core.events import (
-                    ArbiterVerdictReady,
-                    MultiAgentChunk,
-                    MultiAgentToolCall,
-                    ParallelAgentComplete,
-                    ParallelDispatchComplete,
-                    ParallelDispatchStarted,
-                    PatchSetProposed,
-                )
-                from src.core.parallel_dispatcher import ParallelDispatcher
-                from src.core.security import SecurityScanner
-                from src.core.workspace import Workspace
-                from src.tools.lsp import LSPClient
-                from src.tools.sandbox import E2BSandbox
-                _tui_app = _tapp.active_app.get()
-                sandbox = E2BSandbox()
-                ws = Workspace.get_instance()
-                security = SecurityScanner(ws.get_project_root())
-                lsp = LSPClient(ws.get_project_root())
-                arbiter = Arbiter(sandbox, security, lsp)
-                dispatcher = ParallelDispatcher()
-
-                count = 2 if self.mode_manager.active_mode == OperationMode.BATTLE else 3
-                models = self.router.get_parallel_models(count)
-
-                from src.core.system_prompt import SystemPromptBuilder
-
-                sys_prompt = SystemPromptBuilder.build(model_name="orchestrator")
-                context_messages = [{"role": "system", "content": sys_prompt}]
-                for f in attached_files:
-                    context_messages.append(
-                        {"role": "user", "content": f"File {f['path']}:\n{f['content']}"}
-                    )
-                context_messages.append({"role": "user", "content": user_input})
-
-                from src.tools.tool_registry import get_tool_definitions
-
-                tools = get_tool_definitions()
-
-                if self.mode_manager.active_mode == OperationMode.ARCHITECT:
-                    from src.core.architect import ArchitectPipeline
-
-                    arch_pipeline = ArchitectPipeline(dispatcher, arbiter)
-                    event_stream = arch_pipeline.run_planning_phase(
-                        user_input, context_messages, models, tools
-                    )
-                else:
-                    mode_str = (
-                        "battle"
-                        if self.mode_manager.active_mode == OperationMode.BATTLE
-                        else "ensemble"
-                    )
-                    event_stream = dispatcher.dispatch(
-                        user_input, context_messages, models, tools, mode=mode_str
-                    )
-
-                current_dispatch_id = ""
-                agent_texts = {}
-                async for event in event_stream:
-                    if cancel_event and cancel_event.is_set():
-                        import asyncio
-
-                        raise asyncio.CancelledError("Task generation cancelled by user")
-
-                    if event["type"] == "dispatch_started":
-                        current_dispatch_id = event["dispatch_id"]
-                        _tui_app.post_message(
-                            ParallelDispatchStarted(
-                                current_dispatch_id,
-                                self.mode_manager.active_mode.name,
-                                event["agents"],
-                            )
-                        )
-                    elif event["type"] == "agent_chunk":
-                        agent_id = event["agent_id"]
-                        agent_texts[agent_id] = agent_texts.get(agent_id, "") + event["text"]
-                        _tui_app.post_message(
-                            MultiAgentChunk(
-                                dispatch_id=current_dispatch_id,
-                                agent_id=agent_id,
-                                text=event["text"],
-                            )
-                        )
-                    elif event["type"] == "agent_tool_call":
-                        _tui_app.post_message(
-                            MultiAgentToolCall(
-                                dispatch_id=current_dispatch_id,
-                                agent_id=event["agent_id"],
-                                tool_name=event["tool_name"],
-                                args=event["args"],
-                            )
-                        )
-                    elif event["type"] == "agent_complete":
-                        _tui_app.post_message(
-                            ParallelAgentComplete(
-                                dispatch_id=current_dispatch_id,
-                                agent_id=event["agent_id"],
-                                result={
-                                    "duration_ms": event.get("duration_ms", 0),
-                                    "cost_usd": event.get("cost_usd", 0.0),
-                                },
-                            )
-                        )
-                    elif event["type"] == "error":
-                        if error_callback:
-                            await error_callback(event.get("error", "Unknown error"))
-                    elif event["type"] == "all_complete":
-                        dispatch = event["dispatch"]
-                        _tui_app.post_message(ParallelDispatchComplete(dispatch))
-                        if self.mode_manager.active_mode != OperationMode.ARCHITECT:
-                            await narration_callback(
-                                "Running 6-stage Arbiter evaluation on patches...", "info"
-                            )
-
-                            async def on_progress(stage, agent_id, detail):
-                                await narration_callback(f"Arbiter [{stage}]: {detail}", "decision")
-
-                            verdict = await arbiter.evaluate(
-                                dispatch, ws.get_project_root(), "python", on_progress=on_progress
-                            )
-                            _tui_app.post_message(ArbiterVerdictReady(verdict))
-
-                            from src.core.diff_engine import MultiAgentPatchSet
-
-                            valid_patches = [
-                                s.patch_set
-                                for s in verdict.scores
-                                if s.patch_set and not s.eliminated
-                            ]
-                            if valid_patches:
-                                multi_ps = MultiAgentPatchSet(patch_sets=valid_patches)
-                                _tui_app.post_message(PatchSetProposed(patch_set=multi_ps))
-
-                    elif event["type"] == "arbiter_verdict":
-                        _tui_app.post_message(ArbiterVerdictReady(event["verdict"]))
-
-                for text in agent_texts.values():
-                    self._extract_annotations_from_response(text)
-
-                await lsp.shutdown_all()
-
-            await narration_callback("Task completed.", "result")
+            await engine.run(state, context=self)
 
         except Exception as e:
             logger.error(f"Orchestrator failed: {e}")

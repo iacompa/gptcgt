@@ -59,12 +59,16 @@ def pipeline(chat_store: ChatStore) -> ChatPipeline:
 
 def _fake_model():
     """Return a realistic ModelDefinition mock."""
-    return MagicMock(
+    from src.core.model_registry import ModelDefinition, Provider
+    return ModelDefinition(
         id="openai/gpt-4o",
         name="GPT-4o",
-        provider=MagicMock(value="openai"),
+        provider=Provider.OPENAI,
         input_cost_per_mtok=5.0,
         output_cost_per_mtok=15.0,
+        quality_tiers=["standard"],
+        max_context_tokens=128000,
+        max_output_tokens=8192,
     )
 
 
@@ -106,12 +110,17 @@ class TestE2EPipelineHappyPath:
         async def _on_chunk(t: str):
             collected.append(t)
 
+        errors = []
+        async def _on_err(m: str):
+            errors.append(m)
+
         patches = _base_patches([
             patch("src.agents.factory.AgentFactory.create_agent", return_value=mock_agent),
         ])
         with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
-            await pipeline.process_message(user_text="Say hello", yield_chunk_callback=_on_chunk)
+            await pipeline.process_message(user_text="Say hello", yield_chunk_callback=_on_chunk, error_callback=_on_err)  # noqa: E501
 
+        assert not errors, f"Pipeline threw errors: {errors}"
         assert collected == ["Hello, ", "world!"]
         messages = pipeline.chat_store.get_recent_messages(count=10)
         assert any("Hello, world!" in (m.content or "") for m in messages)

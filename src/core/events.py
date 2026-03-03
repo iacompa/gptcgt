@@ -137,6 +137,17 @@ class AgentStatusUpdate(Message):
 
 
 
+class SubTaskDelegated(Message):
+    """Emitted when an agent delegates a sub-task to another agent."""
+
+    def __init__(self, parent_agent_id: str, child_model_name: str, instruction: str, depth: int) -> None:
+        super().__init__()
+        self.parent_agent_id = parent_agent_id
+        self.child_model_name = child_model_name
+        self.instruction = instruction
+        self.depth = depth
+
+
 class AgentDispatched(Message):
     """Emitted when any agent makes an LLM request."""
 
@@ -388,3 +399,79 @@ class ReflectionRetryHint(Message):
         self.model_name = model_name
         self.lesson = lesson
         self.trigger_event = trigger_event
+
+
+class DAGTraceEvent(Message):
+    """
+    Emitted by the DAG engine at each node transition for observability.  # noqa: D213
+
+    Fields:
+        node: Name of the DAG node.
+        status: One of 'running', 'done', 'error'.
+        elapsed_ms: Milliseconds spent in this node (0 for 'running').
+        next_node: Name of the next node (only for 'done'), or None.
+        error: Error message string (only for 'error'), or None.
+    """
+
+    def __init__(
+        self,
+        node: str,
+        status: str,
+        elapsed_ms: int = 0,
+        next_node: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        super().__init__()
+        self.node = node
+        self.status = status
+        self.elapsed_ms = elapsed_ms
+        self.next_node = next_node
+        self.error = error
+
+
+# Phase 9 Events
+
+
+class AgentConversation(Message):
+    """
+    Visible inter-agent message for the Activity Feed.  # noqa: D213
+
+    Represents a direct message from one agent to another during
+    autonomous multi-agent collaboration.
+    """
+
+    def __init__(
+        self,
+        from_agent: str,
+        to_agent: str,
+        content: str,
+        msg_type: str = "info",
+        iteration: int = 0,
+    ) -> None:
+        super().__init__()
+        self.from_agent = from_agent
+        self.to_agent = to_agent
+        self.content = content
+        self.msg_type = msg_type  # "request", "response", "review", "approval", "question"
+        self.iteration = iteration
+
+
+class BudgetExceeded(Message):
+    """
+    Emitted when a per-task or daily budget limit is hit.  # noqa: D213
+
+    The UI should pause execution and ask the user whether to continue.
+    """
+
+    def __init__(
+        self,
+        limit_type: str,
+        limit_value: float,
+        current_value: float,
+        task_description: str = "",
+    ) -> None:
+        super().__init__()
+        self.limit_type = limit_type  # "task_spend", "task_tokens", "daily_spend"
+        self.limit_value = limit_value
+        self.current_value = current_value
+        self.task_description = task_description

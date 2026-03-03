@@ -28,10 +28,13 @@ async def get_current_user_profile(request: Request):
     row = await pool.fetchrow(
         """
         SELECT
-            email, plan, credits_remaining, credits_monthly,
-            spending_cap, overage_enabled, subscription_status, current_period_end
-        FROM users
-        WHERE workos_user_id = $1
+            u.email, u.plan, u.credits_remaining, u.credits_monthly,
+            u.spending_cap, u.overage_enabled, u.subscription_status, u.current_period_end,
+            u.team_role, u.allocated_quota, u.billing_access,
+            COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as team_credits_remaining
+        FROM users u
+        LEFT JOIN teams t ON u.team_id = t.id
+        WHERE u.workos_user_id = $1
         """,
         user_id,
     )
@@ -39,7 +42,10 @@ async def get_current_user_profile(request: Request):
     if not row:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    return dict(row)
+    result = dict(row)
+    # Use team wallet as the primary credits display
+    result["credits_remaining"] = result.pop("team_credits_remaining", result.get("credits_remaining", 0))
+    return result
 
 
 class ProfileUpdateRequest(BaseModel):

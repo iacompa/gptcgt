@@ -78,8 +78,10 @@ class ModeManager:
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "cost_tracker"):
                 today_spend = current_app.cost_tracker.get_today_spend()
-                # Assuming a naive daily limit is $5.00 for simulation purposes
-                daily_limit = 5.00
+                # Read from user config; fall back to $10.00 (UserConfig default)
+                daily_limit = 10.0
+                if hasattr(current_app, "config"):
+                    daily_limit = getattr(current_app.config.user, "daily_spend_limit", 10.0)
                 if today_spend.total_cost >= daily_limit * 0.9:
                     logger.warning(
                         f"Approaching daily limit (${today_spend.total_cost:.2f}/${daily_limit:.2f}), forcing SCOUT mode."  # noqa: E501
@@ -105,3 +107,35 @@ class ModeManager:
 
     def track_credits_used(self, credits: int) -> None:
         self.current_credits_used += credits
+
+    def recommend_tier(self, complexity: int) -> QualityTier:
+        """
+        Auto-scale model tier based on task complexity.  # noqa: D213
+
+        Args:
+            complexity: 1-10 score from intent analysis.
+
+        Returns:  # noqa: D413
+            Recommended QualityTier based on complexity bands:
+                1-3: LIGHT (fast, cheap — syntax fixes, simple questions)
+                4-7: STANDARD (balanced — typical coding tasks)
+                8-10: MAX (reasoning models — architecture, complex debugging)
+
+        """
+        if complexity <= 3:
+            return QualityTier.LIGHT
+        if complexity <= 7:
+            return QualityTier.STANDARD
+        return QualityTier.MAX
+
+    def can_auto_tier(self) -> bool:
+        """Check if auto-tiering is allowed by user config."""
+        try:
+            import textual.app as _tapp
+            current_app = _tapp.active_app.get()
+            if hasattr(current_app, "config"):
+                return getattr(current_app.config.user, "allow_auto_tiering", True)
+        except Exception:
+            pass
+        return True
+

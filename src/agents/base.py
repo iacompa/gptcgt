@@ -17,6 +17,17 @@ from src.core.logger import get_logger
 logger = get_logger("agents.base")
 
 
+class ProviderException(Exception):
+    """Normalized exception for provider APIs (rate limit, auth, context size)."""
+
+    def __init__(self, error_type: str, message: str, provider: str = "unknown"):
+        super().__init__(message)
+        self.error_type = error_type
+        self.message = message
+        self.provider = provider
+
+
+
 @dataclass
 class AgentConfig:
     """Configuration passed to every agent upon initialization."""
@@ -30,6 +41,17 @@ class AgentConfig:
     timeout: float = 300.0
     api_key: str | None = None
     base_url: str | None = None
+    extra_headers: dict | None = None
+
+
+@dataclass
+class ProviderCapabilities:
+    """Capabilities supported by this provider/model."""
+
+    supports_streaming: bool = True
+    supports_tools: bool = True
+    supports_vision: bool = False
+    max_context: int = 8192
 
 
 @dataclass
@@ -50,6 +72,12 @@ class BaseAgent(ABC):
     def __init__(self, config: AgentConfig):
         self.config = config
         self.logger = logger
+
+    @property
+    def capabilities(self):
+        """Return the capabilities of this specific agent/model."""
+        # Default flags, can be overridden by specific provider adapters
+        return ProviderCapabilities(max_context=self.config.max_tokens)
 
     @abstractmethod
     async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[AgentResponse, None]:

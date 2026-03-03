@@ -26,6 +26,9 @@ class Provider(Enum):
     XAI = "xai"
     DEEPSEEK = "deepseek"
     OPENROUTER = "openrouter"
+    MISTRAL = "mistral"
+    COHERE = "cohere"
+    GROQ = "groq"
     CUSTOM = "custom"
 
 
@@ -70,6 +73,10 @@ class ModelDefinition:
     # Status
     deprecated: bool = False
     deprecation_message: str = ""
+
+    # Connection
+    base_url: str | None = None
+    api_key_required: bool = True
 
 
 class ModelRegistry:
@@ -181,6 +188,8 @@ class ModelRegistry:
                         quality_tiers=entry.get("quality_tiers", ["standard"]),
                         display_color=entry.get("display_color", "#FF8800"),
                         display_emoji="🔧",
+                        base_url=entry.get("base_url"),
+                        api_key_required=entry.get("api_key_required", False)  # noqa: W291
                     )
                     self._models[model.id] = model
                     logger.info(f"Registered custom model: {model.id}")
@@ -227,6 +236,57 @@ class ModelRegistry:
             if key_name and KeyChainManager.get_key(key_name) is not None:
                 available.append(model)
         return available
+
+    def get_fallback_model(
+        self,
+        current_model_id: str,
+        tier: QualityTier,
+        provider_preference: str | None = None,
+        excluded: set[str] | None = None,
+    ) -> ModelDefinition | None:
+        """
+        Find a fallback model when the current one fails with a transient error.  # noqa: D213
+
+        Selection policy:
+        1. Same tier + same provider (if provider_preference given).
+        2. Same tier, any provider.
+        3. Adjacent tiers (MAX if current is STANDARD, STANDARD if current is LIGHT).
+        Only returns models the user has API keys for.
+        """
+        excluded = (excluded or set()) | {current_model_id}
+        available = self.get_available_models()
+
+        def _candidates(t: QualityTier, provider: str | None = None) -> list[ModelDefinition]:
+            return [
+                m for m in available
+                if t.value in m.quality_tiers
+                and m.id not in excluded
+                and (provider is None or m.provider.value == provider)
+            ]
+
+        # 1. Same tier + same provider
+        if provider_preference:
+            cands = _candidates(tier, provider_preference)
+            if cands:
+                return min(cands, key=lambda m: m.input_cost_per_mtok)
+
+        # 2. Same tier, any provider
+        cands = _candidates(tier)
+        if cands:
+            return min(cands, key=lambda m: m.input_cost_per_mtok)
+
+        # 3. Adjacent tiers
+        adjacent = {
+            QualityTier.LIGHT: [QualityTier.STANDARD],
+            QualityTier.STANDARD: [QualityTier.MAX, QualityTier.LIGHT],
+            QualityTier.MAX: [QualityTier.STANDARD],
+        }
+        for adj_tier in adjacent.get(tier, []):
+            cands = _candidates(adj_tier)
+            if cands:
+                return min(cands, key=lambda m: m.input_cost_per_mtok)
+
+        return None
 
     def get_default_for_tier(self, tier: QualityTier) -> ModelDefinition | None:
         """Get the recommended default model for a tier that the user actually has keys for."""

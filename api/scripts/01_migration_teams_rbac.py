@@ -58,7 +58,43 @@ async def run_migration():
                     );
                 """)
                 
-                # 4. Data Migration: Create a 1-to-1 Team for every existing user so they don't break
+                # 4. Add moderation columns to users
+                logger.info("Adding moderation columns to 'users' table...")
+                await conn.execute("""
+                    ALTER TABLE users
+                        ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP,
+                        ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMP,
+                        ADD COLUMN IF NOT EXISTS suspended_reason TEXT;
+                """)
+
+                # 5. Create the audit_log table for moderation tracking
+                logger.info("Creating 'audit_log' table...")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_log (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        action VARCHAR(255) NOT NULL,
+                        details JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+
+                # 6. Create the api_keys table if it doesn't exist
+                logger.info("Ensuring 'api_keys' table exists...")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS api_keys (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        owner_type VARCHAR(50) NOT NULL DEFAULT 'user',
+                        owner_id INTEGER REFERENCES users(id),
+                        provider VARCHAR(100) NOT NULL,
+                        encrypted_key BYTEA NOT NULL,
+                        key_hash VARCHAR(255) NOT NULL,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # 7. Data Migration: Create a 1-to-1 Team for every existing user so they don't break
                 logger.info("Migrating existing individual users into individual Teams...")
                 existing_users = await conn.fetch("SELECT id, email, stripe_customer_id, plan, credits_remaining FROM users WHERE team_id IS NULL")
                 

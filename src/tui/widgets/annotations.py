@@ -67,7 +67,9 @@ class AnnotationGutter(Static):
             self.update(" ")
             self.remove_class("severity-info", "severity-warning", "severity-error", "clickable")
             self.tooltip = None
+            self.display = False  # Hide gutter entirely when empty
         else:
+            self.display = True
             icons = {"info": "ℹ️", "warning": "⚠️", "error": "✖"}
             sev = self.annotation.severity if self.annotation.severity in icons else "info"
             self.update(icons.get(sev, "•"))

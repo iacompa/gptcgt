@@ -224,6 +224,22 @@ class StripeService:
                 workos_user_id,
             )
 
+            # Also deposit subscription credits into the Team Wallet
+            user_team_row = await db_pool.fetchrow(
+                "SELECT team_id FROM users WHERE workos_user_id = $1", workos_user_id
+            )
+            if user_team_row and user_team_row["team_id"]:
+                await db_pool.execute(
+                    """
+                    UPDATE teams
+                    SET shared_credits_remaining = $1, plan = $2
+                    WHERE id = $3
+                    """,
+                    credits_monthly,
+                    plan,
+                    user_team_row["team_id"],
+                )
+
             if email:
                 await email_service.send_subscription_started(email, plan)
             await track_async(workos_user_id, "subscription_started", {"plan": plan})
@@ -297,12 +313,22 @@ class StripeService:
         if reason == "subscription_cycle":
             customer_id = invoice.get("customer")
 
-            # Reset credits to their monthly allowance
+            # Reset credits to their monthly allowance (both user and team wallet)
             await db_pool.execute(
                 """
                 UPDATE users
                 SET credits_remaining = credits_monthly
                 WHERE stripe_customer_id = $1 AND plan != 'free'
+                """,
+                customer_id,
+            )
+            # Also reset the Team Wallet
+            await db_pool.execute(
+                """
+                UPDATE teams t
+                SET shared_credits_remaining = u.credits_monthly
+                FROM users u
+                WHERE u.team_id = t.id AND u.stripe_customer_id = $1 AND u.plan != 'free'
                 """,
                 customer_id,
             )

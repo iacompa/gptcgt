@@ -37,8 +37,16 @@ def glob_files(pattern: str, max_results: int = 50) -> list[dict]:
     """Find files matching a glob pattern within workspace."""
     ws = Workspace.get_instance()
     results = []
+    if ".." in Path(pattern).parts:
+        return [{"error": "Pattern cannot contain parent directory references (..)"}]
+
     try:
         for fp in sorted(ws.get_project_root().glob(pattern)):
+            try:
+                ws.validate_path(str(fp))
+            except Exception:
+                continue
+
             if not fp.is_file() or _should_skip(fp, ws.get_project_root()):
                 continue
             rel = str(fp.relative_to(ws.get_project_root()))
@@ -62,8 +70,8 @@ def grep_search(
     ws = Workspace.get_instance()
     search_dir = ws.get_project_root() / path if path else ws.get_project_root()
     try:
-        search_dir.resolve().relative_to(ws.get_project_root().resolve())
-    except ValueError:
+        ws.validate_path(str(search_dir))
+    except Exception:
         return [{"error": "Search path outside workspace"}]
 
     results = []

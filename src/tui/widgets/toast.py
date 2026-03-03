@@ -35,6 +35,8 @@ class Toast(Widget):
     Toast {
         width: 40;
         height: auto;
+        max-height: 15;
+        overflow-y: auto;
         padding: 1 2;
         margin: 1 2;
         background: $panel;

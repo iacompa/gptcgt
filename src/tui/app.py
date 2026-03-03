@@ -9,13 +9,26 @@ from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.widgets import Label
 
 from src.billing.cost_breakdown import CostBreakdownTracker
 from src.billing.overage import OverageManager
 from src.core.chat_store import ChatStore
 from src.core.commands import register_default_commands
-from src.core.config import ConfigManager
-from src.core.events import FileSelected, PatchSetProposed, TaskReceived
+from src.core.config import ConfigManager  # noqa: F401
+from src.core.events import (
+    AnnotationActionClicked,
+    CodeSelectionCleared,
+    CodeSelectionMade,
+    CreditInsufficient,
+    CreditsUpdated,
+    FileRelevanceUpdated,
+    FileSelected,
+    PatchSetProposed,
+    QuickActionTriggered,
+    SpendingCapWarning,
+    TaskReceived,
+)
 from src.core.logger import get_logger, setup_logging
 from src.core.quality_tiers import QualityTier, QualityTierManager
 from src.core.task_tracker import TaskTracker
@@ -45,9 +58,10 @@ class GptcgtApp(App[None]):
     Screen {
         scrollbar-size: 1 1;
         scrollbar-background: transparent;
-        scrollbar-color: $surface-light;
-        scrollbar-color-hover: $primary-muted;
+        scrollbar-color: transparent;
+        scrollbar-color-hover: $surface-lighten-2;
         scrollbar-color-active: $primary;
+        overflow: hidden;
     }
     """
 
@@ -113,6 +127,8 @@ class GptcgtApp(App[None]):
         super().__init__()
         self._active_theme_name = "midnight"
         self.project_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+        self._active_file: str | None = None
+        self._active_line: int | None = None
 
     def compose(self) -> ComposeResult:
         # Temporary instantiation to provide store to ChatPanel
@@ -124,11 +140,14 @@ class GptcgtApp(App[None]):
         self.chat_store = ChatStore(ws)
         self.chat_store.load_active_session()
 
+        from src.core.config import ConfigManager  # noqa: F811
+        self.config = ConfigManager(self.project_path)
+
         from src.core.model_registry import ModelRegistry
         from src.core.orchestrator import Orchestrator
 
         # Load model catalog from bundled JSON BEFORE creating the pipeline
-        ModelRegistry().load()
+        ModelRegistry().load(custom_models=self.config.user.custom_models)
 
         self.orchestrator = Orchestrator(self.chat_store)
 
@@ -140,20 +159,58 @@ class GptcgtApp(App[None]):
                 "code": CodeViewerPanel(id="code-viewer"),
                 "chat": ChatPanel(id="right-panel")
             }
-
-            # Fetch the sequence string parsing
-            from src.core.config import ConfigManager
             _conf = getattr(self, "config", ConfigManager())
-            order = getattr(_conf.user, "layout_order", "files_code_chat").split("_")
-            if len(order) != 3 or not all(k in panels for k in order):
-                order = ["files", "code", "chat"]
+  # noqa: W293
+            placements = getattr(_conf.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"})
+            sizes = getattr(_conf.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2})
+            visible = getattr(_conf.user, "visible_panels", {"files": True, "code": True, "chat": True})
+  # noqa: W293
+            valid_keys = ["files", "code", "chat"]
+            order_weight = {"left": 0, "center": 1, "right": 2, "top": -1, "bottom": 3}
+            horiz_keys = [k for k in valid_keys if placements.get(k) in ("left", "center", "right")]
+            horiz_keys.sort(key=lambda k: order_weight.get(placements.get(k), 1))
+            tb_keys = [k for k in valid_keys if placements.get(k) in ("top", "bottom")]
 
-            # Yield components linked with Resizers dynamically
-            yield panels[order[0]]
-            yield PanelResizer(panels[order[0]].id, panels[order[1]].id, id="resizer-1")
-            yield panels[order[1]]
-            yield PanelResizer(panels[order[1]].id, panels[order[2]].id, id="resizer-2")
-            yield panels[order[2]]
+            # Normalize horizontal widths so visible panels fill 100%
+            visible_horiz = [k for k in horiz_keys if visible.get(k, True)]
+            raw_sum = sum(sizes.get(k, 0.33) for k in visible_horiz) if visible_horiz else 1.0
+            if raw_sum <= 0:
+                raw_sum = 1.0  # fallback: equal distribution
+
+            # Apply sizes and docking before yielding
+            for k in valid_keys:
+                panel = panels[k]
+                panel.display = visible.get(k, True)
+                if k in tb_keys:
+                    panel.styles.dock = placements.get(k, "top")
+                    panel.styles.height = f"{sizes.get(k, 0.3) * 100}%"
+                    panel.styles.width = "100%"
+                elif k in visible_horiz:
+                    effective_fr = max(sizes.get(k, 0.33) / raw_sum, 0.01)
+                    panel.styles.width = f"{effective_fr}fr"
+                    panel.styles.height = "100%"
+                else:
+                    panel.styles.width = "0"
+                    panel.styles.height = "100%"
+  # noqa: W293
+            # Yield top/bottom docked panels first
+            for k in tb_keys:
+                yield panels[k]
+
+            # Yield horizontal panels with resizers
+            import uuid
+            for i, k in enumerate(horiz_keys):
+                yield panels[k]
+                if visible.get(k, True):
+                    # Look for the next visible panel to attach a resizer to
+                    next_visible = None
+                    for j in range(i + 1, len(horiz_keys)):
+                        if visible.get(horiz_keys[j], True):
+                            next_visible = horiz_keys[j]
+                            break
+                    if next_visible:
+                        resizer = PanelResizer(panels[k].id, panels[next_visible].id, id=f"resizer-{uuid.uuid4().hex[:6]}")  # noqa: E501
+                        yield resizer
 
         from src.tui.widgets.toast import ToastContainer
         yield ToastContainer()
@@ -225,7 +282,7 @@ class GptcgtApp(App[None]):
             self.phase_tracker = PhaseTracker(ws)
             self.phase_tracker.ensure_loaded()
 
-            self.config = ConfigManager()
+            # Reuse the ConfigManager created during compose() — don't overwrite
             self.config.auto_detect_project()
 
             from src.auth.auth_manager import AuthManager
@@ -295,14 +352,10 @@ class GptcgtApp(App[None]):
 
             # 3. Creator Mode for empty projects
             def is_project_empty() -> bool:
-                count = 0
                 try:
-                    for entry in self.project_path.iterdir():
-                        if entry.name != ".gptcgt" and entry.name != ".git":
-                            count += 1
-                            if count > 0:
-                                return False
-                    return True
+                    return not any(
+                        e.name not in (".gptcgt", ".git") for e in self.project_path.iterdir()
+                    )
                 except Exception:
                     return False
 
@@ -399,6 +452,9 @@ class GptcgtApp(App[None]):
     async def on_file_selected(self, message: FileSelected) -> None:
         """Handle file selection."""
         logger.debug(f"File selected via event: {message.filepath}")
+        self._active_file = str(message.filepath)
+        self._active_line = None  # Reset line on new file
+        self._update_chat_context_header()
         viewer = self.query_one("#code-viewer", CodeViewerPanel)
         try:
             content = message.filepath.read_text(encoding="utf-8")
@@ -415,6 +471,28 @@ class GptcgtApp(App[None]):
                 }
         except Exception as e:
             logger.error(f"Failed to read file for viewer: {e}")
+
+    def on_code_line_clicked(self, event) -> None:
+        """Track which line the user clicked in the code viewer."""
+        if hasattr(event, "line_number"):
+            self._active_line = event.line_number
+            self._update_chat_context_header()
+
+    def _update_chat_context_header(self) -> None:
+        """Update the chat input header to show what file/line the AI is aware of."""
+        try:
+            chat = self.query_one("#right-panel", ChatPanel)
+            header = chat.query_one("#chat-input-header", Label)
+            if self._active_file:
+                name = Path(self._active_file).name
+                if self._active_line:
+                    header.update(f"🤖 Ready — viewing [bold]{name}[/bold]:{self._active_line}")
+                else:
+                    header.update(f"🤖 Ready — viewing [bold]{name}[/bold]")
+            else:
+                header.update("🤖 Ready")
+        except Exception:
+            pass
 
     @on(PatchSetProposed)
     def handle_patch_proposed(self, event: PatchSetProposed) -> None:
@@ -525,9 +603,9 @@ class GptcgtApp(App[None]):
         async def _narration(txt: str, typ: str):
             self.post_message(OrchestratorNarration(txt, typ))
 
-        async def on_model_selected(real_model_name: str):
-            agent_msg.update_speaker(f"Orchestrator ({real_model_name})")
-            self.post_message(AgentDispatched(agent_name="Orchestrator", model_name=real_model_name))
+        async def on_model_selected(role: str, real_model_name: str):
+            agent_msg.update_speaker(f"{role} ({real_model_name})")
+            self.post_message(AgentDispatched(agent_name=role, model_name=real_model_name))
 
         from src.services.analytics import track
 
@@ -542,6 +620,7 @@ class GptcgtApp(App[None]):
         import time
 
         start_time = time.monotonic()
+        chat_panel.set_header_streaming(model_name)
         try:
             await self.orchestrator.process_task(
                 user_input=task_str,
@@ -561,15 +640,28 @@ class GptcgtApp(App[None]):
         finally:
             self.cancel_event = None
             agent_msg.finalize_streaming()
-            dur_ms = int((time.monotonic() - start_time) * 1000)
+            dur_s = time.monotonic() - start_time
+            dur_ms = int(dur_s * 1000)
             track(uid, "task_completed", {"mode": "standard", "duration_ms": dur_ms, "credits": 5})
             self.post_message(AgentCompleted(agent_id=model_id, full_response=agent_msg.content))
             self.status_bar.is_running = False
             self._update_status_bar()
+            chat_panel.set_header_complete(dur_s)
 
     async def on_task_received(self, message: TaskReceived) -> None:
         logger.info(f"Task received event: {message.task_str}")
-        self.process_task(message.task_str, message.attached_files)
+        task_str = message.task_str
+        attached = list(message.attached_files) if message.attached_files else []
+
+        # Auto-inject active file context so the AI knows what the user is viewing
+        if self._active_file:
+            active_path = Path(self._active_file)
+            if active_path not in attached:
+                attached.append(active_path)
+            line_hint = f" (cursor at line {self._active_line})" if self._active_line else ""
+            task_str = f"[Active file: {active_path.name}{line_hint}]\n\n{task_str}"
+
+        self.process_task(task_str, attached)
 
     def action_push_onboarding(self) -> None:
         """Push the onboarding overlay."""
@@ -607,7 +699,7 @@ class GptcgtApp(App[None]):
                 self.chat_store.load_active_session()
                 notify(self, "Session", "Loaded last session.", "subtle")
         elif action == "export_chat":
-            # Export to clipboard / file
+            # Export to file with native clipboard fallback
             try:
                 chat_panel = self.query_one("#right-panel", ChatPanel)
                 lines = []
@@ -616,18 +708,26 @@ class GptcgtApp(App[None]):
                         role = getattr(child, "role", "system")
                         lines.append(f"**{role.capitalize()}**: {child.content}")
                 md = "\n\n".join(lines)
-                import pyperclip
-                pyperclip.copy(md)
-                notify(self, "Exported", "Chat copied to clipboard as Markdown.", "success")
+                # Try native clipboard first (macOS)
+                import subprocess
+                try:
+                    subprocess.run(["pbcopy"], input=md.encode(), check=True)
+                    notify(self, "Exported", "Chat copied to clipboard as Markdown.", "success")
+                except (FileNotFoundError, subprocess.CalledProcessError):
+                    # Fallback: write to file
+                    export_path = self.project_path / ".gptcgt" / "exported_chat.md"
+                    export_path.parent.mkdir(parents=True, exist_ok=True)
+                    export_path.write_text(md, encoding="utf-8")
+                    notify(self, "Exported", f"Chat saved to {export_path}", "success")
             except Exception as e:
                 logger.debug(f"Export chat failed: {e}")
-                notify(self, "Export", "Could not export chat (pyperclip not installed).", "warning")
+                notify(self, "Export", "Could not export chat.", "warning")
         elif action == "clear_chat":
             self.action_clear_chat()
             notify(self, "Cleared", "Chat history cleared.", "subtle")
         elif action == "check_updates":
             import webbrowser
-            webbrowser.open("https://github.com/your/repo/releases")
+            webbrowser.open("https://github.com/gptcgt/gptcgt/releases")
         elif action == "mode_picker":
             self.action_mode_picker()
         elif action == "push_onboarding":
@@ -700,7 +800,7 @@ class GptcgtApp(App[None]):
         elif action == "open_issues":
             import webbrowser
 
-            webbrowser.open("https://github.com/your/repo/issues")
+            webbrowser.open("https://github.com/gptcgt/gptcgt/issues")
         elif action.startswith("ai_") or action.startswith("tree_"):
             # Route file tree AI context-menu actions
             try:
@@ -727,107 +827,191 @@ class GptcgtApp(App[None]):
             self._recovery_mgr.clear_state()
             logger.debug("Cleaned up recovery state on unmount.")
 
-    def _get_active_layout_order(self) -> list[str]:
-        order = getattr(self.config.user, "layout_order", "files_code_chat").split("_")
-        if len(order) != 3 or not all(k in ["files", "code", "chat"] for k in order):
-            order = ["files", "code", "chat"]
-        return order
+    async def _rebuild_layout(self) -> None:
+        """Dynamically apply layout state to DOM hierarchy and resizers."""
+        app_grid = self.query_one("#app-grid")
+  # noqa: W293
+        placements = getattr(self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"})
+        sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2})
+        visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True})
+  # noqa: W293
+        panel_map = {"files": "left-panel-container", "code": "code-viewer", "chat": "right-panel"}
+        valid_keys = ["files", "code", "chat"]
+        panels = {k: self.query_one(f"#{v}") for k, v in panel_map.items()}
+
+        order_weight = {"left": 0, "center": 1, "right": 2, "top": -1, "bottom": 3}
+        horiz_keys = [k for k in valid_keys if placements.get(k) in ("left", "center", "right")]
+        horiz_keys.sort(key=lambda k: order_weight.get(placements.get(k), 1))
+        tb_keys = [k for k in valid_keys if placements.get(k) in ("top", "bottom")]
+
+        for r in list(app_grid.query("PanelResizer")):
+            await r.remove()
+
+        # Normalize horizontal widths so visible panels fill 100%
+        visible_horiz = [k for k in horiz_keys if visible.get(k, True)]
+        raw_sum = sum(sizes.get(k, 0.33) for k in visible_horiz) if visible_horiz else 1.0
+        if raw_sum <= 0:
+            raw_sum = 1.0  # fallback: equal distribution
+
+        for k in valid_keys:
+            panel = panels[k]
+            panel.display = visible.get(k, True)
+            if k in tb_keys:
+                panel.styles.dock = placements.get(k)
+                panel.styles.height = f"{sizes.get(k, 0.3) * 100}%"
+                panel.styles.width = "100%"
+            elif k in visible_horiz:
+                panel.styles.dock = None
+                effective_fr = max(sizes.get(k, 0.33) / raw_sum, 0.01)
+                panel.styles.width = f"{effective_fr}fr"
+                panel.styles.height = "100%"
+            else:
+                panel.styles.dock = None
+                panel.styles.width = "0"
+                panel.styles.height = "100%"
+
+        import uuid
+        ordered_nodes = []
+        for i, k in enumerate(horiz_keys):
+            ordered_nodes.append(panels[k])
+            if i < len(horiz_keys) - 1:
+                next_k = horiz_keys[i+1]
+                from src.tui.widgets.panel_resizer import PanelResizer
+                resizer = PanelResizer(panels[k].id, panels[next_k].id, id=f"resizer-{uuid.uuid4().hex[:6]}")
+                await app_grid.mount(resizer)
+                resizer.display = visible.get(k, True) and visible.get(next_k, True)
+                ordered_nodes.append(resizer)
+
+        for i in range(1, len(ordered_nodes)):
+            try:
+                app_grid.move_child(ordered_nodes[i], after=ordered_nodes[i-1])
+            except Exception as e:
+                import src.core.logger as log
+                log.get_logger("tui.layout").error(f"Failed to move child: {e}")
 
     def action_toggle_left_panel(self) -> None:
-        """Toggle the leftmost panel (dynamically evaluated via settings)."""
-        order = self._get_active_layout_order()
-        panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
-        leftmost = self.query_one(panel_map[order[0]])
-        resizer = self.query_one("#resizer-1")
-        leftmost.display = not leftmost.display
-        resizer.display = leftmost.display
+        """Toggle the files panel (typically left)."""
+        visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True})
+        visible["files"] = not visible.get("files", True)
+        self.config.user.visible_panels = visible
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
 
     def action_toggle_right_panel(self) -> None:
-        """Toggle the rightmost panel (dynamically evaluated via settings)."""
-        order = self._get_active_layout_order()
-        panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
-        rightmost = self.query_one(panel_map[order[2]])
-        resizer = self.query_one("#resizer-2")
-        rightmost.display = not rightmost.display
-        resizer.display = rightmost.display
+        """Toggle the chat panel (typically right)."""
+        visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True})
+        visible["chat"] = not visible.get("chat", True)
+        self.config.user.visible_panels = visible
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
 
     def action_toggle_zen_mode(self) -> None:
-        """Hide both side panels."""
-        order = self._get_active_layout_order()
-        panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
-        left = self.query_one(panel_map[order[0]])
-        right = self.query_one(panel_map[order[2]])
+        """Hide both files and chat panels."""
+        visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True})
+        zen_active = not (visible.get("files", True) or visible.get("chat", True))
+        visible["files"] = zen_active
+        visible["chat"] = zen_active
+        self.config.user.visible_panels = visible
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
 
-        left_r = self.query_one("#resizer-1")
-        right_r = self.query_one("#resizer-2")
-        zen_active = not (left.display or right.display)
+    def on_panel_resizer_reset_layout(self, event: type) -> None:
+        """Double click on resizer resetting sizes to default."""
+        sizes = {"files": 0.2, "code": 0.6, "chat": 0.2}
+        self.config.user.panel_sizes = sizes
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
 
-        left.display = zen_active
-        left_r.display = zen_active
-        right.display = zen_active
-        right_r.display = zen_active
-
-    def on_panel_resizer_reset_layout(self, event: PanelResizer.ResetLayout) -> None:
-        """Double click on resizer resetting to default."""
-        order = self._get_active_layout_order()
-        panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
-        left = self.query_one(panel_map[order[0]])
-        center = self.query_one(panel_map[order[1]])
-        right = self.query_one(panel_map[order[2]])
-
-        # We restore normal FR weights
-        left.styles.width = "20%"
-        center.styles.width = "1fr"
-        right.styles.width = "30%"
-
-    def on_panel_resizer_resize_complete(self, event: PanelResizer.ResizeComplete) -> None:
-        """Fired after drag completes, so we can save new widths to ConfigManager later."""
-        pass
+    def on_panel_resizer_resize_complete(self, event: type) -> None:
+        """Fired after drag completes, so we can save new fractional widths to config."""
+        sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2}).copy()
+  # noqa: W293
+        # event is PanelResizer.ResizeComplete
+        panel_map_rev = {"left-panel-container": "files", "code-viewer": "code", "right-panel": "chat"}
+  # noqa: W293
+        if hasattr(event, "left_id") and hasattr(event, "right_id"):
+            l_key = panel_map_rev.get(event.left_id)
+            r_key = panel_map_rev.get(event.right_id)
+            if l_key and r_key:
+                sizes[l_key] = event.left_pct
+                sizes[r_key] = event.right_pct
+                self.config.user.panel_sizes = sizes
+                self.config._save_global()
 
     def action_show_layout_editor(self) -> None:
         from src.tui.overlays.layout_editor import LayoutEditorOverlay
-
         def check_layout(layout_name: str | None) -> None:
             if layout_name:
                 self.apply_layout(layout_name)
-
         self.push_screen(LayoutEditorOverlay(), check_layout)
 
     def apply_layout(self, preset: str) -> None:
-        order = self._get_active_layout_order()
-        panel_map = {"files": "#left-panel-container", "code": "#code-viewer", "chat": "#right-panel"}
-        left = self.query_one(panel_map[order[0]])
-        center = self.query_one(panel_map[order[1]])
-        right = self.query_one(panel_map[order[2]])
-        left_r = self.query_one("#resizer-1")
-        right_r = self.query_one("#resizer-2")
-
+        visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True}).copy()
+  # noqa: W293
         if preset == "default":
-            left.display, center.display, right.display = True, True, True
-            left_r.display, right_r.display = True, True
+            visible["files"], visible["code"], visible["chat"] = True, True, True
         elif preset == "code_focus":
-            left.display, center.display, right.display = False, True, True
-            left_r.display, right_r.display = False, True
+            visible["files"], visible["code"], visible["chat"] = False, True, True
         elif preset == "review":
-            left.display, center.display, right.display = True, True, False
-            left_r.display, right_r.display = True, False
+            visible["files"], visible["code"], visible["chat"] = True, True, False
         elif preset == "chat_focus":
-            left.display, center.display, right.display = False, False, True
-            left_r.display, right_r.display = False, False
+            visible["files"], visible["code"], visible["chat"] = False, False, True
+  # noqa: W293
+        self.config.user.visible_panels = visible
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
 
     def apply_size(self, preset: str) -> None:
-        left = self.query_one("#left-panel-container")
-        center = self.query_one("#code-viewer")
-        right = self.query_one("#right-panel")
-
+        sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2}).copy()
+  # noqa: W293
         if preset == "default":
-            left.styles.width, center.styles.width, right.styles.width = "20%", "1fr", "30%"
+            sizes["files"], sizes["code"], sizes["chat"] = 0.2, 0.6, 0.2
         elif preset == "wide_code":
-            left.styles.width, center.styles.width, right.styles.width = "15%", "1fr", "25%"
+            sizes["files"], sizes["code"], sizes["chat"] = 0.15, 0.7, 0.15
         elif preset == "wide_chat":
-            left.styles.width, center.styles.width, right.styles.width = "15%", "1fr", "45%"
+            sizes["files"], sizes["code"], sizes["chat"] = 0.15, 0.45, 0.4
         elif preset == "equal":
-            left.styles.width, center.styles.width, right.styles.width = "33%", "1fr", "33%"
+            sizes["files"], sizes["code"], sizes["chat"] = 0.33, 0.33, 0.33
+  # noqa: W293
+        self.config.user.panel_sizes = sizes
+        self.config._save_global()
+        self.run_worker(self._rebuild_layout())
+
+    def action_move_panel(self, panel_key: str, direction: str) -> None:
+        """Move a specific panel to a new layout position."""
+        if panel_key not in ["files", "code", "chat"] or direction not in ["left", "right", "center", "top", "bottom"]:
+            return
+  # noqa: W293
+        positions = getattr(self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}).copy()  # noqa: E501
+  # noqa: W293
+        # Validate: at least 1 panel must stay in horizontal area (left/center/right)
+        test_positions = dict(positions)
+        test_positions[panel_key] = direction
+        horiz_count = sum(1 for v in test_positions.values() if v in ("left", "center", "right"))
+        if horiz_count == 0:
+            from src.tui.widgets.toast import notify
+            notify(self, "Layout", "At least one panel must stay in the horizontal area.", "warning")
+            return
+
+        # If moving to left/center/right, we might need to swap if something is already there
+        if direction in ["left", "center", "right"]:
+            existing_key = None
+            for k, v in positions.items():
+                if v == direction and k != panel_key:
+                    existing_key = k
+                    break
+  # noqa: W293
+            if existing_key:
+                # Swap their positions
+                positions[existing_key] = positions[panel_key]
+  # noqa: W293
+        positions[panel_key] = direction
+        self.config.user.panel_positions = positions
+        self.config._save_global()
+  # noqa: W293
+        from src.tui.widgets.toast import notify
+        notify(self, "Layout", f"Moved {panel_key.title()} to {direction.title()}", "info")
+        self.run_worker(self._rebuild_layout())
 
     def action_toggle_theme(self) -> None:
         """Cycle through themes (midnight -> polar -> slate -> ember -> neon -> midnight)."""
@@ -928,8 +1112,9 @@ class GptcgtApp(App[None]):
         self.push_screen(CommandPaletteScreen())
 
     def action_fuzzy_search(self) -> None:
-        """Placeholder for fuzzy search."""
-        logger.debug("fuzzy search")
+        """Fuzzy file search — coming soon."""
+        from src.tui.widgets.toast import notify
+        notify(self, "Fuzzy Search", "Coming soon! Use the file tree for now.", "info")
 
     def action_session_history(self) -> None:
         """Push the SessionBrowser modal."""
@@ -1083,13 +1268,6 @@ class GptcgtApp(App[None]):
         if hasattr(self, "quick_actions"):
             self.quick_actions.toggle_visibility()
 
-    from src.core.events import (
-        AnnotationActionClicked,
-        CodeSelectionCleared,
-        CodeSelectionMade,
-        FileRelevanceUpdated,
-        QuickActionTriggered,
-    )
 
     @on(CodeSelectionMade)
     def on_code_selection_for_actions(self, event: CodeSelectionMade) -> None:
@@ -1218,6 +1396,41 @@ class GptcgtApp(App[None]):
             files = [Path(file_path)] if file_path else []
             self.post_message(TaskReceived(task_str=prompt, attached_files=files))
 
+
+    @on(CreditsUpdated)
+    def on_credits_updated(self, event: CreditsUpdated) -> None:
+        """Update status bar when credits change after task completion."""
+        try:
+            status_bar = self.query_one("#status-bar")
+            remaining = event.credits_remaining
+            monthly = event.credits_monthly
+            if monthly > 0:
+                status_bar.update(f"Credits: {remaining}/{monthly}")
+        except Exception:
+            pass
+
+    @on(SpendingCapWarning)
+    def on_spending_cap_warning(self, event: SpendingCapWarning) -> None:
+        from src.tui.widgets.toast import notify
+        notify(
+            self,
+            f"Spending Cap Alert: {event.warning_level.upper()}",
+            f"You have used {event.percent_used:.1f}% (${event.spent_dollars:.2f} / ${event.cap_dollars:.2f}) of your daily spending cap.",  # noqa: E501
+            "warning"
+        )
+
+    @on(CreditInsufficient)
+    def on_credit_insufficient(self, event: CreditInsufficient) -> None:
+        from src.tui.widgets.toast import notify
+        msg = f"You need {event.credits_needed} credits, but only have {event.credits_remaining}."
+        if event.suggested_mode:
+            msg += f" Try switching to {event.suggested_mode} mode."
+        notify(
+            self,
+            "Insufficient Credits",
+            msg,
+            "error"
+        )
 
 def main() -> None:
     """Entry point for the application."""
