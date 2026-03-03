@@ -43,10 +43,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not user_id:
                 return self._json_response(401, "Invalid token payload")
 
+            # The JWT sub could be either a WorkOS user ID (CLI login) or an email (web login).
+            # We need to resolve both to a valid user.
+            pool = get_pool()
+            user_row = await pool.fetchrow(
+                "SELECT workos_user_id FROM users WHERE workos_user_id = $1", user_id
+            )
+            if not user_row:
+                # Try matching by email (web login flow sets sub=email)
+                email = payload.get("email") or user_id
+                user_row = await pool.fetchrow(
+                    "SELECT workos_user_id FROM users WHERE email = $1", email
+                )
+                if user_row:
+                    # Use the actual workos_user_id for downstream lookups
+                    user_id = user_row["workos_user_id"]
+
             request.state.user_id = user_id
 
             # Moderation Enforcement
-            pool = get_pool()
             async with pool.acquire() as conn:
                 status = await moderation_service.check_user_status(conn, user_id)
                 if status["status"] != "active":

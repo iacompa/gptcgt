@@ -4,7 +4,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     const session = await getSession();
     const token = session?.accessToken;
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    const baseUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const url = `${baseUrl}${endpoint}`;
 
     const headers = new Headers(options.headers || {});
