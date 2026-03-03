@@ -54,10 +54,32 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         403, f"Account {status['status']}: {status.get('reason')}"
                     )
 
+                # Credit-Exhaustion Enforcement for AI proxy endpoints
+                if self._is_proxy_endpoint(request.url.path):
+                    credits = await conn.fetchval(
+                        """
+                        SELECT COALESCE(t.shared_credits_remaining, u.credits_remaining, 0)
+                        FROM users u
+                        LEFT JOIN teams t ON u.team_id = t.id
+                        WHERE u.workos_user_id = $1
+                        """,
+                        user_id,
+                    )
+                    if credits is not None and credits <= 0:
+                        return self._json_response(
+                            402,
+                            "⚠️ Credits exhausted. Please visit your dashboard at https://gptcgt.ai/dashboard/billing to purchase more credits."
+                        )
+
         except jwt.PyJWTError:
             return self._json_response(401, "Invalid token")
 
         return await call_next(request)
+
+    def _is_proxy_endpoint(self, path: str) -> bool:
+        """Check if the request is for an AI proxy endpoint that should enforce credit limits."""
+        proxy_paths = ["/proxy", "/chat", "/generate", "/completions", "/v1/"]
+        return any(path.startswith(p) for p in proxy_paths)
 
     def _json_response(self, status_code: int, message: str):
         from fastapi.responses import JSONResponse

@@ -138,13 +138,26 @@ async def _sync_user(workos_user_id: str, email: str):
         from src.services.email import email_service
 
         try:
+            # First create a personal team for the user
+            domain = email.split("@")[-1].split(".")[0].capitalize()
+            team_name = f"{domain} Workspace"
+            team_id = await pool.fetchval(
+                """
+                INSERT INTO teams (name, plan, shared_credits_remaining)
+                VALUES ($1, 'free', 0)
+                RETURNING id
+                """,
+                team_name,
+            )
+
             await pool.execute(
                 """
-                INSERT INTO users (workos_user_id, email, plan, credits_remaining, credits_monthly)
-                VALUES ($1, $2, 'free', 0, 0)
+                INSERT INTO users (workos_user_id, email, plan, credits_remaining, credits_monthly, team_id, team_role, billing_access)
+                VALUES ($1, $2, 'free', 0, 0, $3, 'owner', true)
                 """,
                 workos_user_id,
                 email,
+                team_id,
             )
             await email_service.send_welcome(email)
             await track_async(workos_user_id, "user_signed_up", {"email": email})
