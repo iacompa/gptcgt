@@ -1,5 +1,26 @@
-import asyncio
+"""DEPRECATED — Use api/scripts/01_migration_teams_rbac.py (and later migrations) instead.
+
+This file uses stale SERIAL-type columns that conflict with the UUID-based
+canonical migrations. It exists for reference only and should NOT be run
+against production.
+"""
+
 import os
+import warnings
+
+warnings.warn(
+    "create_tables.py is DEPRECATED. Use api/scripts/01_migration_teams_rbac.py instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+if os.environ.get("ALLOW_DEPRECATED_CREATE_TABLES", "").lower() not in {"1", "true", "yes"}:
+    raise SystemExit(
+        "Refusing to run deprecated create_tables.py. "
+        "Use api/migrations/run_migration.py (preferred), or set ALLOW_DEPRECATED_CREATE_TABLES=1 explicitly."
+    )
+
+import asyncio
 
 import asyncpg
 from dotenv import load_dotenv

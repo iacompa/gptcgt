@@ -7,8 +7,6 @@ from src.services.registry import services
 
 logger = logging.getLogger(__name__)
 
-_processed_webhook_events: set[str] = set()
-
 
 # Price mapping based on registry
 def get_price_id(plan: str, annual: bool) -> str | None:
@@ -153,13 +151,33 @@ class StripeService:
         data = event["data"]["object"]
 
         event_id = event.get("id", "")
-        if event_id in _processed_webhook_events:
-            return {"status": "duplicate"}
-        _processed_webhook_events.add(event_id)
 
-        # Prevent unbounded growth — keep only last 1000 events
-        if len(_processed_webhook_events) > 1000:
-            _processed_webhook_events.clear()
+        # Postgres-backed idempotency — survives restarts + multi-instance
+        try:
+            existing = await db_pool.fetchval(
+                "SELECT 1 FROM webhook_events WHERE event_id = $1", event_id
+            )
+            if existing:
+                return {"status": "duplicate"}
+            await db_pool.execute(
+                "INSERT INTO webhook_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING",
+                event_id,
+            )
+        except Exception:
+            # Table may not exist yet — create it
+            try:
+                await db_pool.execute("""
+                    CREATE TABLE IF NOT EXISTS webhook_events (
+                        event_id TEXT PRIMARY KEY,
+                        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                await db_pool.execute(
+                    "INSERT INTO webhook_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING",
+                    event_id,
+                )
+            except Exception as e:
+                logger.warning(f"Webhook dedup table error (non-fatal): {e}")
 
         logger.info(f"Processing Stripe webhook: {event_type}")
 
@@ -261,6 +279,17 @@ class StripeService:
                     """,
                     amount,
                     user_team_row["team_id"],
+                )
+            else:
+                # Solo user — deposit credits to personal balance
+                await db_pool.execute(
+                    """
+                    UPDATE users
+                    SET credits_remaining = credits_remaining + $1
+                    WHERE workos_user_id = $2
+                    """,
+                    amount,
+                    workos_user_id,
                 )
 
     async def _handle_subscription_update(self, db_pool, subscription: dict) -> None:

@@ -13,10 +13,7 @@ except ImportError:
     print("Error: asyncpg is required. Run `pip install asyncpg`")
     sys.exit(1)
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgres://postgres:postgres@localhost:5432/gptcgt",  # Default fallback for local testing without DB  # noqa: E501
-)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
 async def run_migration():
@@ -52,5 +49,6 @@ async def run_migration():
 
 if __name__ == "__main__":
     if not os.environ.get("DATABASE_URL"):
-        print("WARNING: DATABASE_URL not set in environment. Using localhost fallback.")
+        print("ERROR: DATABASE_URL must be set explicitly before running migrations.")
+        sys.exit(1)
     asyncio.run(run_migration())

@@ -193,6 +193,7 @@ class AutonomousRunner:
 
     async def _ensure_plan(self, goal: str, narration_callback) -> str:
         """Generate a project plan via LLM or read an existing one."""
+        from src.core.workspace import Workspace
         workspace = Workspace.get_instance()
         plan_path = Path(self.state.plan_path)
 
@@ -235,8 +236,10 @@ class AutonomousRunner:
             from src.core.model_registry import QualityTier
 
             # Use a LIGHT model for plan generation to save budget
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
             planner = ChatPipeline(
-                ChatStore(), default_tier=QualityTier.LIGHT,
+                ChatStore(workspace=ws), default_tier=QualityTier.LIGHT,
             )
 
             async def _capture_chunk(text: str) -> None:
@@ -315,6 +318,24 @@ class AutonomousRunner:
             result.attempts = attempt + 1
 
             # ── Step 1: Coder — call real ChatPipeline ──────────────────
+            # Per-task budget check
+            try:
+                import textual.app as _tapp
+                app = _tapp.active_app.get()
+                if hasattr(app, "config"):
+                    per_task_limit = getattr(app.config.user, "max_spend_per_task", 5.0)
+                    if result.cost_usd >= per_task_limit:
+                        logger.warning(f"Per-task budget limit (${per_task_limit}) reached for '{subtask[:20]}'.")
+                        self.bus.send(AgentMessage(
+                            "orchestrator", "coder",
+                            f"Per-task budget limit (${per_task_limit}) reached. Aborting subtask.",
+                            msg_type="error",
+                            iteration=iteration,
+                        ))
+                        break
+            except Exception:
+                pass
+
             coder_prompt = (
                 f"You are working on an autonomous coding task.\n\n"
                 f"**Subtask:** {subtask}\n"
@@ -344,8 +365,10 @@ class AutonomousRunner:
 
             try:
                 # Determine tier: use STANDARD for coding tasks
+                from src.core.workspace import Workspace
+                ws = Workspace.get_instance()
                 coder_pipeline = ChatPipeline(
-                    ChatStore(), default_tier=QualityTier.STANDARD,
+                    ChatStore(workspace=ws), default_tier=QualityTier.STANDARD,
                 )
 
                 await coder_pipeline.process_message(
@@ -432,7 +455,7 @@ class AutonomousRunner:
                     logger.warning(f"LSP Verification skipped or failed: {e}")
 
             # ── Step 3: Tester — run tests on diffs ─────────────────────
-            test_passed = True
+            test_passed = patch_set.file_count == 0
             test_feedback = ""
 
             if patch_set.file_count > 0:
@@ -446,8 +469,10 @@ class AutonomousRunner:
                     # Build diff text from patches for the tester
                     diff_text = patch_set.raw_response or full_response[:3000]
 
+                    # Pass the correctly evaluated language to the tester
                     test_result = await tester.generate_and_run_tests(
                         diff_text=diff_text,
+                        language=lang,
                         project_root=project_root,
                     )
 
@@ -457,11 +482,12 @@ class AutonomousRunner:
                         f"Errors: {test_result.errors}"
                     )
 
-                    if test_result.failed > 0 or test_result.errors > 0:
+                    # Reject if tests explicitly failed OR if the tester was inconclusive (no keys, no tests generated)
+                    if test_result.failed > 0 or test_result.errors > 0 or test_result.is_inconclusive or not test_result.generated_test_code:
                         test_passed = False
                         details = "; ".join(test_result.failure_details[:3])
                         test_feedback = (
-                            f"Tests failed ({test_result.failed}F, {test_result.errors}E): "
+                            f"Tests failed or inconclusive ({test_result.failed}F, {test_result.errors}E): "
                             f"{details[:500]}"
                         )
                         self.bus.send(AgentMessage(
@@ -480,25 +506,50 @@ class AutonomousRunner:
 
                 except Exception as e:
                     logger.warning(f"TesterAgent skipped: {e}")
-                    # If tester can't run (no E2B, no API), treat as pass
+                    test_passed = False
+                    test_feedback = (
+                        "Tester unavailable; cannot verify generated changes safely. "
+                        "Configure tester dependencies/API keys and retry."
+                    )
                     self.bus.send(AgentMessage(
                         "tester", "arbiter",
-                        "Tester unavailable; skipping tests. Requesting review.",
+                        "Tester unavailable; blocking auto-apply until verification is available.",
                         msg_type="response",
                         iteration=iteration,
                     ))
 
             if not test_passed:
-                feedback = test_feedback
+                feedback = test_feedback or "Automated tests did not pass."
                 continue
 
             # ── Step 4: Arbiter — approve and apply ───────────────────────
             # If we get here, code was generated + tests passed
-  # noqa: W293
+
             if patch_set.file_count > 0:
-                # Evaluate Arbiter confidence (placeholder simulated badge for now, Phase 4 expands this)
-                verification_badge = "clean" if test_passed else "flagged"
-  # noqa: W293
+                verification_badge = "flagged"  # Default to flagged
+                if test_passed:
+                    try:
+                        from src.core.security import SecurityScanner
+                        from src.core.workspace import Workspace
+                        ws = Workspace.get_instance()
+                        project_root = ws.get_project_root()
+                        lang = ws.config.project.primary_language or "python"
+                        findings = await SecurityScanner().scan_patch(patch_set, lang)
+                        has_blocking = any(
+                            getattr(f, "severity", "").lower() in ("critical", "high")
+                            for f in findings
+                        )
+                        verification_badge = "clean" if not has_blocking else "flagged"
+                        if has_blocking:
+                            feedback = "Security scan found high/critical issues. Revise patch."
+                        logger.info(f"Arbiter verification: tests passed, security_findings={len(findings)}")
+                    except Exception as e:
+                        logger.warning(
+                            f"Arbiter verification failed: {e}. Blocking auto-apply."
+                        )
+                        verification_badge = "flagged"
+                        feedback = "Arbiter verification failed; patch not applied."
+
                 if verification_badge == "clean":
                     # Mark all hunks as explicitly approved by Arbiter
                     for fp in patch_set.patches:
@@ -570,13 +621,22 @@ class AutonomousRunner:
             logger.warning(f"Could not update plan: {e}")
 
     def _check_budget_exceeded(self) -> bool:
-        """Check if total autonomous cost exceeds per-task budget."""
+        """
+        Check if total autonomous SESSION cost exceeds the session budget.
+
+        Uses max_autonomous_budget for the entire session cap.
+        Per-task budget (max_spend_per_task) is checked inside _execute_subtask.
+        """
         try:
             import textual.app as _tapp
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "config"):
-                limit = getattr(current_app.config.user, "max_spend_per_task", 2.0)
-                return self.state.total_cost >= limit
+                session_limit = getattr(
+                    current_app.config.user,
+                    "max_autonomous_budget",
+                    20.0,
+                )
+                return self.state.total_cost >= session_limit
         except Exception:
             pass
         return False

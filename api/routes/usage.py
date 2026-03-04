@@ -14,7 +14,7 @@ router = APIRouter(tags=["usage"])
 async def get_usage(
     request: Request, start_date: Optional[str] = None, end_date: Optional[str] = None
 ):
-    """Get usage events for the current user from the immutable usage_logs table."""
+    """Get usage events for the current user from the immutable usage_events table."""
     user_id = getattr(request.state, "user_id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -25,10 +25,9 @@ async def get_usage(
         raise HTTPException(status_code=404, detail="User not found")
 
     query = """
-        SELECT id, action as task_mode, tokens_used as credits_consumed,
-               '{}' as models_used, tokens_used as input_tokens, 0 as output_tokens,
+        SELECT id, task_mode, credits_consumed, models_used, input_tokens, output_tokens,
                created_at
-        FROM usage_logs
+        FROM usage_events
         WHERE user_id = $1
     """
     args = [internal_id]
@@ -45,7 +44,7 @@ async def get_usage(
     try:
         rows = await pool.fetch(query, *args)
     except Exception as e:
-        logger.warning(f"Usage query failed (table may not exist yet): {e}")
+        logger.warning(f"Usage query failed: {e}")
         return []
 
     result = []
@@ -55,9 +54,9 @@ async def get_usage(
                 "id": str(row["id"]),
                 "task_mode": row["task_mode"],
                 "credits_consumed": row["credits_consumed"],
-                "models_used": [row["task_mode"].split("(")[-1].rstrip(")")] if "(" in row["task_mode"] else [],
-                "input_tokens": row["input_tokens"],
-                "output_tokens": row["output_tokens"],
+                "models_used": row["models_used"] or [],
+                "input_tokens": row["input_tokens"] or 0,
+                "output_tokens": row["output_tokens"] or 0,
                 "created_at": row["created_at"].isoformat(),
             }
         )

@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import shlex
 from contextlib import asynccontextmanager
+from pathlib import PurePosixPath
 from typing import Dict, Optional
 
 import jwt
@@ -16,6 +18,7 @@ from pydantic import BaseModel
 from proxy.content_filter import ContentFilter
 from proxy.database import close_db_pool, get_pool, init_db_pool
 from proxy.metering import UsageMeter
+from src.auth.token_validation import verify_access_token
 from src.billing.credits import CreditService
 from src.billing.spending_caps import SpendingCapService
 from src.services.registry import services
@@ -66,6 +69,94 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from src.services.analytics import track_async  # noqa: E402
 from src.services.monitoring import monitor  # noqa: E402
 
+# ─── Security helpers ────────────────────────────────────────────────
+
+def _determine_mode_from_model(model: str | None) -> str:
+    """
+    Determine billing mode from the model name (server-side).
+
+    Prevents billing fraud via client-controlled headers.
+    """
+    if not model:
+        return "standard"
+    model_lower = (model or "").lower()
+    # Scout-tier: small/cheap models
+    scout_keywords = ("haiku", "flash", "mini", "nano", "small", "lite")
+    if any(kw in model_lower for kw in scout_keywords):
+        return "scout"
+    # Ensemble-tier: multiple models or ensemble markers
+    if "ensemble" in model_lower:
+        return "ensemble"
+    # Architect-tier: reasoning/o-series models
+    architect_keywords = ("o1", "o3", "reasoning", "opus")
+    if any(kw in model_lower for kw in architect_keywords):
+        return "architect"
+    return "standard"
+
+
+# Allowlist of safe base commands for sandbox execution
+_SANDBOX_ALLOWED_COMMANDS = frozenset({
+    "pytest", "python", "python3",
+    "npm", "npx", "node",
+    "cargo", "go", "rustc",
+    "ruff", "flake8", "mypy",
+    "eslint", "tsc",
+    "pip", "pip3",
+    "cat", "echo", "ls", "head", "tail", "wc",
+})
+
+# Characters that indicate shell injection attempts
+_SANDBOX_FORBIDDEN_CHARS = frozenset(";|`$(){}\\<>!\n\r")
+
+
+def _validate_sandbox_command(command: str) -> None:
+    """
+    Validate sandbox commands against an allowlist.
+
+    Raises HTTPException if the command is not allowed.
+    """
+    if not command or not command.strip():
+        raise HTTPException(status_code=400, detail="Empty command")
+
+    # Check for forbidden shell metacharacters
+    for char in _SANDBOX_FORBIDDEN_CHARS:
+        if char in command:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Forbidden character in command: {char!r}",
+            )
+
+    # Check that each chained command's base binary is allowlisted.
+    parts = [p.strip() for p in command.split("&&")]
+    for part in parts:
+        try:
+            tokens = shlex.split(part)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid shell quoting in command")
+        if not tokens:
+            continue
+        base_cmd = tokens[0]
+        if base_cmd not in _SANDBOX_ALLOWED_COMMANDS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Command not in allowlist: {base_cmd}",
+            )
+
+
+def _normalize_sandbox_path(rel_path: str) -> str:
+    """
+    Normalize user-supplied file path to a safe relative POSIX path.
+    Rejects absolute paths and traversal attempts.
+    """
+    normalized = PurePosixPath(rel_path.strip())
+    if normalized.is_absolute():
+        raise HTTPException(status_code=400, detail=f"Absolute paths are not allowed: {rel_path}")
+    parts = normalized.parts
+    if not parts:
+        raise HTTPException(status_code=400, detail="Empty file path")
+    if any(part in ("..", "") for part in parts):
+        raise HTTPException(status_code=400, detail=f"Invalid file path: {rel_path}")
+    return str(normalized)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -114,9 +205,15 @@ async def verify_proxy_auth(request: Request) -> str:
         # JWT Flow
         try:
             secret = services.jwt.secret
-            if not secret:
-                raise ValueError("JWT_SECRET missing")
-            payload = jwt.decode(token, secret, algorithms=["HS256"])
+            if not secret or len(secret) < 32:
+                raise ValueError("JWT_SECRET missing or too short (must be ≥32 chars)")
+            payload = verify_access_token(
+                token,
+                hs256_secret=secret,
+                jwks_url=os.environ.get("WORKOS_JWKS_URL") or None,
+                issuer=os.environ.get("WORKOS_ISSUER") or None,
+                audience=os.environ.get("WORKOS_AUDIENCE") or None,
+            )
             return payload["sub"]
         except jwt.PyJWTError as e:
             logger.warning(f"JWT Validation failed: {str(e)}")
@@ -135,13 +232,15 @@ async def proxy_completions(request: Request, user_id: str = Depends(verify_prox
     stream = body.get("stream", False)
 
     # 1. Content Filtering
-    allowed, reason = content_filter.map_messages(messages)
+    allowed, reason = content_filter.map_messages(messages, user_id=user_id)
     if not allowed:
         logger.warning(f"Blocked request from {user_id} due to content policy: {reason}")
         raise HTTPException(status_code=403, detail="Request blocked by content filter.")
 
     pool = get_pool()
-    mode = request.headers.get("X-GPTCGT-Mode", "standard")
+    # SECURITY: Determine mode server-side from the model name.
+    # Client-controlled X-GPTCGT-Mode was a billing fraud vector.
+    mode = _determine_mode_from_model(model)
 
     # 2. Credit Check
     affordability = await credit_service.check_credits(pool, user_id, mode)
@@ -255,10 +354,14 @@ async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: st
     try:
         # Write files entirely in-memory to the E2B VM
         for rel_path, content in request_data.files.items():
-            sandbox.files.write(f"/home/user/project/{rel_path}", content)
+            safe_rel_path = _normalize_sandbox_path(rel_path)
+            sandbox.files.write(f"/home/user/project/{safe_rel_path}", content)
 
         if not request_data.command:
             raise HTTPException(status_code=400, detail="Command is required")
+
+        # SECURITY: Validate command against allowlist to prevent injection
+        _validate_sandbox_command(request_data.command)
 
         result = sandbox.commands.run(
             f"cd /home/user/project && {request_data.command}",

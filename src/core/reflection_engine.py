@@ -224,6 +224,20 @@ TASK: Extract the lesson learned as JSON.
             self.workspace.safe_write(target_file, json.dumps(existing_memory, indent=2))
             logger.info(f"Successfully compacted memory vector for {model_name}.")
 
+            # Also persist to per-agent MD file for structured context injection
+            try:
+                from src.core.memory import AgentMemory
+                agent_mem = AgentMemory(self.workspace.get_project_root())
+                agent_mem.record_interaction(
+                    agent_id=model_name,
+                    task_summary=original_prompt[:200],
+                    outcome="failure",
+                    lesson=lesson_data.get("action_taken", ""),
+                    files_touched=file_refs,
+                )
+            except Exception as e:
+                logger.debug(f"AgentMemory write failed: {e}")
+
             # Emit ReflectionRetryHint so the TUI can surface the lesson and
             # inject it into the next dispatch as a system context hint.
             try:
@@ -304,6 +318,16 @@ TASK: Extract the lesson learned as JSON.
 
             import json
             self.workspace.safe_write(target_file, json.dumps(existing, indent=2))
+
+            # Also persist to per-agent MD file
+            from src.core.memory import AgentMemory
+            agent_mem = AgentMemory(self.workspace.get_project_root())
+            agent_mem.record_interaction(
+                agent_id=model_name,
+                task_summary=f"Successful completion (tier={tier})",
+                outcome="success",
+                cost_usd=cost_usd,
+            )
 
         except Exception as e:
             logger.debug(f"Proactive learning failed: {e}")

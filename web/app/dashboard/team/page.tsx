@@ -1,35 +1,119 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { UserPlus, Mail, Shield, CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { UserPlus, Mail, Shield, CheckCircle2, Trash2, Clock, Users, AlertTriangle } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
+
+interface TeamMember {
+    id: string;
+    email: string;
+    role: string;
+    status: string;
+    joined: string;
+}
+
+interface PendingInvite {
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+}
 
 export default function TeamPage() {
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRole, setInviteRole] = useState("member");
+    const [inviting, setInviting] = useState(false);
+    const [inviteError, setInviteError] = useState("");
+    const [inviteSuccess, setInviteSuccess] = useState("");
+    const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
     const members = profile ? [
-        { id: "1", email: profile.email, role: "Owner", status: "Active", joined: "Today" }
+        { id: "self", email: profile.email, role: profile.team_role || "Owner", status: "Active", joined: "—" },
+        ...teamMembers,
     ] : [];
 
-    useEffect(() => {
-        loadProfile();
+    const loadTeamData = useCallback(async () => {
+        try {
+            const [members, invites] = await Promise.all([
+                fetchAPI("/team/members").catch(() => []),
+                fetchAPI("/team/invites/pending").catch(() => []),
+            ]);
+            setTeamMembers(members || []);
+            setPendingInvites(invites || []);
+        } catch (e) {
+            console.error(e);
+        }
     }, []);
 
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         try {
             const data = await fetchAPI("/user/me");
             setProfile(data);
+
+            if (data.plan === "team" || data.plan === "enterprise") {
+                await loadTeamData();
+            }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
+    }, [loadTeamData]);
+
+    useEffect(() => {
+        loadProfile();
+    }, [loadProfile]);
+
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inviteEmail.trim() || inviting) return;
+
+        setInviting(true);
+        setInviteError("");
+        setInviteSuccess("");
+
+        try {
+            await fetchAPI("/team/invites/invite", {
+                method: "POST",
+                body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+            });
+            setInviteSuccess(`Invite sent to ${inviteEmail}`);
+            setInviteEmail("");
+            await loadTeamData();
+            setTimeout(() => setInviteSuccess(""), 5000);
+        } catch (err: any) {
+            setInviteError(err.message || "Failed to send invite");
+        } finally {
+            setInviting(false);
+        }
+    };
+
+    const handleRemoveMember = async (userId: string) => {
+        if (!confirm("Remove this member from the team?")) return;
+        try {
+            await fetchAPI("/team/invites/member", {
+                method: "DELETE",
+                body: JSON.stringify({ target_user_id: userId }),
+            });
+            await loadTeamData();
+        } catch (err: any) {
+            alert(err.message || "Failed to remove member");
+        }
     };
 
     const isTeamPlan = profile?.plan === "team" || profile?.plan === "enterprise";
+    const isOwnerOrAdmin = profile?.team_role === "owner" || profile?.team_role === "admin";
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-5xl">
@@ -38,6 +122,12 @@ export default function TeamPage() {
                     <h1 className="text-2xl font-bold">Team Members</h1>
                     <p className="text-gray-400 mt-1">Manage organization access and unified billing.</p>
                 </div>
+                {isTeamPlan && (
+                    <span className="text-xs text-gray-500 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        {members.length} {members.length === 1 ? "member" : "members"}
+                    </span>
+                )}
             </div>
 
             {!isTeamPlan && (
@@ -52,54 +142,96 @@ export default function TeamPage() {
                         <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Shared proxy cap management</li>
                         <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Single invoice for all developers</li>
                     </ul>
-                    <button className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/20">
+                    <a href="/pricing" className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/20 transition-colors">
                         View Plans & Pricing
-                    </button>
+                    </a>
                 </div>
             )}
 
-            {isTeamPlan && (
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8 flex gap-4">
-                    <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-bold">Invite Member</h3>
-                            <span className="bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">Coming Soon</span>
+            {/* Invite Form — functional for team plans */}
+            {isTeamPlan && isOwnerOrAdmin && (
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
+                    <div className="flex justify-between items-center mb-1">
+                        <h3 className="font-bold">Invite Member</h3>
+                    </div>
+                    <p className="text-sm text-gray-400 mb-4">Send an email invitation to join your organization workspace.</p>
+
+                    <form onSubmit={handleInvite} className="flex gap-3">
+                        <div className="relative flex-1">
+                            <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                            <input
+                                type="email"
+                                value={inviteEmail}
+                                onChange={(e) => setInviteEmail(e.target.value)}
+                                placeholder="colleague@domain.com"
+                                required
+                                className="w-full bg-gray-950 border border-gray-700 rounded-md pl-10 pr-4 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                            />
                         </div>
-                        <p className="text-sm text-gray-400 mb-4">Send an email invitation to join your organization workspace.</p>
-                        <div className="flex gap-3 relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-[1px] z-10 hidden"></div>
-                            <div className="relative flex-1 opacity-50">
-                                <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
-                                <input
-                                    type="email"
-                                    placeholder="colleague@domain.com"
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-md pl-10 pr-4 py-2 text-white focus:outline-none focus:border-indigo-500"
-                                    disabled
-                                />
+                        <select
+                            value={inviteRole}
+                            onChange={(e) => setInviteRole(e.target.value)}
+                            className="bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white focus:outline-none focus:border-indigo-500 w-32"
+                        >
+                            <option value="member">Member</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button
+                            type="submit"
+                            disabled={inviting || !inviteEmail.trim()}
+                            className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 transition-colors"
+                        >
+                            <UserPlus size={18} />
+                            {inviting ? "Sending..." : "Send Invite"}
+                        </button>
+                    </form>
+
+                    {inviteError && (
+                        <div className="mt-3 text-sm text-red-400 bg-red-950/30 border border-red-900/50 rounded-md p-2 flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {inviteError}
+                        </div>
+                    )}
+                    {inviteSuccess && (
+                        <div className="mt-3 text-sm text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 rounded-md p-2 flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {inviteSuccess}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Pending Invites */}
+            {isTeamPlan && pendingInvites.length > 0 && (
+                <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5 mb-6">
+                    <h3 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4" /> Pending Invitations
+                    </h3>
+                    <div className="space-y-2">
+                        {pendingInvites.map((invite) => (
+                            <div key={invite.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-2.5">
+                                <div>
+                                    <span className="text-sm font-medium">{invite.email}</span>
+                                    <span className="ml-3 text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded">
+                                        {invite.role}
+                                    </span>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                    Sent {new Date(invite.created_at).toLocaleDateString()}
+                                </span>
                             </div>
-                            <select disabled className="opacity-50 bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white focus:outline-none focus:border-indigo-500 w-32">
-                                <option value="member">Member</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                            <button disabled className="opacity-50 cursor-not-allowed bg-indigo-600/50 hover:bg-indigo-600/50 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2">
-                                <UserPlus size={18} /> Send Invite
-                            </button>
-                        </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative">
-                {isTeamPlan && (
-                    <div className="absolute top-3 right-6 bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider hidden">Coming Soon</div>
-                )}
+            {/* Members Table */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-800 text-gray-400">
                         <tr>
                             <th className="px-6 py-3 font-medium">USER</th>
                             <th className="px-6 py-3 font-medium">ROLE</th>
                             <th className="px-6 py-3 font-medium">STATUS</th>
-                            <th className="px-6 py-3 font-medium text-right">JOINED</th>
+                            <th className="px-6 py-3 font-medium text-right">ACTIONS</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
@@ -107,7 +239,12 @@ export default function TeamPage() {
                             <tr key={member.id} className="hover:bg-gray-800/50">
                                 <td className="px-6 py-4 font-medium">{member.email}</td>
                                 <td className="px-6 py-4">
-                                    <span className="bg-indigo-500/10 text-indigo-400 px-2 py-1 rounded text-xs font-semibold">
+                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${member.role === "owner" || member.role === "Owner"
+                                            ? "bg-amber-500/10 text-amber-400"
+                                            : member.role === "admin"
+                                                ? "bg-indigo-500/10 text-indigo-400"
+                                                : "bg-gray-700/50 text-gray-400"
+                                        }`}>
                                         {member.role}
                                     </span>
                                 </td>
@@ -117,7 +254,17 @@ export default function TeamPage() {
                                         {member.status}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-right text-gray-400">{member.joined}</td>
+                                <td className="px-6 py-4 text-right">
+                                    {isOwnerOrAdmin && member.id !== "self" && member.role !== "owner" && member.role !== "Owner" && (
+                                        <button
+                                            onClick={() => handleRemoveMember(member.id)}
+                                            className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                                            title="Remove member"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

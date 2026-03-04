@@ -16,3 +16,6 @@ node_modules/
 *.log
 web/.env.local
 .github/workflows/
+
+# Virtual environment
+test-env/

@@ -5,59 +5,85 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api.config import settings
 from api.database import get_pool
 from api.services.moderation import ModerationService
+from src.auth.token_validation import verify_access_token
 
 moderation_service = ModerationService()
 
-# Paths that don't need authentication
-PUBLIC_PATHS = [
+# Paths that don't need authentication — EXACT match or explicit prefix
+# Using tuples of (path, match_type) where match_type is "exact" or "prefix"
+PUBLIC_PATHS_EXACT = frozenset({
     "/health",
-    "/auth/device",
-    "/auth/token",
-    "/billing/webhook",
     "/docs",
     "/openapi.json",
-]
+    "/auth/device",
+    "/auth/token",
+    "/auth/signin",
+    "/auth/sso/callback",
+    "/billing/webhook",
+})
+
+PUBLIC_PATH_PREFIXES = (
+    "/docs/",        # Only /docs/ subpaths, not /docs-secret
+    "/auth/device/",  # Only /auth/device/ subpaths
+    "/auth/token/",   # Only /auth/token/ subpaths
+    "/billing/webhook/",
+)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        if request.method == "OPTIONS" or any(request.url.path.startswith(p) for p in PUBLIC_PATHS):
+        path = request.url.path
+
+        # CORS preflight — always allow
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        # Public path check — exact match or explicit prefix
+        if path in PUBLIC_PATHS_EXACT or any(path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return self._json_response(401, "Missing or invalid Authorization header")
 
-        token = auth_header.split(" ")[1]
+        token = auth_header.split(" ", 1)[1]
 
-        # Verify JWT locally with our secret? Wait, WorkOS issues these tokens.
-        # But we verify them. WorkOS uses JWKS. Let's do a basic WorkOS integration
-        # or just pass through for this stub if we mock it in development.
-
-        # In production, use standard JWKS client.
         try:
-            # Verify JWT using our local secret for the MVP integration.
-            # In a full production WorkOS setup, we'd use their JWKS endpoint.
-            payload = jwt.decode(token, key=settings.jwt_secret, algorithms=["HS256"])
-            user_id = payload.get("sub") or payload.get("id")
-            if not user_id:
-                return self._json_response(401, "Invalid token payload")
+            payload = verify_access_token(
+                token,
+                hs256_secret=settings.jwt_secret,
+                jwks_url=settings.workos_jwks_url or None,
+                issuer=settings.workos_issuer or None,
+                audience=settings.workos_audience or None,
+            )
 
-            # The JWT sub could be either a WorkOS user ID (CLI login) or an email (web login).
-            # We need to resolve both to a valid user.
+            user_id = payload.get("sub")
+            if not user_id:
+                return self._json_response(401, "Invalid token: missing subject")
+
+            # Resolve user identity — MUST find user in DB or reject
             pool = get_pool()
             user_row = await pool.fetchrow(
-                "SELECT workos_user_id FROM users WHERE workos_user_id = $1", user_id
+                "SELECT workos_user_id FROM users WHERE workos_user_id = $1",
+                user_id,
             )
+
             if not user_row:
                 # Try matching by email (web login flow sets sub=email)
                 email = payload.get("email") or user_id
                 user_row = await pool.fetchrow(
-                    "SELECT workos_user_id FROM users WHERE email = $1", email
+                    "SELECT workos_user_id FROM users WHERE email = $1",
+                    email,
                 )
+
                 if user_row:
-                    # Use the actual workos_user_id for downstream lookups
                     user_id = user_row["workos_user_id"]
+                else:
+                    # SECURITY: Reject if user not found — no silent fallthrough
+                    return self._json_response(
+                        401,
+                        "User not found. Please sign up or contact support.",
+                    )
 
             request.state.user_id = user_id
 
@@ -70,10 +96,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     )
 
                 # Credit-Exhaustion Enforcement for AI proxy endpoints
-                if self._is_proxy_endpoint(request.url.path):
+                if self._is_proxy_endpoint(path):
                     credits = await conn.fetchval(
                         """
-                        SELECT COALESCE(t.shared_credits_remaining, u.credits_remaining, 0)
+                        SELECT COALESCE(
+                            t.shared_credits_remaining,
+                            u.credits_remaining,
+                            0
+                        )
                         FROM users u
                         LEFT JOIN teams t ON u.team_id = t.id
                         WHERE u.workos_user_id = $1
@@ -83,21 +113,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     if credits is not None and credits <= 0:
                         msg = (
                             "⚠️ Credits exhausted. Visit your dashboard at "
-                            "https://gptcgt.ai/dashboard/billing to purchase more."
+                            "https://gptcgt.ai/dashboard/billing "
+                            "to purchase more."
                         )
                         return self._json_response(402, msg)
 
-        except jwt.PyJWTError:
+        except jwt.ExpiredSignatureError:
+            return self._json_response(401, "Token expired. Please sign in again.")
+        except jwt.InvalidTokenError:
             return self._json_response(401, "Invalid token")
 
         return await call_next(request)
 
     def _is_proxy_endpoint(self, path: str) -> bool:
-        """Check if the request is for an AI proxy endpoint that should enforce credit limits."""
-        proxy_paths = ["/proxy", "/chat", "/generate", "/completions", "/v1/"]
-        return any(path.startswith(p) for p in proxy_paths)
+        """Check if the request targets an AI proxy endpoint."""
+        # Use exact prefixes to prevent overmatching
+        proxy_prefixes = ("/proxy/", "/v1/chat/", "/v1/completions")
+        return any(path.startswith(p) for p in proxy_prefixes)
 
     def _json_response(self, status_code: int, message: str):
         from fastapi.responses import JSONResponse
 
-        return JSONResponse(status_code=status_code, content={"detail": message})
+        return JSONResponse(
+            status_code=status_code, content={"detail": message}
+        )

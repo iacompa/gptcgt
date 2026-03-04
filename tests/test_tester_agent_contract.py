@@ -59,62 +59,63 @@ class TestTesterAgentContract:
         assert result.generated_test_code == ""
 
     @pytest.mark.asyncio
-    @patch("src.core.config.ConfigManager")
+    @patch("src.core.config.ConfigManager.get_instance")
     @patch("src.agents.factory.AgentFactory.create_agent")
     @patch("src.auth.keychain.KeyChainManager.get_key", return_value="fake_key")
-    async def test_generate_and_run_honors_override(self, mock_get_key, mock_create, mock_config_cls):
+    async def test_generate_and_run_honors_override(self, mock_get_key, mock_create, mock_config_inst):
         """Tester configures itself with the user's tester_model from config."""
         from src.core.model_registry import ModelDefinition, Provider
-  # noqa: W293
+
         # Setup mock models
         cheap_model = ModelDefinition(id="openai/gpt-3.5-turbo", name="GPT-3.5", provider=Provider.OPENAI, input_cost_per_mtok=1.0, output_cost_per_mtok=2.0, max_context_tokens=8192)  # noqa: E501
         override_model = ModelDefinition(id="anthropic/claude-3-opus", name="Opus", provider=Provider.ANTHROPIC, input_cost_per_mtok=15.0, output_cost_per_mtok=75.0, max_context_tokens=200000)  # noqa: E501
-  # noqa: W293
+
         agent = TesterAgent()
-  # noqa: W293
-        # Setup configs
-        mock_config = mock_config_cls.return_value
+
+        # Setup configs — get_instance() returns the mock config
+        mock_config = mock_config_inst.return_value
         mock_config.user.tester_model = "anthropic/claude-3-opus"
-  # noqa: W293
+
         # Create a mock agent instance that doesn't blow up on the loop
         mock_agent_instance = mock_create.return_value
-  # noqa: W293
+
         async def mock_stream(*args, **kwargs):
             from src.agents.base import AgentResponse
             yield AgentResponse(text="def test_foo(): pass")
-  # noqa: W293
+
         mock_agent_instance.chat_stream = mock_stream
-  # noqa: W293
+
         test_code = await agent._generate_tests_multi_turn([], "python", [cheap_model, override_model])
-  # noqa: W293
+
         # Assertion
         assert "def test_foo(): pass" in test_code
         mock_create.assert_called_once_with(override_model, api_key="fake_key", base_url=None)
 
     @pytest.mark.asyncio
-    @patch("src.core.config.ConfigManager")
+    @patch("src.core.config.ConfigManager.get_instance")
     @patch("src.agents.factory.AgentFactory.create_agent")
     @patch("src.auth.keychain.KeyChainManager.get_key", return_value="fake_key")
-    async def test_generate_and_run_falls_back(self, mock_get_key, mock_create, mock_config_cls):
+    async def test_generate_and_run_falls_back(self, mock_get_key, mock_create, mock_config_inst):
         """Tester falls back to cheapest model if override is missing or invalid."""
         from src.core.model_registry import ModelDefinition, Provider
-  # noqa: W293
+
         cheap_model = ModelDefinition(id="openai/gpt-3.5-turbo", name="GPT-3.5", provider=Provider.OPENAI, input_cost_per_mtok=1.0, output_cost_per_mtok=2.0, max_context_tokens=8192)  # noqa: E501
         expensive_model = ModelDefinition(id="openai/gpt-4", name="GPT-4", provider=Provider.OPENAI, input_cost_per_mtok=10.0, output_cost_per_mtok=30.0, max_context_tokens=8192)  # noqa: E501
-  # noqa: W293
+
         agent = TesterAgent()
-  # noqa: W293
-        mock_config = mock_config_cls.return_value
+
+        mock_config = mock_config_inst.return_value
         mock_config.user.tester_model = "invalid-model/not-found"
-  # noqa: W293
+
         mock_agent_instance = mock_create.return_value
+
         async def mock_stream(*args, **kwargs):
             from src.agents.base import AgentResponse
             yield AgentResponse(text="def test_bar(): pass")
         mock_agent_instance.chat_stream = mock_stream
-  # noqa: W293
+
         test_code = await agent._generate_tests_multi_turn([], "python", [expensive_model, cheap_model])
-  # noqa: W293
+
         # Assertion
         assert "def test_bar(): pass" in test_code
         mock_create.assert_called_once_with(cheap_model, api_key="fake_key", base_url=None)

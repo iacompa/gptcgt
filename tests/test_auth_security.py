@@ -35,7 +35,7 @@ async def test_proxy_auth_missing_header():
 async def test_proxy_auth_invalid_jwt(monkeypatch):
     """Ensure invalid JWT is rejected."""
     # Mock settings / registry correctly for proxy tests
-    monkeypatch.setattr("proxy.main.services.jwt.secret", "valid_secret_key_mock")
+    monkeypatch.setattr("proxy.main.services.jwt.secret", "a" * 32)  # ≥32 chars required
     request = MagicMock()
     request.headers.get.return_value = "Bearer invalid.jwt.token"
     with pytest.raises(HTTPException) as exc:
