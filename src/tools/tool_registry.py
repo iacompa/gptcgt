@@ -86,7 +86,7 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> str:
         try:
             from src.core.config import ConfigManager
             from src.tools.mcp_client import MCPManager
-            c = ConfigManager().user
+            c = ConfigManager.get_instance().user
             mcp_servers = getattr(c, "mcp_servers", [])
             target_server = next((s for s in mcp_servers if s.get("name") == server_name), None)
             if target_server:
@@ -126,7 +126,7 @@ def get_tool_definitions() -> list[dict]:
         _mcp_cache = []
         try:
             from src.core.config import ConfigManager
-            c = ConfigManager().user
+            c = ConfigManager.get_instance().user
             mcp_servers = getattr(c, "mcp_servers", [])
             if mcp_servers:
                 from src.tools.mcp_client import MCPManager

@@ -21,7 +21,13 @@ class SpendingCapService:
     async def get_cap_status(self, db_pool, workos_user_id: str) -> dict:
         """Current spend vs cap."""
         row = await db_pool.fetchrow(
-            "SELECT spending_cap, credits_remaining, credits_monthly FROM users WHERE workos_user_id = $1",  # noqa: E501
+            """
+            SELECT u.spending_cap, u.credits_monthly,
+                   COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as effective_credits
+            FROM users u
+            LEFT JOIN teams t ON u.team_id = t.id
+            WHERE u.workos_user_id = $1
+            """,
             workos_user_id,
         )
         if not row:

@@ -8,7 +8,7 @@ from api.config import settings
 from api.database import close_db_pool, init_db_pool
 from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
-from api.routes import api_keys, auth, billing, proxy, team, usage, users
+from api.routes import api_keys, auth, billing, github, proxy, team, team_invites, usage, users
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
@@ -44,7 +44,9 @@ app.include_router(billing.router, prefix="/billing")
 app.include_router(auth.router, prefix="/auth")
 app.include_router(users.router, prefix="/user")
 app.include_router(team.router, prefix="/team")
+app.include_router(team_invites.router, prefix="/team/invites")
 app.include_router(api_keys.router, prefix="/api_keys")
+app.include_router(github.router, prefix="/github")
 from fastapi.responses import JSONResponse  # noqa: E402
 
 from src.services.monitoring import monitor  # noqa: E402

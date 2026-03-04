@@ -4,8 +4,11 @@ import logging
 from datetime import datetime
 
 from proxy.database import get_pool
+from src.billing.credits import CreditService
 
 logger = logging.getLogger(__name__)
+
+_credit_service = CreditService()
 
 
 class UsageMeter:
@@ -68,14 +71,12 @@ class UsageMeter:
                 )
                 return
 
-            # Note: deduct_credits function expects internal UUID
-            new_balance = await pool.fetchval(
-                "SELECT deduct_credits($1, $2)", internal_id, self.cost_credits
-            )
+            # Deduct credits via the unified CreditService (row-level FOR UPDATE lock)
+            deduction = await _credit_service.deduct(pool, self.workos_user_id, self.mode)
 
-            if new_balance == -1:
+            if not deduction["success"]:
                 logger.error(
-                    f"Usage metered but user {self.workos_user_id} lacked credits for deduction."
+                    f"Usage metered but deduction failed for {self.workos_user_id}: {deduction.get('reason')}"
                 )
 
             models_array = list(self.models_used) if self.models_used else ["unknown"]
@@ -120,11 +121,9 @@ class UsageMeter:
                 logger.error(f"Cannot record fixed cost: User UUID not found for workos_id {self.workos_user_id}")
                 return
 
-            new_balance = await pool.fetchval(
-                "SELECT deduct_credits($1, $2)", internal_id, self.cost_credits
-            )
-            if new_balance == -1:
-                logger.error(f"Fixed cost metered but user {self.workos_user_id} lacked credits.")
+            deduction = await _credit_service.deduct(pool, self.workos_user_id, self.mode)
+            if not deduction["success"]:
+                logger.error(f"Fixed cost deduction failed for {self.workos_user_id}: {deduction.get('reason')}")
 
             duration_ms = int((datetime.now() - self.start_time).total_seconds() * 1000)
             await pool.execute(
