@@ -31,7 +31,7 @@ class UserConfig:
     # Defaults
     default_quality_tier: str = "standard"
     default_operation_mode: str = "standard"
-  # noqa: W293
+
     # Layout State
     panel_positions: dict = field(default_factory=lambda: {"files": "left", "code": "center", "chat": "right"})
     panel_sizes: dict = field(default_factory=lambda: {"files": 0.2, "code": 0.6, "chat": 0.2})
@@ -69,6 +69,13 @@ class UserConfig:
     # Autonomous
     allow_auto_tiering: bool = True  # Let agents pick their own model tier
     max_autonomous_iterations: int = 50  # Hard cap on autonomous loop
+    max_autonomous_budget: float = 20.0  # USD cap for entire autonomous session
+
+    # API
+    api_base_url: str = "https://gptcgt.ai/api"  # Base URL for proxy API
+
+    # Token Efficiency
+    max_context_tokens_per_agent: int = 100_000  # Context budget per agent
 
     # Integrations
     mcp_servers: list = field(default_factory=list)  # MCP server configs

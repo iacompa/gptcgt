@@ -161,12 +161,23 @@ class SystemPromptBuilder:
                     provider = "openai"  # default
                     k_name = PROVIDER_KEY_MAP.get(provider)
                     api_key = KeyChainManager.get_key(k_name) if k_name else None
+                    
+                    if not api_key:
+                        provider = "google"
+                        k_name = PROVIDER_KEY_MAP.get(provider)
+                        api_key = KeyChainManager.get_key(k_name) if k_name else None
+
                     if api_key:
+                        emb_model = "text-embedding-3-small" if provider == "openai" else "gemini/text-embedding-004"
                         try:
+                            if provider == "openai":
+                                os.environ["OPENAI_API_KEY"] = api_key
+                            elif provider == "google":
+                                os.environ["GEMINI_API_KEY"] = api_key
+                            
                             emb_res = litellm.embedding(
-                                model="text-embedding-3-small",
+                                model=emb_model,
                                 input=[search_query],
-                                api_key=api_key,
                             )
                             emb_query = emb_res.data[0]['embedding']
                         except Exception:
@@ -193,6 +204,10 @@ class SystemPromptBuilder:
 
                         scored_lessons.sort(key=lambda x: x[0], reverse=True)
                         top_lessons = [m for _, m in scored_lessons[:3]]
+                        
+                        if not top_lessons:
+                            # Fallback: Just take the 3 most recent non-telemetry if embedding loop yielded nothing
+                            top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]
                     else:
                         # Fallback: Just take the 3 most recent
                         top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]
@@ -200,7 +215,10 @@ class SystemPromptBuilder:
                     if top_lessons:
                         prompt_parts.append("\n<accumulated_learnings>")
                         for l in top_lessons:  # noqa: E741
-                            prompt_parts.append(f"- RULE: {l.get('lesson')} (Context: {l.get('trigger')})")
+                            lesson = l.get("lesson") or l.get("action_taken") or ""
+                            trigger = l.get("trigger") or l.get("failure_mode") or "unknown"
+                            if lesson:
+                                prompt_parts.append(f"- RULE: {lesson} (Context: {trigger})")
                         prompt_parts.append("</accumulated_learnings>")
                         prompt_parts.append(
                             "<directive>CRITICAL: You must adhere to these past learnings to avoid repeating previous mistakes in this codebase.</directive>"  # noqa: E501

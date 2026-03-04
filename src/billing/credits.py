@@ -8,19 +8,26 @@ class CreditService:
         "ensemble": 25,
         "architect": 100,
         "battle": 25,
+        "sandbox": 1,
     }
 
     async def check_credits(self, db_pool, workos_user_id: str, mode: str) -> dict:
-        """Pre-task check: can user afford this mode?"""
+        """Pre-task check: can user afford this mode? Checks team wallet if applicable."""
         cost = self.CREDIT_COSTS.get(mode, 5)
         row = await db_pool.fetchrow(
-            "SELECT id, credits_remaining, overage_enabled, plan FROM users WHERE workos_user_id = $1",  # noqa: E501
+            """
+            SELECT u.id, u.overage_enabled, u.plan, u.allocated_quota, u.team_id,
+                   COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as effective_credits
+            FROM users u
+            LEFT JOIN teams t ON u.team_id = t.id
+            WHERE u.workos_user_id = $1
+            """,
             workos_user_id,
         )
         if not row:
             return {"can_proceed": False, "action": "block", "credits_cost": cost, "remaining": 0}
 
-        remaining = row["credits_remaining"]
+        remaining = row["effective_credits"]
         overage = row["overage_enabled"]
 
         if remaining >= cost:
@@ -55,22 +62,42 @@ class CreditService:
 
         async with db_pool.acquire() as conn:
             async with conn.transaction():
-                # Lock the row to prevent race conditions
-                row = await conn.fetchrow(
-                    "SELECT id, credits_remaining FROM users WHERE workos_user_id = $1 FOR UPDATE",
+                # Lock the user row to prevent race conditions and get team config
+                user_row = await conn.fetchrow(
+                    "SELECT id, team_id, credits_remaining FROM users WHERE workos_user_id = $1 FOR UPDATE",
                     workos_user_id,
                 )
-                if not row:
+                if not user_row:
                     return {"success": False, "reason": "user_not_found"}
 
-                new_balance = row["credits_remaining"] - cost
-                if new_balance < 0:
-                    return {"success": False, "reason": "insufficient_credits"}
+                if user_row["team_id"]:
+                    # Team Wallet Deduction
+                    team_row = await conn.fetchrow(
+                        "SELECT id, shared_credits_remaining FROM teams WHERE id = $1 FOR UPDATE",
+                        user_row["team_id"]
+                    )
+                    if not team_row:
+                        return {"success": False, "reason": "team_not_found"}
+                    
+                    new_balance = team_row["shared_credits_remaining"] - cost
+                    if new_balance < 0:
+                        return {"success": False, "reason": "insufficient_team_credits"}
+                    
+                    await conn.execute(
+                        "UPDATE teams SET shared_credits_remaining = $1 WHERE id = $2", 
+                        new_balance, team_row["id"]
+                    )
+                    return {"success": True, "new_balance": new_balance, "deducted": cost}
+                else:
+                    # Solo User Deduction
+                    new_balance = user_row["credits_remaining"] - cost
+                    if new_balance < 0:
+                        return {"success": False, "reason": "insufficient_credits"}
 
-                await conn.execute(
-                    "UPDATE users SET credits_remaining = $1 WHERE id = $2", new_balance, row["id"]
-                )
-                return {"success": True, "new_balance": new_balance, "deducted": cost}
+                    await conn.execute(
+                        "UPDATE users SET credits_remaining = $1 WHERE id = $2", new_balance, user_row["id"]
+                    )
+                    return {"success": True, "new_balance": new_balance, "deducted": cost}
 
     async def replenish_monthly(self, db_pool, workos_user_id: str) -> dict:
         """Reset credits to plan allowance (called by Stripe webhook)."""
@@ -101,13 +128,19 @@ class CreditService:
     async def get_balance(self, db_pool, workos_user_id: str) -> dict:
         """Current credit status."""
         row = await db_pool.fetchrow(
-            "SELECT credits_remaining, credits_monthly, plan, overage_enabled FROM users WHERE workos_user_id = $1",  # noqa: E501
+            """
+            SELECT u.plan, u.overage_enabled, u.credits_monthly,
+                   COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as effective_credits
+            FROM users u
+            LEFT JOIN teams t ON u.team_id = t.id
+            WHERE u.workos_user_id = $1
+            """,
             workos_user_id,
         )
         if not row:
             return {}
         return {
-            "credits_remaining": row["credits_remaining"],
+            "credits_remaining": row["effective_credits"],
             "credits_monthly": row["credits_monthly"],
             "plan": row["plan"],
             "overage_enabled": row["overage_enabled"],

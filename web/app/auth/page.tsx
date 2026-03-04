@@ -29,10 +29,8 @@ export default function AuthPage() {
                 return;
             }
 
-            // Store the JWT so client-side fetchAPI can attach it as Bearer token
-            if (data.token) {
-                localStorage.setItem("gptcgt_access_token", data.token);
-            }
+            // SECURITY: Token is set as httpOnly cookie by the server.
+            // No localStorage storage — prevents XSS token theft.
 
             // Force a hard redirect so the browser sends the new cookie
             window.location.href = "/dashboard";
@@ -83,6 +81,7 @@ export default function AuthPage() {
                                 type="password"
                                 autoComplete="current-password"
                                 required
+                                minLength={8}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="block w-full rounded-md bg-gray-900 border border-gray-700 py-2 px-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent sm:text-sm"

@@ -322,7 +322,7 @@ class E2BSandbox:
             "command": test_cmd
         }
 
-        config = ConfigManager()
+        config = ConfigManager.get_instance()
         base_url = config.user.api_base_url or "https://gptcgt.ai/api"
         # The proxy exposes /v1/sandbox/execute
         url = f"{base_url}/v1/sandbox/execute"
@@ -555,12 +555,12 @@ class E2BSandbox:
                         }
                     )
 
-        # Fallback: use exit code
-        if result.total == 0:
+        # When no test output was parsed, do NOT fabricate a pass.
+        # An exit code of 0 with no parsed results means either no tests ran
+        # or the output format was unrecognized — both are inconclusive, not passing.
+        if result.total == 0 and exit_code != 0:
+            # Non-zero exit with no parsed results = something failed
             result.total = 1
-            if exit_code == 0:
-                result.passed = 1
-            else:
-                result.failed = 1
+            result.failed = 1
 
         return result

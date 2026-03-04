@@ -235,7 +235,7 @@ class ParallelDispatcher:
                     new_m["content"] = custom_sys
                 messages_copy.append(new_m)
 
-            task = asyncio.create_task(self._run_single_agent(slot, messages_copy, tools, queue))
+            task = asyncio.create_task(self._run_single_agent_with_timeout(slot, messages_copy, tools, queue))
             agent_tasks.append(task)
 
         # Yield events as they arrive from any agent
@@ -260,6 +260,30 @@ class ParallelDispatcher:
         dispatch.completed_at = time.time()
 
         yield {"type": "all_complete", "dispatch": dispatch}
+
+    AGENT_TIMEOUT_SECONDS = 120  # Per-agent wall-clock ceiling
+
+    async def _run_single_agent_with_timeout(
+        self, slot: AgentSlot, messages: list[dict],
+        tools: list[dict] | None, queue: asyncio.Queue,
+    ) -> None:
+        """Wrap _run_single_agent with a per-agent timeout ceiling."""
+        try:
+            await asyncio.wait_for(
+                self._run_single_agent(slot, messages, tools, queue),
+                timeout=self.AGENT_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            slot.status = "failed"
+            slot.error = f"Agent timed out after {self.AGENT_TIMEOUT_SECONDS}s"
+            slot.end_time = time.time()
+            logger.warning(f"Agent {slot.agent_id} ({slot.model.name}) timed out")
+            await queue.put({
+                "type": "agent_error",
+                "agent_id": slot.agent_id,
+                "model_name": slot.model.name,
+                "error": slot.error,
+            })
 
     async def _run_single_agent(
         self,

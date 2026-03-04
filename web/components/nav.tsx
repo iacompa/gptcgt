@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Key, CreditCard, Users, User, LogOut } from "lucide-react";
+import { Activity, Key, CreditCard, Users, User, LogOut, MessageSquare, Github } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export function DashboardNav({ session }: { session: any }) {
@@ -9,6 +9,8 @@ export function DashboardNav({ session }: { session: any }) {
 
     const navigation = [
         { name: "Overview", href: "/dashboard", icon: Activity },
+        { name: "Chat", href: "/dashboard/chat", icon: MessageSquare },
+        { name: "Hub", href: "/dashboard/hub", icon: Github },
         { name: "API Keys", href: "/dashboard/keys", icon: Key },
         { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
         { name: "Usage", href: "/dashboard/usage", icon: Activity },

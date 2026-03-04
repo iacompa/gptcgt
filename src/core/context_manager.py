@@ -18,7 +18,11 @@ from src.core.model_registry import ModelDefinition, ModelRegistry
 logger = get_logger("core.context_manager")
 
 
-def _try_post_truncation_event(reason: str, tokens_dropped: int = 0, files: list[str] | None = None) -> None:
+def _try_post_truncation_event(
+    reason: str,
+    tokens_dropped: int = 0,
+    files_truncated: list[str] | None = None,
+) -> None:
     """
     Post a ContextTruncated event to the live TUI app if one is running.
 
@@ -29,7 +33,11 @@ def _try_post_truncation_event(reason: str, tokens_dropped: int = 0, files: list
 
         from src.core.events import ContextTruncated
         _tapp.active_app.get().post_message(
-            ContextTruncated(reason=reason, tokens_dropped=tokens_dropped, files_truncated=files or [])
+            ContextTruncated(
+                reason=reason,
+                tokens_dropped=tokens_dropped,
+                files_truncated=files_truncated or [],
+            )
         )
     except Exception:
         pass  # No live TUI — normal during tests / CLI usage
@@ -50,10 +58,19 @@ class ContextManager:
             self.agent_counter = None
         else:
             self.max_tokens = self.model_def.max_context_tokens
-            # Reserve room for the output response. We default to ensuring at least 15%
-            # or the model's max output tokens size remains available
+
+            # Honor config-level per-agent token cap if set
+            try:
+                from src.core.config import ConfigManager
+                cfg = ConfigManager.get_instance()
+                cap = getattr(cfg, "max_context_tokens_per_agent", 0)
+                if cap and cap > 0:
+                    self.max_tokens = min(self.max_tokens, cap)
+                    logger.debug(f"Applied per-agent token cap: {cap}")
+            except Exception:
+                pass
+
             self.output_reserve = min(self.model_def.max_output_tokens, int(self.max_tokens * 0.15))
-            # Just create a dummy agent instance to access its tokenizer
             self.agent_counter = AgentFactory.create_agent(self.model_def)
 
     def count_tokens(self, text: str) -> int:
@@ -189,4 +206,3 @@ class ContextManager:
         logger.debug(f"Prepared LLM payload: {total_used} / {self.max_tokens} tokens (limit).")
 
         return payload
-

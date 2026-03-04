@@ -281,19 +281,26 @@ class Arbiter:
             if not ast_changed:
                 if on_progress:
                     await on_progress(
-                        "verification", slot.agent_id, "AST unchanged (comments/whitespace only). Skipping sandbox."
+                        "verification", slot.agent_id,
+                        "AST unchanged. Running local lint + security (skipping tests).",
                     )
-                # Dummy successful results
+                # TRUTHFUL: No tests were run. Report 0/0.
+                # Must still run linter and security to catch whitespace errors and secrets in comments.
                 from src.tools.sandbox import LintResult, TestResult, VerificationResult
-                verification_result = VerificationResult(
-                    agent_id=slot.agent_id,
-                    model_name=slot.model_name,
-                    syntax_valid=True,
-                    lint_result=LintResult(),
-                    test_result=TestResult(total=1, passed=1),  # Fake pass so it gets 100%
+                verification_result = await self._sandbox._verify_local_only(
+                    slot.patch_set, project_root, language,
+                    VerificationResult(
+                        agent_id=slot.agent_id,
+                        model_name=slot.model_name,
+                        syntax_valid=True,
+                        test_result=TestResult(total=0, passed=0),  # Honest: no tests run
+                    )
                 )
-                security_findings = []
-                # Still check LSP to prevent regressions? Actually LSP would be identical if AST is identical.
+                
+                # IMPORTANT: Run security scan even on comment-only changes
+                security_findings = await self._security.scan_patch(slot.patch_set, language)
+                
+                # LSP would be identical if AST is identical
                 if self._lsp:
                     lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
                 else:
@@ -365,7 +372,7 @@ class Arbiter:
             score.stage_scores["lint_cleanliness"] = lint_score
 
             # Stage 3: Test score
-            test_score = 100.0  # Default if no tests available
+            test_score = 0.0
             if verification_result.test_result and verification_result.test_result.total > 0:
                 test_score = verification_result.test_result.pass_rate
             # Wire TesterAgent: generate + run targeted tests from the diff
@@ -376,7 +383,7 @@ class Arbiter:
                 if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
                     tester_result = await tester.generate_and_run_tests(
                         diff_text=diff_text,
-                        language="python",
+                        language=language,
                         project_root=str(project_root) if project_root else ".",
                     )
                     if tester_result.passed + tester_result.failed > 0:
@@ -434,11 +441,13 @@ class Arbiter:
             tests_passed = False
             if verification_result.test_result:
                 if verification_result.test_result.total > 0:
-                    tests_passed = getattr(verification_result.test_result, 'passed', False)
-                else:
-                    tests_passed = True # No tests exist is technically a pass, though risky
+                    tests_passed = bool(getattr(verification_result.test_result, "all_passed", False))
 
             if tests_passed:
+                confidence += 0.3
+            elif not ast_changed:
+                # If AST is provably unchanged, it's logically safe.
+                # Give equivalent confidence as passing tests, without fabricating a test pass.
                 confidence += 0.3
 
             # Security check
@@ -529,28 +538,36 @@ class Arbiter:
                     s.model_id for s in scores
                     if s.model_id != winner_id and not s.eliminated
                 ]
-                costs = {s.model_id: s.cost_usd for s in scores}
 
-                elo = EloTracker()
-                elo.record_match(
-                    winner_id=winner_id,
-                    loser_ids=loser_ids,
-                    complexity=dispatch.slots[0].model.max_context_tokens // 10000 if dispatch.slots else 5,
-                    duration_sec=total_ms / 1000.0,
-                    costs=costs,
-                )
+                # ANTI-GAMING: Skip ELO update if only 1 agent participated
+                # Single-agent runs shouldn't distort rankings
+                if not loser_ids:
+                    logger.debug("Skipping ELO update: single-agent run, no comparison")
+                else:
+                    costs = {s.model_id: s.cost_usd for s in scores}
 
-                router = CodingRouter()
-                for s in scores:
-                    router.record_outcome(
-                        task_id=dispatch.dispatch_id,
-                        model_id=s.model_id,
-                        intent="edit",
-                        complexity=5,
-                        success=(s.model_id == winner_id),
-                        error_message=s.elimination_reason if s.eliminated else None,
+                    elo = EloTracker()
+                    # Clamp complexity to [1, 10] range
+                    task_complexity = max(1, min(10, getattr(dispatch, "complexity", 5)))
+                    elo.record_match(
+                        winner_id=winner_id,
+                        loser_ids=loser_ids,
+                        complexity=task_complexity,
+                        duration_sec=total_ms / 1000.0,
+                        costs=costs,
                     )
-                logger.info(f"ELO feedback pushed: winner={winner_id}, losers={loser_ids}")
+
+                    router = CodingRouter()
+                    for s in scores:
+                        router.record_outcome(
+                            task_id=dispatch.dispatch_id,
+                            model_id=s.model_id,
+                            intent="edit",
+                            complexity=task_complexity,
+                            success=(s.model_id == winner_id),
+                            error_message=s.elimination_reason if s.eliminated else None,
+                        )
+                    logger.info(f"ELO feedback pushed: winner={winner_id}, losers={loser_ids}")
         except Exception as e:
             logger.debug(f"ELO feedback push failed (non-critical): {e}")
 
@@ -668,17 +685,24 @@ class Arbiter:
 
     def _stage6_complexity(self, patch_set: PatchSet, project_root: Path) -> ComplexityStats:
         """
-        Stage 6: Estimate cyclomatic complexity delta.
-
-        Uses a simple heuristic: count branching keywords (if, elif, for, while,
-        except, and, or, case) in original vs modified lines.
-        A full implementation would use tree-sitter AST analysis.
+        Stage 6: Measure cyclomatic complexity delta using AST for Python,
+        keyword heuristic for other languages.
         """
+        import ast as _ast
+
         stats = ComplexityStats()
 
-        branch_keywords_python = re.compile(
-            r"\b(if|elif|else|for|while|except|and|or|case|match)\b"
+        # AST node types that increase cyclomatic complexity
+        BRANCH_NODES = (
+            _ast.If, _ast.For, _ast.While, _ast.ExceptHandler,
+            _ast.With, _ast.Assert, _ast.BoolOp,
         )
+        # Python 3.10+
+        try:
+            BRANCH_NODES = BRANCH_NODES + (_ast.Match,)
+        except AttributeError:
+            pass
+
         branch_keywords_js = re.compile(r"\b(if|else|for|while|catch|switch|case|\&\&|\|\||\?)\b")
 
         total_before = 0
@@ -686,27 +710,56 @@ class Arbiter:
         max_nesting_before = 0
         max_nesting_after = 0
 
+        def _ast_complexity(code: str) -> tuple[int, int]:
+            """Return (branch_count, max_nesting) from AST analysis."""
+            try:
+                tree = _ast.parse(code)
+            except SyntaxError:
+                return 0, 0
+
+            branches = sum(1 for node in _ast.walk(tree) if isinstance(node, BRANCH_NODES))
+            nesting = _max_nesting(tree, 0)
+            return branches, nesting
+
+        def _max_nesting(node, depth: int) -> int:
+            """Recursively find maximum nesting depth in AST."""
+            max_d = depth
+            for child in _ast.iter_child_nodes(node):
+                if isinstance(child, BRANCH_NODES):
+                    max_d = max(max_d, _max_nesting(child, depth + 1))
+                else:
+                    max_d = max(max_d, _max_nesting(child, depth))
+            return max_d
+
         for fp in patch_set.patches:
             ext = Path(fp.file_path).suffix.lower() if fp.file_path else ""
-            keywords = (
-                branch_keywords_js
-                if ext in (".js", ".jsx", ".ts", ".tsx")
-                else branch_keywords_python
-            )
+            is_python = ext in (".py", ".pyi")
+
             for hunk in fp.hunks:
-                # Count branching in original lines
-                for line in hunk.original_lines:
-                    total_before += len(keywords.findall(line))
-                    indent = len(line) - len(line.lstrip())
-                    max_nesting_before = max(max_nesting_before, indent // 4)
+                if is_python:
+                    # Use real AST analysis
+                    before_code = "\n".join(hunk.original_lines)
+                    after_code = "\n".join(hunk.modified_lines)
+                    b_branches, b_nesting = _ast_complexity(before_code)
+                    a_branches, a_nesting = _ast_complexity(after_code)
+                    total_before += b_branches
+                    total_after += a_branches
+                    max_nesting_before = max(max_nesting_before, b_nesting)
+                    max_nesting_after = max(max_nesting_after, a_nesting)
+                else:
+                    # Fallback: keyword heuristic for JS/TS/etc.
+                    keywords = branch_keywords_js if ext in (".js", ".jsx", ".ts", ".tsx") else re.compile(
+                        r"\b(if|elif|else|for|while|except|and|or|case|match)\b"
+                    )
+                    for line in hunk.original_lines:
+                        total_before += len(keywords.findall(line))
+                        indent = len(line) - len(line.lstrip())
+                        max_nesting_before = max(max_nesting_before, indent // 4)
+                    for line in hunk.modified_lines:
+                        total_after += len(keywords.findall(line))
+                        indent = len(line) - len(line.lstrip())
+                        max_nesting_after = max(max_nesting_after, indent // 4)
 
-                # Count branching in modified lines
-                for line in hunk.modified_lines:
-                    total_after += len(keywords.findall(line))
-                    indent = len(line) - len(line.lstrip())
-                    max_nesting_after = max(max_nesting_after, indent // 4)
-
-        # Normalize to average per hunk
         hunk_count = max(patch_set.total_hunks, 1)
         stats.avg_complexity_before = total_before / hunk_count
         stats.avg_complexity_after = total_after / hunk_count
@@ -833,113 +886,95 @@ class Arbiter:
             total_evaluation_ms=total_ms,
         )
 
+    def _apply_deterministic_exemptions(
+        self,
+        verification: VerificationResult,
+        security_findings: list[SecurityFinding],
+        exemptions: list[dict],
+    ) -> None:
+        """
+        Apply only explicit, user-authored exemptions.
+
+        Unlike the old LLM-based pardons, this method:
+        - Only removes findings that match exemption rules by rule_id
+        - Never overrides test failures
+        - Requires human-authored exemption entries
+        """
+        if not exemptions:
+            return
+
+        for exemption in exemptions:
+            rule = exemption.get("rule")
+            reason = exemption.get("reason", "user exemption")
+            if rule:
+                before_count = len(security_findings)
+                security_findings[:] = [
+                    f for f in security_findings
+                    if not (
+                        hasattr(f, "rule_id") and f.rule_id == rule
+                    )
+                ]
+                removed = before_count - len(security_findings)
+                if removed > 0:
+                    logger.info(
+                        f"Exempted {removed} security finding(s) "
+                        f"matching rule '{rule}': {reason}"
+                    )
+
     async def _apply_memory_pardons(
         self,
         verification: VerificationResult,
         security_findings: list[SecurityFinding],
-        memory: str,
+        arbiter_memory: str,
     ) -> None:
-        """Uses a lightning-fast LIGHT model to compare failures against known false-positives in memory."""
-        has_test_fails = verification.test_result and not verification.test_result.passed and verification.test_result.total > 0  # noqa: E501
-        has_sec_fails = len(security_findings) > 0
+        """
+        Deterministically apply user-authored exemptions from arbiter memory.
 
-        if not (has_test_fails or has_sec_fails):
+        SECURITY: Only `low` and `info` severity findings can be pardoned.
+        Medium/high/critical findings are immune to memory exemptions.
+
+        Expected format lines in memory:
+        - `EXEMPT_RULE:<rule_id> reason...`
+        """
+        exemptions: list[dict] = []
+        for line in arbiter_memory.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("EXEMPT_RULE:"):
+                continue
+            _, rule_and_reason = stripped.split("EXEMPT_RULE:", 1)
+            rule_and_reason = rule_and_reason.strip()
+            if not rule_and_reason:
+                continue
+            parts = rule_and_reason.split(" ", 1)
+            rule = parts[0].strip()
+            reason = parts[1].strip() if len(parts) > 1 else "arbiter memory exemption"
+            exemptions.append({"rule": rule, "reason": reason})
+
+        if not exemptions:
             return
 
-        from src.agents.factory import PROVIDER_KEY_MAP, AgentFactory
-        from src.auth.keychain import KeyChainManager
-        from src.core.model_registry import QualityTier
-        from src.core.router import CodingRouter
-
-        # Phase 21: Route to an explicit Arbiter override, otherwise dynamically discover cheapest
-        router = CodingRouter()
-        arbiter_model_def = router.route_task("chat", 1, QualityTier.LIGHT, role="arbiter")
-
-        if not arbiter_model_def:
-            logger.warning("Arbiter memory pardon bypassed: No API keys configured.")
-            return
-
-        key_name = PROVIDER_KEY_MAP.get(arbiter_model_def.provider.value)
-        api_key = KeyChainManager.get_key(key_name) if key_name else None
-
-        if not api_key:
-            return
-
-        agent = AgentFactory.create_agent(arbiter_model_def, api_key=api_key)
-        agent.config.max_tokens = 300
-        try:
-            agent.config.response_format = {"type": "json_object"}
-        except AttributeError:
-            pass
-
-        prompt = f"""
-You are the Arbiter Judge. You are evaluating failing test and security outcomes.
-You must review your specific ARBITER MEMORY of known false-positives and exceptions.
-
-ARBITER MEMORY:
-{memory}
-
-TEST FAILURES: {verification.test_result.test_failures if verification.test_result else 'None'}
-SECURITY FINDINGS: {[f.message for f in security_findings]}
-
-If memory says these errors are false-positives, you must PARDON them.
-Return strictly a JSON object:
-{{
-    "pardon_tests": true/false,
-    "pardon_security": true/false
-}}
-"""
-        from src.core.system_prompt import SystemPromptBuilder
-        system_prompt = SystemPromptBuilder.build(
-            role_type="engineer",
-            custom_instructions="You are a JSON-only evaluation agent.",
-            model_name="arbiter"
-        )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
+        # Filter out findings that are too severe to pardon
+        pardonable_findings = [
+            f for f in security_findings
+            if f.severity in ("low", "info")
+        ]
+        non_pardonable = [
+            f for f in security_findings
+            if f.severity not in ("low", "info")
         ]
 
-        try:
-            full = ""
-            async for chunk in agent.chat_stream(messages):
-                if chunk.text:
-                    full += chunk.text
+        if pardonable_findings:
+            self._apply_deterministic_exemptions(verification, pardonable_findings, exemptions)
 
-            raw = full.strip()
-            if raw.startswith("```json"):
-                raw = raw[7:-3]
-            elif raw.startswith("```"):
-                raw = raw[3:-3]
-
-            import json
-            try:
-                decision = json.loads(raw.strip())
-                if decision.get("pardon_tests") and verification.test_result:
-                    verification.test_result.passed = verification.test_result.total
-                    verification.test_result.failed = 0
-                    verification.test_result.errors = 0
-                    logger.info("Arbiter pardoned test failures based on memory.")
-
-                if decision.get("pardon_security"):
-                    security_findings.clear()
-                    logger.info("Arbiter pardoned security findings based on memory.")
-            except Exception as e:
-                logger.warning(f"Failed to parse Arbiter pardon decision: {e} (Raw: {raw})")
-
-            import json
-            parsed = json.loads(raw.strip())
-
-            if parsed.get("pardon_tests", False) and verification.test_result:
-                verification.test_result.failed = 0
-                verification.test_result.errors = 0
-                verification.test_result.failures = []
-
-            if parsed.get("pardon_security", False):
-                security_findings.clear()
-
-        except Exception as e:
-            logger.error(f"Failed to apply Arbiter memory pardons: {e}")
+        # Log if user tried to pardon high-severity findings
+        if non_pardonable:
+            for ex in exemptions:
+                for f in non_pardonable:
+                    if f.rule_id == ex["rule"]:
+                        logger.warning(
+                            f"Memory pardon BLOCKED: cannot exempt {f.severity} "
+                            f"finding '{f.rule_id}' — only low/info severity can be pardoned"
+                        )
 
     def format_verdict(self, verdict: ArbiterVerdict) -> str:
         """Format the verdict for display in the chat narration."""
