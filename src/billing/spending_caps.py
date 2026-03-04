@@ -1,5 +1,9 @@
 import time
 
+# Canonical credit-to-dollar conversion rate — MUST match billing.py and proxy
+# 1 credit = $0.04 (aligned with Stripe checkout pricing)
+CREDIT_TO_DOLLAR = 0.04
+
 
 class SpendingCapService:
     """
@@ -38,10 +42,9 @@ class SpendingCapService:
             return {"has_cap": False, "warning_level": None}
 
         monthly = row["credits_monthly"]
-        remaining = row["credits_remaining"]
+        remaining = row["effective_credits"]
         used = monthly - remaining
-        # Convert credits to dollars: 1 credit ≈ $0.025
-        spent_dollars = used * 0.025
+        spent_dollars = used * CREDIT_TO_DOLLAR
         pct = spent_dollars / cap if cap > 0 else 0
 
         warning_level = None
@@ -63,7 +66,7 @@ class SpendingCapService:
         if not status["has_cap"]:
             return {"allowed": True}
 
-        estimated_cost = estimated_credits * 0.025
+        estimated_cost = estimated_credits * CREDIT_TO_DOLLAR
         projected = status["spent_dollars"] + estimated_cost
 
         if projected > status["cap_dollars"]:

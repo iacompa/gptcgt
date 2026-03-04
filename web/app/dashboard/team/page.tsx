@@ -37,11 +37,18 @@ export default function TeamPage() {
 
     const loadTeamData = useCallback(async () => {
         try {
-            const [members, invites] = await Promise.all([
-                fetchAPI("/team/members").catch(() => []),
+            const [rawMembers, invites] = await Promise.all([
+                // F09: API route is GET /team/ (not /team/members)
+                fetchAPI("/team/").catch(() => []),
                 fetchAPI("/team/invites/pending").catch(() => []),
             ]);
-            setTeamMembers(members || []);
+            // F10: Map team_role from API to role expected by UI
+            const mapped = (rawMembers || []).map((m: any) => ({
+                ...m,
+                role: m.team_role || m.role || "member",
+                status: "Active",
+            }));
+            setTeamMembers(mapped);
             setPendingInvites(invites || []);
         } catch (e) {
             console.error(e);
@@ -240,10 +247,10 @@ export default function TeamPage() {
                                 <td className="px-6 py-4 font-medium">{member.email}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded text-xs font-semibold ${member.role === "owner" || member.role === "Owner"
-                                            ? "bg-amber-500/10 text-amber-400"
-                                            : member.role === "admin"
-                                                ? "bg-indigo-500/10 text-indigo-400"
-                                                : "bg-gray-700/50 text-gray-400"
+                                        ? "bg-amber-500/10 text-amber-400"
+                                        : member.role === "admin"
+                                            ? "bg-indigo-500/10 text-indigo-400"
+                                            : "bg-gray-700/50 text-gray-400"
                                         }`}>
                                         {member.role}
                                     </span>

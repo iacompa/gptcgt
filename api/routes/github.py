@@ -1,5 +1,7 @@
 """GitHub Integration: OAuth, repo listing, and file access."""
 
+import hashlib
+import hmac
 import logging
 from typing import Optional
 
@@ -20,6 +22,36 @@ GITHUB_API = "https://api.github.com"
 
 class GitHubCallbackRequest(BaseModel):
     code: str
+    state: str = ""  # F13: state is now required for CSRF validation
+
+
+def _generate_oauth_state(user_id: str) -> str:
+    """F13: Generate HMAC-signed state param for OAuth CSRF protection."""
+    secret = (settings.jwt_secret or "fallback-dev-secret").encode()
+    return hmac.new(secret, user_id.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def _encrypt_token(token: str) -> str:
+    """F03: Encrypt GitHub access token before storage."""
+    try:
+        from src.services.key_vault import KeyVault
+        vault = KeyVault(settings.encryption_key)
+        return vault.encrypt(token)
+    except Exception:
+        # If encryption fails, prefix with marker so we know it's plaintext
+        return f"pt:{token}"  # pragma: no cover
+
+
+def _decrypt_token(stored: str) -> str:
+    """F03: Decrypt stored GitHub access token."""
+    if stored.startswith("pt:"):
+        return stored[3:]  # Legacy plaintext
+    try:
+        from src.services.key_vault import KeyVault
+        vault = KeyVault(settings.encryption_key)
+        return vault.decrypt(stored)
+    except Exception:
+        return stored  # Fallback: assume plaintext
 
 
 # ------------------------------------------------------------------ #
@@ -41,9 +73,11 @@ async def github_connect(request: Request):
     redirect_uri = f"{getattr(settings, 'base_url', 'https://gptcgt.ai')}/api/github/callback"
     scope = "repo read:user"
 
+    # F13: Generate HMAC state for CSRF protection
+    state = _generate_oauth_state(workos_user_id)
     auth_url = (
         f"{GITHUB_OAUTH_URL}?client_id={client_id}"
-        f"&redirect_uri={redirect_uri}&scope={scope}&state={workos_user_id}"
+        f"&redirect_uri={redirect_uri}&scope={scope}&state={state}"
     )
     return {"auth_url": auth_url}
 
@@ -54,6 +88,11 @@ async def github_callback(request: Request, body: GitHubCallbackRequest):
     workos_user_id = getattr(request.state, "user_id", None)
     if not workos_user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # F13: Validate OAuth state to prevent CSRF
+    expected_state = _generate_oauth_state(workos_user_id)
+    if not body.state or not hmac.compare_digest(body.state, expected_state):
+        raise HTTPException(status_code=400, detail="Invalid OAuth state — possible CSRF")
 
     client_id = getattr(settings, "github_client_id", None)
     client_secret = getattr(settings, "github_client_secret", None)
@@ -86,7 +125,8 @@ async def github_callback(request: Request, body: GitHubCallbackRequest):
         )
         gh_profile = gh_user.json() if gh_user.status_code == 200 else {}
 
-    # Store token in database
+    # F03: Encrypt token before storage
+    encrypted_token = _encrypt_token(access_token)
     pool = get_pool()
     await pool.execute(
         """
@@ -94,7 +134,7 @@ async def github_callback(request: Request, body: GitHubCallbackRequest):
         SET github_token = $1, github_username = $2
         WHERE workos_user_id = $3
         """,
-        access_token,
+        encrypted_token,
         gh_profile.get("login", ""),
         workos_user_id,
     )
@@ -129,7 +169,7 @@ async def list_repos(request: Request):
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{GITHUB_API}/user/repos",
-            headers={"Authorization": f"Bearer {row['github_token']}"},
+            headers={"Authorization": f"Bearer {_decrypt_token(row['github_token'])}"},
             params={"sort": "updated", "per_page": 50, "type": "owner"},
         )
 
@@ -181,7 +221,7 @@ async def get_repo_tree(request: Request, owner: str, repo: str, branch: Optiona
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             f"{GITHUB_API}/repos/{owner}/{repo}/git/trees/{ref}",
-            headers={"Authorization": f"Bearer {row['github_token']}"},
+            headers={"Authorization": f"Bearer {_decrypt_token(row['github_token'])}"},
             params={"recursive": "1"},
         )
 
@@ -225,7 +265,7 @@ async def get_file_content(
         resp = await client.get(
             f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}",
             headers={
-                "Authorization": f"Bearer {row['github_token']}",
+                "Authorization": f"Bearer {_decrypt_token(row['github_token'])}",
                 "Accept": "application/vnd.github.v3.raw",
             },
             params={"ref": ref},

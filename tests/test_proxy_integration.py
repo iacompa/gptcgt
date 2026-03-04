@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
-
 # ─── Content Filter Integration ──────────────────────────────────────
 
 class TestContentFilterIntegration:
@@ -267,8 +266,8 @@ class TestCreditServiceIntegration:
         }
         status = await svc.get_cap_status(db_pool, "team_user_1")
         assert status["has_cap"] is True
-        # 5000 - 2000 = 3000 used; 3000 * 0.025 = $75
-        assert status["spent_dollars"] == 75.0
+        # 5000 - 2000 = 3000 used; 3000 * 0.04 = $120
+        assert status["spent_dollars"] == 120.0
 
 
 # ─── Security Scanner Integration ───────────────────────────────────
@@ -278,8 +277,9 @@ class TestSecurityScannerIntegration:
 
     def test_sql_injection_fstring_detected(self):
         """f-string SQL injection must be flagged as critical."""
-        from src.core.security import SECURITY_PATTERNS
         import re
+
+        from src.core.security import SECURITY_PATTERNS
         test_line = 'cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")'
         found = False
         for pattern, msg, severity, category, cwe in SECURITY_PATTERNS:
@@ -292,8 +292,9 @@ class TestSecurityScannerIntegration:
 
     def test_hardcoded_secret_detected(self):
         """Hardcoded credential must be flagged as high severity."""
-        from src.core.security import SECURITY_PATTERNS
         import re
+
+        from src.core.security import SECURITY_PATTERNS
         test_line = 'api_key = "sk-1234567890abcdef1234"'
         found = False
         for pattern, msg, severity, category, cwe in SECURITY_PATTERNS:
@@ -306,8 +307,9 @@ class TestSecurityScannerIntegration:
 
     def test_clean_code_passes(self):
         """Normal code should not trigger security findings."""
-        from src.core.security import SECURITY_PATTERNS
         import re
+
+        from src.core.security import SECURITY_PATTERNS
         clean_lines = [
             "def calculate_sum(a, b): return a + b",
             "users = db.query(User).filter_by(id=user_id).all()",

@@ -44,8 +44,8 @@ async def get_usage(
     try:
         rows = await pool.fetch(query, *args)
     except Exception as e:
-        logger.warning(f"Usage query failed: {e}")
-        return []
+        logger.error(f"Usage query failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Usage query failed: {type(e).__name__}")
 
     result = []
     for row in rows:

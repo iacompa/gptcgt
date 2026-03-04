@@ -286,7 +286,7 @@ class Arbiter:
                     )
                 # TRUTHFUL: No tests were run. Report 0/0.
                 # Must still run linter and security to catch whitespace errors and secrets in comments.
-                from src.tools.sandbox import LintResult, TestResult, VerificationResult
+                from src.tools.sandbox import TestResult, VerificationResult
                 verification_result = await self._sandbox._verify_local_only(
                     slot.patch_set, project_root, language,
                     VerificationResult(
@@ -296,10 +296,10 @@ class Arbiter:
                         test_result=TestResult(total=0, passed=0),  # Honest: no tests run
                     )
                 )
-                
+
                 # IMPORTANT: Run security scan even on comment-only changes
                 security_findings = await self._security.scan_patch(slot.patch_set, language)
-                
+
                 # LSP would be identical if AST is identical
                 if self._lsp:
                     lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
