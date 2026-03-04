@@ -64,6 +64,8 @@ export function createSessionToken(subject: string, email: string, name?: string
             sub: subject,
             email,
             name: name || email.split("@")[0],
+            iss: "gptcgt",
+            aud: "gptcgt-api",
         },
         secret,
         { expiresIn: "7d", algorithm: "HS256" }
