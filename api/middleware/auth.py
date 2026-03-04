@@ -43,10 +43,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return self._json_response(401, "Missing or invalid Authorization header")
+        token: str | None = None
 
-        token = auth_header.split(" ", 1)[1]
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+        else:
+            # Fallback: read httpOnly session cookie (browser requests via credentials: "include")
+            # SECURITY: gptcgt_session is httpOnly + SameSite=strict, immune to XSS/CSRF.
+            # The JWT is verified identically regardless of transport.
+            token = request.cookies.get("gptcgt_session")
+
+        if not token:
+            return self._json_response(401, "Missing or invalid Authorization header")
 
         try:
             payload = verify_access_token(
