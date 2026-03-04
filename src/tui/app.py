@@ -141,7 +141,8 @@ class GptcgtApp(App[None]):
         self.chat_store.load_active_session()
 
         from src.core.config import ConfigManager  # noqa: F811
-        self.config = ConfigManager(self.project_path)
+        if not hasattr(self, "config") or self.config is None:
+            self.config = ConfigManager(self.project_path)
 
         from src.core.model_registry import ModelRegistry
         from src.core.orchestrator import Orchestrator
@@ -159,12 +160,12 @@ class GptcgtApp(App[None]):
                 "code": CodeViewerPanel(id="code-viewer"),
                 "chat": ChatPanel(id="right-panel")
             }
-            _conf = getattr(self, "config", ConfigManager())
-  # noqa: W293
+            _conf = getattr(self, "config", ConfigManager.get_instance())
+
             placements = getattr(_conf.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"})
             sizes = getattr(_conf.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2})
             visible = getattr(_conf.user, "visible_panels", {"files": True, "code": True, "chat": True})
-  # noqa: W293
+
             valid_keys = ["files", "code", "chat"]
             order_weight = {"left": 0, "center": 1, "right": 2, "top": -1, "bottom": 3}
             horiz_keys = [k for k in valid_keys if placements.get(k) in ("left", "center", "right")]
@@ -192,7 +193,7 @@ class GptcgtApp(App[None]):
                 else:
                     panel.styles.width = "0"
                     panel.styles.height = "100%"
-  # noqa: W293
+
             # Yield top/bottom docked panels first
             for k in tb_keys:
                 yield panels[k]

@@ -29,6 +29,7 @@ class TestResult:
     coverage_delta: float = 0.0
     failure_details: list[str] = field(default_factory=list)
     generated_test_code: str = ""
+    is_inconclusive: bool = False  # True when tests could not be run (no keys, etc)
 
     @property
     def pass_rate(self) -> float:
@@ -66,6 +67,7 @@ class TesterAgent:
         available = self.registry.get_available_models()
         if not available:
             logger.warning("TesterAgent: No API keys configured — cannot generate tests.")
+            result.is_inconclusive = True
             return result
 
         from src.core.system_prompt import SystemPromptBuilder
@@ -190,7 +192,7 @@ class TesterAgent:
                 return ""
 
             from src.core.config import ConfigManager
-            config = ConfigManager()
+            config = ConfigManager.get_instance()
             tester_model_id = config.user.tester_model
 
             selected_model = None

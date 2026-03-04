@@ -77,16 +77,38 @@ class EloTracker:
         if not cursor.fetchone():
             cursor.execute("INSERT INTO models (id) VALUES (?)", (model_id,))
 
-    def _calculate_elo(self, winner_elo: float, loser_elo: float, k_factor: float = 32.0) -> tuple[float, float]:
-        """Calculates new ELO ratings for a 1v1 match."""
-        # Expected win probability for winner
+    def _calculate_elo(
+        self,
+        winner_elo: float,
+        loser_elo: float,
+        winner_matches: int = 0,
+        loser_matches: int = 0,
+    ) -> tuple[float, float]:
+        """
+        Calculate new ELO ratings with dynamic K-factor.
+
+        K decays as models play more matches:
+        - Cold start (< 10 matches): K=40 (faster calibration)
+        - Warm (10-30 matches): K=32
+        - Veteran (30+ matches): K=16 (stable)
+        """
+        def _k(matches: int) -> float:
+            if matches < 10:
+                return 40.0
+            if matches < 30:
+                return 32.0
+            return 16.0
+
+        k_winner = _k(winner_matches)
+        k_loser = _k(loser_matches)
+
+        # Expected win probability
         expected_winner = 1.0 / (1.0 + 10.0 ** ((loser_elo - winner_elo) / 400.0))
-        # Expected win probability for loser
         expected_loser = 1.0 / (1.0 + 10.0 ** ((winner_elo - loser_elo) / 400.0))
 
-        # New ratings
-        new_winner_elo = winner_elo + k_factor * (1.0 - expected_winner)
-        new_loser_elo = loser_elo + k_factor * (0.0 - expected_loser)
+        # New ratings with floor of 800 (prevent runaway negative)
+        new_winner_elo = max(800.0, winner_elo + k_winner * (1.0 - expected_winner))
+        new_loser_elo = max(800.0, loser_elo + k_loser * (0.0 - expected_loser))
 
         return new_winner_elo, new_loser_elo
 
@@ -154,11 +176,27 @@ class EloTracker:
                 # For multiple losers, process as individual 1v1 matches against the winner
                 winner_elo_delta = 0.0
                 for loser_id in loser_ids:
-                    cursor.execute("SELECT elo_rating FROM models WHERE id = ?", (loser_id,))
-                    loser_elo = cursor.fetchone()[0]
+                    # Get current match counts for K-factor decay
+                    cursor.execute(
+                        "SELECT matches_won + matches_lost FROM models WHERE id = ?",
+                        (winner_id,),
+                    )
+                    winner_total = cursor.fetchone()[0]
 
-                    # Calculate new ELOs
-                    new_winner_elo_from_this, new_loser_elo = self._calculate_elo(winner_elo, loser_elo)
+                    cursor.execute(
+                        "SELECT elo_rating, matches_won + matches_lost FROM models WHERE id = ?",
+                        (loser_id,),
+                    )
+                    row = cursor.fetchone()
+                    loser_elo = row[0]
+                    loser_total = row[1]
+
+                    # Calculate new ELOs with K-factor decay
+                    new_winner_elo_from_this, new_loser_elo = self._calculate_elo(
+                        winner_elo, loser_elo,
+                        winner_matches=winner_total,
+                        loser_matches=loser_total,
+                    )
 
                     # Accumulate delta for winner
                     winner_elo_delta += (new_winner_elo_from_this - winner_elo)
@@ -212,3 +250,18 @@ class EloTracker:
         except sqlite3.Error as e:
             log.error(f"Failed to fetch leaderboard: {e}")
             return []
+
+    def get_model_stats(self, model_id: str) -> Dict[str, Any] | None:
+        """Get stats for a single model."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT * FROM models WHERE id = ?", (model_id,)
+                )
+                row = cursor.fetchone()
+                return dict(row) if row else None
+        except sqlite3.Error as e:
+            log.error(f"Failed to fetch model stats: {e}")
+            return None

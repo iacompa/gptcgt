@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import bcrypt
 import httpx
 import jwt
 from fastapi import APIRouter, HTTPException
@@ -19,6 +20,8 @@ def _generate_jwt(sub: str, email: str, ttl: int = 3600) -> str:
     payload = {
         "sub": sub,
         "email": email,
+        "iss": "gptcgt",
+        "aud": "gptcgt-api",
         "iat": now.timestamp(),
         "exp": now.timestamp() + ttl,
     }
@@ -123,6 +126,98 @@ async def get_token(request: TokenRequest):
 
     else:
         raise HTTPException(status_code=400, detail="Missing grant_type or device_code")
+
+
+class SSOCallbackRequest(BaseModel):
+    code: str
+
+
+class SigninRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/sso/callback")
+async def sso_callback(request: SSOCallbackRequest):
+    """Exchange WorkOS SSO auth code for user profile and JWT."""
+    url = "https://api.workos.com/sso/token"
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            url,
+            data={
+                "client_id": settings.workos_client_id,
+                "client_secret": settings.workos_api_key,
+                "grant_type": "authorization_code",
+                "code": request.code,
+            },
+        )
+
+        if resp.status_code != 200:
+            logger.error(f"SSO callback error: {resp.text}")
+            raise HTTPException(status_code=401, detail="SSO authentication failed")
+
+        data = resp.json()
+        profile = data.get("profile", {})
+        workos_id = profile.get("id")
+        email = profile.get("email")
+
+        if not workos_id or not email:
+            raise HTTPException(status_code=400, detail="Invalid profile from WorkOS")
+
+        await _sync_user(workos_id, email)
+
+        access_token = _generate_jwt(workos_id, email, 3600)
+        return {
+            "access_token": access_token,
+            "email": email,
+            "name": profile.get("first_name", email.split("@")[0]),
+            "workos_user_id": workos_id,
+        }
+
+
+@router.post("/signin")
+async def signin_with_password(request: SigninRequest):
+    """Email/password signin for web dashboard."""
+    if not settings.allow_legacy_password_signin:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Email/password signin is disabled. "
+                "Use WorkOS SSO login or enable ALLOW_LEGACY_PASSWORD_SIGNIN for local development."
+            ),
+        )
+
+    email = request.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if len(request.password) < 8:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    pool = get_pool()
+    row = await pool.fetchrow(
+        "SELECT workos_user_id, email, password_hash FROM users WHERE email = $1",
+        email,
+    )
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # SECURITY: Verify password hash — reject if no hash stored or mismatch
+    stored_hash = row.get("password_hash")
+    if not stored_hash:
+        raise HTTPException(
+            status_code=401,
+            detail="Password login not configured for this account. Use SSO.",
+        )
+
+    if not bcrypt.checkpw(request.password.encode("utf-8"), stored_hash.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    access_token = _generate_jwt(row["workos_user_id"], row["email"], 3600)
+    return {
+        "access_token": access_token,
+        "email": row["email"],
+        "workos_user_id": row["workos_user_id"],
+    }
 
 
 async def _sync_user(workos_user_id: str, email: str):

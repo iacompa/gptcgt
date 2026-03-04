@@ -453,7 +453,9 @@ class ParallelExecutionNode(DAGNode):
                         await state.narration_callback(f"Arbiter [{stage}]: {detail}", "decision")
 
                     verdict = await arbiter.evaluate(
-                        dispatch, project_root, "python", on_progress=on_progress, intent=state.intent
+                        dispatch, project_root,
+                        ctx.workspace.config.project.primary_language or "python",
+                        on_progress=on_progress, intent=state.intent
                     )
                     _tui_app.post_message(ArbiterVerdictReady(verdict))
 

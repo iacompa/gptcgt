@@ -127,7 +127,7 @@ class ChatPipeline:
         agent = AgentFactory.create_agent(
             model_def, api_key=api_key, base_url=base_url, extra_headers=extra_headers
         )
-        messages = self._build_context_messages(
+        messages = await self._build_context_messages(
             user_text, attached_files, reflection_hint, model_def, SystemPromptBuilder, ContextManager
         )
 
@@ -386,7 +386,7 @@ class ChatPipeline:
             return False
         try:
             from src.core.config import ConfigManager
-            config = ConfigManager()
+            config = ConfigManager.get_instance()
             limit = config.user.daily_spend_limit
             today_spend = self.cost_tracker.get_today_spend().total_cost
             if limit is not None and limit > 0 and today_spend >= limit:
@@ -402,7 +402,7 @@ class ChatPipeline:
             logger.error(f"Failed to check BYOK spending limits: {e}")
         return False
 
-    def _build_context_messages(
+    async def _build_context_messages(
         self, user_text, attached_files, reflection_hint, model_def, SystemPromptBuilder, ContextManager
     ) -> list[dict]:
         """
@@ -427,7 +427,7 @@ class ChatPipeline:
         conversational = [m for m in history if m.role.value in ("user", "agent")]
         if len(conversational) > keep_full:
             to_summarize = conversational[:-keep_full]
-            summary_text = compactor._summarize_old_messages(to_summarize)
+            summary_text = await compactor._summarize_old_messages(to_summarize)
             if summary_text:
                 summary_prefix = [{"role": "user", "content": f"[Earlier summary: {summary_text}]"}]
             # Keep only recent messages for the history_dicts
@@ -444,11 +444,24 @@ class ChatPipeline:
         if summary_prefix:
             history_dicts = summary_prefix + history_dicts
 
-        # Inject reflection lesson if present (from ReflectionEngine via ChatPanel)
+        # Inject per-agent persistent memory (past lessons learned)
         effective_system_prompt = system_prompt
+        try:
+            from src.core.memory import AgentMemory
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
+            agent_mem = AgentMemory(ws.get_project_root())
+            agent_context = agent_mem.get_context(model_def.name)
+            if agent_context:
+                effective_system_prompt += f"\n\n{agent_context}"
+                logger.info(f"Injected {len(agent_context)} chars of agent memory into prompt.")
+        except Exception as e:
+            logger.debug(f"Agent memory injection skipped: {e}")
+
+        # Inject reflection lesson if present (from ReflectionEngine via ChatPanel)
         if reflection_hint:
             effective_system_prompt = (
-                system_prompt
+                effective_system_prompt
                 + f"\n\n## Memory Update (Reflection Engine)\n{reflection_hint}"
             )
             logger.info("Injected ReflectionEngine lesson into system context.")
@@ -739,6 +752,17 @@ class ChatPipeline:
             )
         except Exception as e:
             logger.debug(f"Proactive logging skipped: {e}")
+
+        # Record to session history
+        try:
+            from src.core.memory import SessionHistory
+            from src.core.workspace import Workspace
+            ws = Workspace.get_instance()
+            history = SessionHistory(ws.get_project_root())
+            history.log("user", user_text)
+            history.log("agent", full_response[:300], model=model_def.name)
+        except Exception as e:
+            logger.debug(f"Session history write skipped: {e}")
 
     async def _handle_self_healing(
         self,
