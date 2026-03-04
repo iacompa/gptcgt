@@ -78,13 +78,13 @@ class CreditService:
                     )
                     if not team_row:
                         return {"success": False, "reason": "team_not_found"}
-                    
+
                     new_balance = team_row["shared_credits_remaining"] - cost
                     if new_balance < 0:
                         return {"success": False, "reason": "insufficient_team_credits"}
-                    
+
                     await conn.execute(
-                        "UPDATE teams SET shared_credits_remaining = $1 WHERE id = $2", 
+                        "UPDATE teams SET shared_credits_remaining = $1 WHERE id = $2",
                         new_balance, team_row["id"]
                     )
                     return {"success": True, "new_balance": new_balance, "deducted": cost}

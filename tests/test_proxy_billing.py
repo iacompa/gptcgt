@@ -12,18 +12,18 @@ async def test_spending_cap_status_math():
     """Ensure math for cap threshold is deterministic."""
     svc = SpendingCapService()
     db_pool = AsyncMock()
-    # Mock user who has a cap of $150 and has spent $100 equivalent
-    # 1 credit = $0.025 -> $100 spent = 4000 credits used.
+    # Mock user who has a cap of $150 and has used 4000 credits.
+    # 1 credit = $0.04 -> $160 spent = 4000 credits used.
     # If 5000 monthly, remaining = 1000
     db_pool.fetchrow.return_value = {
         "spending_cap": 150.0,
         "credits_monthly": 5000,
-        "credits_remaining": 1000,
+        "effective_credits": 1000,
     }
 
     status = await svc.get_cap_status(db_pool, "user_123")
     assert status["has_cap"] is True
-    assert status["spent_dollars"] == 100.0
+    assert status["spent_dollars"] == 160.0
     assert status["cap_dollars"] == 150.0
 
 
