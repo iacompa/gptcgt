@@ -483,7 +483,12 @@ class AutonomousRunner:
                     )
 
                     # Reject if tests explicitly failed OR if the tester was inconclusive (no keys, no tests generated)
-                    if test_result.failed > 0 or test_result.errors > 0 or test_result.is_inconclusive or not test_result.generated_test_code:
+                    if (
+                        test_result.failed > 0
+                        or test_result.errors > 0
+                        or test_result.is_inconclusive
+                        or not test_result.generated_test_code
+                    ):
                         test_passed = False
                         details = "; ".join(test_result.failure_details[:3])
                         test_feedback = (

@@ -1062,27 +1062,29 @@ class ChatPanel(Vertical):
             if len(messages) < 10:
                 self._append_message("system", "📦 Session too short to compact (< 10 messages).")
                 return
-  # noqa: W293
+
             from src.core.context_compactor import ContextCompactor  # noqa: I001
             from src.core.chat_store import ChatMessage, MessageRole
             import uuid
             from datetime import datetime
-  # noqa: W293
+
             compactor = ContextCompactor()
             old_msgs = [m for m in messages if m.role.value in ("user", "agent")]
-  # noqa: W293
+
             if len(old_msgs) > 20:
-                summary = compactor._summarize_old_messages(old_msgs[:-20])
+                # F19/F20: Use sync heuristic_summarize (not the async _summarize_old_messages)
+                # because _slash_compact is a sync Textual event handler.
+                summary = compactor._heuristic_summarize(old_msgs[:-20])
                 summary_msg = ChatMessage(
                     id=str(uuid.uuid4()),
                     role=MessageRole.SYSTEM,
                     content=f"[Context Summary] {summary}",
                     timestamp=datetime.now()
                 )
-  # noqa: W293
+
                 # Hard reset memory: keep last 20 messages and prepend summary
                 self.app.chat_store.truncate_history(keep_count=20, summary_msg=summary_msg)
-  # noqa: W293
+
                 self._append_message(
                     "system",
                     f"📦 Compacted {len(old_msgs) - 20} older messages into a summary. "

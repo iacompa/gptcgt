@@ -161,7 +161,7 @@ class SystemPromptBuilder:
                     provider = "openai"  # default
                     k_name = PROVIDER_KEY_MAP.get(provider)
                     api_key = KeyChainManager.get_key(k_name) if k_name else None
-                    
+
                     if not api_key:
                         provider = "google"
                         k_name = PROVIDER_KEY_MAP.get(provider)
@@ -174,7 +174,7 @@ class SystemPromptBuilder:
                                 os.environ["OPENAI_API_KEY"] = api_key
                             elif provider == "google":
                                 os.environ["GEMINI_API_KEY"] = api_key
-                            
+
                             emb_res = litellm.embedding(
                                 model=emb_model,
                                 input=[search_query],
@@ -204,7 +204,7 @@ class SystemPromptBuilder:
 
                         scored_lessons.sort(key=lambda x: x[0], reverse=True)
                         top_lessons = [m for _, m in scored_lessons[:3]]
-                        
+
                         if not top_lessons:
                             # Fallback: Just take the 3 most recent non-telemetry if embedding loop yielded nothing
                             top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]

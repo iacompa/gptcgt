@@ -96,7 +96,17 @@ export default function AccountPage() {
                 <PricingTable currentPlan={profile.plan} />
 
                 <div className="mt-4 flex justify-end">
-                    <button className="text-indigo-400 hover:text-indigo-300 text-sm font-medium">
+                    <button
+                        className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+                        onClick={async () => {
+                            try {
+                                const res = await fetchAPI("/billing/portal", { method: "POST" });
+                                if (res?.url) window.location.href = res.url;
+                            } catch (e) {
+                                alert("Could not open billing portal. Please try again.");
+                            }
+                        }}
+                    >
                         Manage Billing via Stripe &rarr;
                     </button>
                 </div>

@@ -114,33 +114,36 @@ def _validate_sandbox_command(command: str) -> None:
     Validate sandbox commands against an allowlist.
 
     Raises HTTPException if the command is not allowed.
+    F04: Blocks shell metacharacters including & (backgrounding bypass).
     """
     if not command or not command.strip():
         raise HTTPException(status_code=400, detail="Empty command")
 
-    # Check for forbidden shell metacharacters
-    for char in _SANDBOX_FORBIDDEN_CHARS:
-        if char in command:
+    # Check for forbidden shell metacharacters (including & for backgrounding)
+    _forbidden = set(";|`$(){}\\<>!&\n\r")
+    for char in command:
+        if char in _forbidden:
             raise HTTPException(
                 status_code=400,
                 detail=f"Forbidden character in command: {char!r}",
             )
 
     # Check that each chained command's base binary is allowlisted.
-    parts = [p.strip() for p in command.split("&&")]
-    for part in parts:
-        try:
-            tokens = shlex.split(part)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid shell quoting in command")
-        if not tokens:
-            continue
-        base_cmd = tokens[0]
-        if base_cmd not in _SANDBOX_ALLOWED_COMMANDS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Command not in allowlist: {base_cmd}",
-            )
+    # Since & is now forbidden, only && chains remain impossible —
+    # we validate the full command as a single unit.
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid shell quoting in command")
+    if not tokens:
+        raise HTTPException(status_code=400, detail="Empty command after parsing")
+
+    base_cmd = tokens[0]
+    if base_cmd not in _SANDBOX_ALLOWED_COMMANDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Command not in allowlist: {base_cmd}",
+        )
 
 
 def _normalize_sandbox_path(rel_path: str) -> str:
