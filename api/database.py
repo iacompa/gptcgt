@@ -8,8 +8,12 @@ _pool = None
 async def init_db_pool():
     global _pool
     if not _pool:
-        # Fallback for local testing if DATABASE_URL is somehow missing but neon configs exist
-        db_url = settings.database_url or "postgres://postgres:postgres@localhost:5432/gptcgt"
+        # F26: No fallback — missing DATABASE_URL must fail loudly in production
+        db_url = settings.database_url
+        if not db_url:
+            raise RuntimeError(
+                "FATAL: DATABASE_URL not configured. Set the DATABASE_URL environment variable."
+            )
         _pool = await asyncpg.create_pool(db_url, min_size=2, max_size=20)
     return _pool
 

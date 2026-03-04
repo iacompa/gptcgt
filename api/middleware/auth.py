@@ -61,8 +61,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 token,
                 hs256_secret=settings.jwt_secret,
                 jwks_url=settings.workos_jwks_url or None,
-                issuer=settings.workos_issuer or None,
-                audience=settings.workos_audience or None,
+                # F12: Always enforce issuer/audience — default to gptcgt when WorkOS not configured
+                issuer=settings.workos_issuer or "gptcgt",
+                audience=settings.workos_audience or "gptcgt-api",
             )
 
             user_id = payload.get("sub")

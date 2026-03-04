@@ -16,10 +16,12 @@ from pydantic import BaseModel
 from api.database import get_pool
 from api.services.cost_computation import determine_tier
 from src.billing.credits import CreditService
+from src.billing.spending_caps import SpendingCapService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["proxy"])
 credit_service = CreditService()
+spending_caps = SpendingCapService()
 
 
 class RecordUsageRequest(BaseModel):
@@ -51,6 +53,17 @@ async def record_usage(request: Request, body: RecordUsageRequest):
             detail=(
                 f"Insufficient credits. Requires {affordability['credits_cost']}. "
                 f"Remaining: {affordability['remaining']}"
+            ),
+        )
+
+    # F08: Spending cap enforcement (was missing — bypass path vs main proxy)
+    cap_status = await spending_caps.check_before_task(pool, user_id, affordability["credits_cost"])
+    if not cap_status["allowed"]:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Spending cap exceeded: ${cap_status.get('spent_dollars', 0):.2f} spent "
+                f"of ${cap_status.get('cap_dollars', 0)} cap"
             ),
         )
 

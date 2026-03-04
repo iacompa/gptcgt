@@ -136,12 +136,17 @@ class ChatPipeline:
         if self.cost_tracker:
             import uuid
             task_id = str(uuid.uuid4())
+            # F21: Use actual mode and credit cost instead of hardcoded standard/5
+            from src.billing.credits import CreditService
+            _credit_svc = CreditService()
+            _actual_mode = current_mode if current_mode else "standard"
+            _actual_credits = _credit_svc.CREDIT_COSTS.get(_actual_mode, 5)
             self.cost_tracker.start_task(
                 task_id=task_id,
                 title=user_text[:50],
-                mode="standard",
+                mode=_actual_mode,
                 tier=self.default_tier.value,
-                credits=5,
+                credits=_actual_credits,
             )
 
         agent.config.tools = get_tool_definitions()
@@ -887,8 +892,10 @@ class ChatPipeline:
                 ))
                 logger.warning(msg)
                 raise RuntimeError(msg)
-                logger.warning(f"Token budget exceeded: {total_tokens:,} >= {max_tokens:,}")
 
+        except RuntimeError:
+            # F18: Budget RuntimeError must propagate — do NOT swallow it
+            raise
         except Exception as e:
             logger.debug(f"Task budget check skipped: {e}")
 

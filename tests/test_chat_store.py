@@ -108,7 +108,8 @@ def test_session_export_markdown(chat_store):
     assert "I am Claude" in md
 
 
-def test_context_compactor_respects_budget():
+@pytest.mark.asyncio
+async def test_context_compactor_respects_budget():
     """Compactor never exceeds max_tokens."""
     compactor = ContextCompactor(max_tokens=100)  # Tiny budget
 
@@ -118,7 +119,7 @@ def test_context_compactor_respects_budget():
 
     # Depending on how the final trimming is implemented, it should prune or warn.
     # Our simple implementation just summarizes early ones. We check it doesn't crash.
-    messages = compactor.build_context(
+    messages = await compactor.build_context(
         chat_history=history,
         current_task="task",
         relevant_files=[],
@@ -128,7 +129,8 @@ def test_context_compactor_respects_budget():
     assert len(messages) >= 1
 
 
-def test_compactor_keeps_recent_full():
+@pytest.mark.asyncio
+async def test_compactor_keeps_recent_full():
     """Last 10 exchanges are included in full, older ones summarized."""
     compactor = ContextCompactor()
     history = []
@@ -139,7 +141,7 @@ def test_compactor_keeps_recent_full():
             _make_msg(MessageRole.USER if i % 2 == 0 else MessageRole.AGENT, f"Message {i}")
         )
 
-    messages = compactor.build_context(history, "Current task", [], "", "")
+    messages = await compactor.build_context(history, "Current task", [], "", "")
 
     # Assert earlier summary exists
     summary_idx = 1
@@ -150,22 +152,23 @@ def test_compactor_keeps_recent_full():
     assert messages[-1]["role"] == "user"  # The task addition
 
 
-def test_compactor_summary_is_cached():
+@pytest.mark.asyncio
+async def test_compactor_summary_is_cached():
     """Summary is not regenerated if no new messages crossed the threshold."""
     compactor = ContextCompactor()
     history = [_make_msg(MessageRole.USER, f"Msg {i}") for i in range(25)]
 
     # First call generates summary
-    compactor.build_context(history, "", [], "", "")
+    await compactor.build_context(history, "", [], "", "")
 
     # Second call with same history uses cache
     compactor._summary_cache = "MANUALLY POISONED"
-    compactor.build_context(history, "", [], "", "")
+    await compactor.build_context(history, "", [], "", "")
     assert compactor._summary_cache == "MANUALLY POISONED"  # Cache was hit, not regenerated
 
     # Adding new message crossing threshold regenerates
     history.append(_make_msg(MessageRole.AGENT, "Msg 25"))
-    compactor.build_context(history, "", [], "", "")
+    await compactor.build_context(history, "", [], "", "")
     assert compactor._summary_cache != "MANUALLY POISONED"  # Cache was regenerated
 
 
