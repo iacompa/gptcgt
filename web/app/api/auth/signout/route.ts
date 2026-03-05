@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BASE_URL } from "@/lib/config";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,9 +10,4 @@ export async function POST() {
     return response;
 }
 
-// Backwards-compatible GET redirect (e.g. old bookmarks or nav links)
-export async function GET() {
-    const response = NextResponse.redirect(new URL("/", process.env.NEXT_PUBLIC_BASE_URL || "https://gptcgt.ai"));
-    response.cookies.delete("gptcgt_session");
-    return response;
-}
+

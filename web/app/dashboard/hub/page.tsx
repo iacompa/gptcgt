@@ -15,7 +15,7 @@ import {
     ExternalLink,
     RefreshCw,
 } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 
 interface Repo {
     id: number;
@@ -172,8 +172,9 @@ export default function HubPage() {
 
     const loadRepos = useCallback(async () => {
         try {
-            const data = await fetchAPI("/github/repos");
-            setRepos(data);
+            const { data, error } = await apiClient.GET("/github/repos");
+            if (error) throw error;
+            setRepos((data as any[]) || []);
         } catch (err: any) {
             console.error("Failed to load repos:", err);
         }
@@ -181,10 +182,13 @@ export default function HubPage() {
 
     const checkGithubStatus = useCallback(async () => {
         try {
-            const status = await fetchAPI("/github/status");
-            setConnected(status.connected);
-            setGhUsername(status.username || "");
-            if (status.connected) {
+            const { data, error } = await apiClient.GET("/github/status");
+            if (error) throw error;
+
+            const status = data as any;
+            setConnected(!!status?.connected);
+            setGhUsername(status?.username || "");
+            if (status?.connected) {
                 await loadRepos();
             }
         } catch {
@@ -200,9 +204,11 @@ export default function HubPage() {
 
     const handleConnect = async () => {
         try {
-            const data = await fetchAPI("/github/connect");
-            if (data.auth_url) {
-                window.location.href = data.auth_url;
+            const { data, error } = await apiClient.GET("/github/connect");
+            if (error) throw error;
+            const res = data as any;
+            if (res?.auth_url) {
+                window.location.href = res.auth_url;
             }
         } catch (err: any) {
             alert(err.message || "Failed to connect to GitHub");
@@ -217,8 +223,14 @@ export default function HubPage() {
 
         try {
             const [owner, name] = repo.full_name.split("/");
-            const data = await fetchAPI(`/github/tree/${owner}/${name}?branch=${repo.default_branch}`);
-            setTree(buildTree(data));
+            const { data, error } = await apiClient.GET("/github/tree/{owner}/{repo}", {
+                params: {
+                    path: { owner, repo: name },
+                    query: { branch: repo.default_branch }
+                }
+            });
+            if (error) throw error;
+            setTree(buildTree((data as any[]) || []));
         } catch (err: any) {
             console.error("Failed to load tree:", err);
             setTree([]);
@@ -234,10 +246,14 @@ export default function HubPage() {
 
         try {
             const [owner, name] = selectedRepo.full_name.split("/");
-            const data = await fetchAPI(
-                `/github/file/${owner}/${name}/${path}?branch=${selectedRepo.default_branch}`
-            );
-            setFileContent(data.content);
+            const { data, error } = await apiClient.GET("/github/file/{owner}/{repo}/{path}", {
+                params: {
+                    path: { owner, repo: name, path },
+                    query: { branch: selectedRepo.default_branch }
+                }
+            });
+            if (error) throw error;
+            setFileContent((data as any)?.content || "");
         } catch (err: any) {
             setFileContent(`Error loading file: ${err.message}`);
         } finally {

@@ -1,4 +1,4 @@
-import { fetchAPI } from "@/lib/api-server";
+import { getServerApiClient } from "@/lib/api-server";
 import { getSession } from "@/lib/auth";
 import { Key, CreditCard, Activity, AlertTriangle, Zap, Users } from "lucide-react";
 import Link from "next/link";
@@ -13,7 +13,13 @@ export default async function DashboardOverview() {
     let apiError = null;
 
     try {
-        profile = await fetchAPI("/user/me");
+        const client = await getServerApiClient();
+        const { data, error } = await client.GET("/user/me");
+        if (error) {
+            apiError = "Failed to load profile details";
+        } else {
+            profile = data as any;
+        }
     } catch (e: any) {
         apiError = e.message;
     }

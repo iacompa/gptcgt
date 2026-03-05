@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { API_URL } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
-
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 /**
  * POST /api/chat
@@ -35,6 +34,7 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({
                 messages,
+                model: body.model || "gpt-4o-mini",
                 stream: true,
             }),
         });

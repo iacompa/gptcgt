@@ -1,11 +1,25 @@
 import { getSession } from "@/lib/auth";
+import { API_URL } from "@/lib/config";
+import createClient from "openapi-fetch";
+import type { paths } from "./api-schema";
+
+export async function getServerApiClient() {
+    const session = await getSession();
+    const token = session?.accessToken;
+
+    return createClient<paths>({
+        baseUrl: API_URL,
+        headers: token ? {
+            "Authorization": `Bearer ${token}`
+        } : {}
+    });
+}
 
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     const session = await getSession();
     const token = session?.accessToken;
 
-    const baseUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    const url = `${baseUrl}${endpoint}`;
+    const url = `${API_URL}${endpoint}`;
 
     const headers = new Headers(options.headers || {});
     headers.set("Content-Type", "application/json");
