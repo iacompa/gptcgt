@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Bot, User, Loader2, Sparkles, Copy, Check } from "lucide-react";
+import { apiClient } from "@/lib/api-client";
 
 interface Message {
     id: string;
@@ -15,9 +16,23 @@ export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [credits, setCredits] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        apiClient.GET("/user/me")
+            .then(({ data, error }) => {
+                if (error) throw error;
+                const profile = data as any;
+                if (profile?.credits_remaining !== undefined) {
+                    setCredits(profile.credits_remaining);
+                }
+            })
+            .catch(console.error);
+    }, []);
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -58,6 +73,7 @@ export default function ChatPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    model: selectedModel,
                     messages: [...messages, userMsg].map((m) => ({
                         role: m.role,
                         content: m.content,
@@ -154,9 +170,31 @@ export default function ChatPage() {
                         Send prompts through the gptcgt proxy to any model
                     </p>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-                    Streaming enabled
+                <div className="flex items-center gap-4">
+                    <select
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                    >
+                        <option value="gpt-4o-mini">Fast (Scout - 1 cr)</option>
+                        <option value="gpt-4o">Smart (Standard - 5 cr)</option>
+                        <option value="claude-3-7-sonnet-20250219">Claude 3.7 (Standard - 5 cr)</option>
+                        <option value="deepseek-chat">DeepSeek V3 (Standard - 5 cr)</option>
+                        <option value="o3-mini">o3-mini (Scout - 1 cr)</option>
+                    </select>
+                    <div className="flex items-center gap-4 text-xs font-medium bg-gray-900 border border-gray-800 px-3 py-1.5 rounded text-gray-300">
+                        {credits !== null ? (
+                            <span className="flex items-center gap-1.5" title="Available Credits">
+                                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                                {credits.toLocaleString()} Credits
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
+                                Loading...
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -179,14 +217,14 @@ export default function ChatPage() {
                     <div
                         key={msg.id}
                         className={`group flex gap-3 py-4 px-4 rounded-xl transition-colors ${msg.role === "user"
-                                ? "bg-gray-900/40"
-                                : "bg-gray-900/70 border border-gray-800/50"
+                            ? "bg-gray-900/40"
+                            : "bg-gray-900/70 border border-gray-800/50"
                             }`}
                     >
                         <div
                             className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${msg.role === "user"
-                                    ? "bg-indigo-500/20 text-indigo-400"
-                                    : "bg-emerald-500/20 text-emerald-400"
+                                ? "bg-indigo-500/20 text-indigo-400"
+                                : "bg-emerald-500/20 text-emerald-400"
                                 }`}
                         >
                             {msg.role === "user" ? (

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth';
+import { API_URL, BASE_URL, IS_PRODUCTION } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
-
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 /**
  * POST handler for email/password signin.
@@ -68,7 +67,7 @@ export async function POST(request: Request) {
         // httpOnly cookie only — no token in response body
         response.cookies.set('gptcgt_session', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: IS_PRODUCTION,
             sameSite: 'strict',
             path: '/',
             maxAge: 60 * 60 * 24, // 24 hours
@@ -90,12 +89,12 @@ export async function GET(request: Request) {
     const provider = searchParams.get('provider') || 'google';
 
     const workosClientId = process.env.WORKOS_CLIENT_ID;
-    const redirectUri = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://gptcgt.ai'}/api/auth/callback`;
+    const redirectUri = `${BASE_URL}/api/auth/callback`;
 
     if (!workosClientId) {
         // Fallback: redirect to email/password auth page
         return NextResponse.redirect(
-            new URL('/auth', process.env.NEXT_PUBLIC_BASE_URL || 'https://gptcgt.ai')
+            new URL('/auth', BASE_URL)
         );
     }
 
@@ -106,5 +105,18 @@ export async function GET(request: Request) {
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('provider', provider === 'github' ? 'authkit' : 'GoogleOAuth');
 
-    return NextResponse.redirect(authUrl.toString());
+    // P1-01: CSRF state verification
+    const state = crypto.randomUUID();
+    authUrl.searchParams.set('state', state);
+
+    const response = NextResponse.redirect(authUrl.toString());
+    response.cookies.set('oauth_state', state, {
+        httpOnly: true,
+        secure: IS_PRODUCTION,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 10, // 10 minutes
+    });
+
+    return response;
 }

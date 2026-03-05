@@ -1,9 +1,36 @@
 "use client";
 
-import { Check, Shield, Database, Users, KeyRound } from "lucide-react";
+import { Check, Shield, Database, Users, KeyRound, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import { apiClient } from "@/lib/api-client";
 
 export default function PricingPage() {
+    const [loadingPack, setLoadingPack] = useState<number | null>(null);
+
+    const handleBuyPack = async (amount: number) => {
+        try {
+            setLoadingPack(amount);
+            const { data, error } = await apiClient.POST("/billing/credits", {
+                body: { credit_amount: amount } as any
+            });
+            if (error) throw error;
+            if (data?.url) {
+                window.location.href = data.url;
+            } else {
+                alert("Checkout failed: Unknown error");
+            }
+        } catch (e: any) {
+            if (e.message && e.message.includes("Authorization")) {
+                window.location.href = "/auth?redirect_url=/pricing";
+            } else {
+                alert("Error initiating checkout: " + e.message);
+            }
+        } finally {
+            setLoadingPack(null);
+        }
+    };
+
     return (
         <div className="py-24 sm:py-32 max-w-7xl mx-auto px-6 lg:px-8">
             <div className="mx-auto max-w-4xl text-center">
@@ -11,7 +38,7 @@ export default function PricingPage() {
                 <p className="mt-2 text-4xl font-bold tracking-tight text-white sm:text-5xl">
                     Scale capabilities, not headcount
                 </p>
-                <p className="mt-4 text-lg text-gray-400">Use your own API keys for free, or subscribe for managed credits and zero-config access to every provider.</p>
+                <p className="mt-4 text-lg text-gray-400">Use your own API keys for free in the CLI/Terminal, or subscribe for managed credits to unlock the Web UI and zero-config access to every provider.</p>
             </div>
 
             <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-6 lg:max-w-7xl lg:grid-cols-4">
@@ -20,9 +47,9 @@ export default function PricingPage() {
                     <div>
                         <div className="flex items-center gap-2">
                             <KeyRound className="h-5 w-5 text-emerald-400" />
-                            <h3 className="text-2xl font-bold text-white">BYOK</h3>
+                            <h3 className="text-2xl font-bold text-white">BYOK (CLI)</h3>
                         </div>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">Bring Your Own Keys. Use your own API keys from any provider — pay them directly.</p>
+                        <p className="mt-4 text-sm leading-6 text-gray-400">Bring Your Own Keys. Use your own API keys locally in the CLI/Terminal — pay providers directly.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
                             <span className="text-4xl font-bold tracking-tight text-emerald-400">Free</span>
                             <span className="text-sm font-semibold leading-6 text-gray-400">forever</span>
@@ -57,7 +84,7 @@ export default function PricingPage() {
                             <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Standard Support</li>
                         </ul>
                     </div>
-                    <Link href="/auth" className="mt-8 block rounded-md bg-indigo-500/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-indigo-400 hover:bg-indigo-500/20 ring-1 ring-inset ring-indigo-500/20">
+                    <Link href="/dashboard/billing" className="mt-8 block rounded-md bg-indigo-500/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-indigo-400 hover:bg-indigo-500/20 ring-1 ring-inset ring-indigo-500/20">
                         Get started
                     </Link>
                 </div>
@@ -79,7 +106,7 @@ export default function PricingPage() {
                             <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Priority Support</li>
                         </ul>
                     </div>
-                    <Link href="/auth" className="mt-8 block rounded-md bg-indigo-500 px-3 py-2 text-center text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    <Link href="/dashboard/billing" className="mt-8 block rounded-md bg-indigo-500 px-3 py-2 text-center text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
                         Start Team Trial
                     </Link>
                 </div>
@@ -113,19 +140,40 @@ export default function PricingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
                         <div className="text-xl font-bold text-white mb-1">100 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$5.00</div>
-                        <button className="w-full bg-gray-800 hover:bg-gray-700 text-white rounded py-2 text-sm font-medium transition">Buy Pack</button>
+                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$1.00</div>
+                        <button
+                            onClick={() => handleBuyPack(100)}
+                            disabled={loadingPack !== null}
+                            className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            {loadingPack === 100 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Buy Pack
+                        </button>
                     </div>
                     <div className="bg-gray-900 border border-indigo-500/50 rounded-xl p-6 relative">
                         <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Value</div>
                         <div className="text-xl font-bold text-white mb-1">500 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$20.00</div>
-                        <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded py-2 text-sm font-medium transition">Buy Pack</button>
+                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$5.00</div>
+                        <button
+                            onClick={() => handleBuyPack(500)}
+                            disabled={loadingPack !== null}
+                            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            {loadingPack === 500 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Buy Pack
+                        </button>
                     </div>
                     <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
                         <div className="text-xl font-bold text-white mb-1">1,000 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$35.00</div>
-                        <button className="w-full bg-gray-800 hover:bg-gray-700 text-white rounded py-2 text-sm font-medium transition">Buy Pack</button>
+                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$10.00</div>
+                        <button
+                            onClick={() => handleBuyPack(1000)}
+                            disabled={loadingPack !== null}
+                            className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                        >
+                            {loadingPack === 1000 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Buy Pack
+                        </button>
                     </div>
                 </div>
             </div>

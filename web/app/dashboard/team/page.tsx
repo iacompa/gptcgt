@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { UserPlus, Mail, Shield, CheckCircle2, Trash2, Clock, Users, AlertTriangle } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 
 interface TeamMember {
     id: string;
@@ -37,15 +37,14 @@ export default function TeamPage() {
 
     const loadTeamData = useCallback(async () => {
         try {
-            const [rawMembers, invites] = await Promise.all([
-                // F09: API route is GET /team/ (not /team/members)
-                fetchAPI("/team/").catch(() => []),
-                fetchAPI("/team/invites/pending").catch(() => []),
+            const [rawMembersRes, invitesRes] = await Promise.all([
+                apiClient.GET("/team/"),
+                apiClient.GET("/team/invites/pending"),
             ]);
-            // F10: Map team_role from API to role expected by UI
+            const rawMembers = (rawMembersRes.data as any[]) || [];
+            const invites = (invitesRes.data as any[]) || [];
             const mapped = (rawMembers || []).map((m: any) => ({
                 ...m,
-                role: m.team_role || m.role || "member",
                 status: "Active",
             }));
             setTeamMembers(mapped);
@@ -57,10 +56,12 @@ export default function TeamPage() {
 
     const loadProfile = useCallback(async () => {
         try {
-            const data = await fetchAPI("/user/me");
-            setProfile(data);
+            const { data, error } = await apiClient.GET("/user/me");
+            if (error) throw error;
+            const profileData = data as any;
+            setProfile(profileData);
 
-            if (data.plan === "team" || data.plan === "enterprise") {
+            if (profileData.plan === "team" || profileData.plan === "enterprise") {
                 await loadTeamData();
             }
         } catch (e) {
@@ -83,10 +84,10 @@ export default function TeamPage() {
         setInviteSuccess("");
 
         try {
-            await fetchAPI("/team/invites/invite", {
-                method: "POST",
-                body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+            const { error } = await apiClient.POST("/team/invites/invite", {
+                body: { email: inviteEmail, role: inviteRole } as any
             });
+            if (error) throw error;
             setInviteSuccess(`Invite sent to ${inviteEmail}`);
             setInviteEmail("");
             await loadTeamData();
@@ -101,10 +102,10 @@ export default function TeamPage() {
     const handleRemoveMember = async (userId: string) => {
         if (!confirm("Remove this member from the team?")) return;
         try {
-            await fetchAPI("/team/invites/member", {
-                method: "DELETE",
-                body: JSON.stringify({ target_user_id: userId }),
+            const { error } = await apiClient.DELETE("/team/invites/member", {
+                body: { target_user_id: userId } as any
             });
+            if (error) throw error;
             await loadTeamData();
         } catch (err: any) {
             alert(err.message || "Failed to remove member");
