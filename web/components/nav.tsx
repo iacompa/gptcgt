@@ -52,9 +52,15 @@ export function DashboardNav({ session }: { session: any }) {
             </nav>
 
             <div className="p-4 border-t border-gray-800">
-                <a href="/api/auth/signout" className="text-gray-400 hover:text-red-400 flex items-center gap-2 text-sm px-2 transition-colors">
+                <button
+                    onClick={async () => {
+                        await fetch("/api/auth/signout", { method: "POST" });
+                        window.location.href = "/";
+                    }}
+                    className="text-gray-400 hover:text-red-400 flex items-center gap-2 text-sm px-2 transition-colors w-full"
+                >
                     <LogOut className="h-4 w-4" /> Sign Out
-                </a>
+                </button>
             </div>
         </div>
     );

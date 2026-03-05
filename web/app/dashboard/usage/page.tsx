@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import { UsageChart } from "@/components/usage-chart";
 
 export default function UsagePage() {
@@ -21,17 +21,20 @@ export default function UsagePage() {
     const loadUsage = async () => {
         try {
             // In a real app we'd pass start_date and end_date
-            const data = await fetchAPI("/usage/");
-            setEvents(data);
+            const { data, error } = await apiClient.GET("/usage/");
+            if (error) throw error;
+
+            const usageData = (data as any[]) || [];
+            setEvents(usageData);
 
             // Calculate Stats
             let credits = 0;
-            let requests = data.length;
+            let requests = usageData.length;
             let sandboxRuns = 0;
 
             const chartMap = new Map<string, number>();
 
-            data.forEach((evt: any) => {
+            usageData.forEach((evt: any) => {
                 credits += evt.credits_consumed;
                 if (evt.task_mode === "sandbox" || (evt.models_used && evt.models_used.includes("e2b_sandbox_run"))) {
                     sandboxRuns++;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import { PricingTable } from "@/components/pricing-table";
 
 export default function AccountPage() {
@@ -9,6 +9,7 @@ export default function AccountPage() {
     const [loading, setLoading] = useState(true);
     const [capInput, setCapInput] = useState("");
     const [savingCap, setSavingCap] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         loadProfile();
@@ -16,10 +17,14 @@ export default function AccountPage() {
 
     const loadProfile = async () => {
         try {
-            const data = await fetchAPI("/user/me");
-            setProfile(data);
-            if (data.spending_cap !== null) {
-                setCapInput(data.spending_cap.toString());
+            const { data, error } = await apiClient.GET("/user/me");
+            if (error) throw error;
+            if (data) {
+                const pd = data as any;
+                setProfile(pd);
+                if (pd.spending_cap !== null && pd.spending_cap !== undefined) {
+                    setCapInput(pd.spending_cap.toString());
+                }
             }
         } catch (e) {
             console.error(e);
@@ -32,16 +37,38 @@ export default function AccountPage() {
         setSavingCap(true);
         try {
             const capVal = capInput === "" ? null : parseInt(capInput);
-            await fetchAPI("/user/me/spending_cap", {
-                method: "PATCH",
-                body: JSON.stringify({ spending_cap: capVal })
+            const { error } = await apiClient.PATCH("/user/me/spending_cap", {
+                body: { spending_cap: capVal }
             });
+            if (error) throw error;
             loadProfile();
         } catch (e) {
             console.error(e);
             alert("Failed to update spending cap");
         } finally {
             setSavingCap(false);
+        }
+    };
+
+    const deleteAccount = async () => {
+        const confirmed = window.confirm(
+            "Are you absolutely sure you want to delete your account? " +
+            "This will instantly cancel any active subscriptions, disable your API keys, and anonymize your identity. " +
+            "This action cannot be undone."
+        );
+        if (!confirmed) return;
+
+        setDeleting(true);
+        try {
+            const { error } = await apiClient.DELETE("/user/me");
+            if (error) throw error;
+            // Hard clear the session cookie through the signout handler to ensure frontend wipe
+            await fetch("/api/auth/signout", { method: "POST" });
+            window.location.href = "/";
+        } catch (e) {
+            console.error("Deletion failed", e);
+            alert("Failed to delete account. Please try again or contact support.");
+            setDeleting(false);
         }
     };
 
@@ -100,8 +127,9 @@ export default function AccountPage() {
                         className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
                         onClick={async () => {
                             try {
-                                const res = await fetchAPI("/billing/portal", { method: "POST" });
-                                if (res?.url) window.location.href = res.url;
+                                const { data, error } = await apiClient.POST("/billing/portal");
+                                if (error) throw error;
+                                if (data?.url) window.location.href = data.url;
                             } catch (e) {
                                 alert("Could not open billing portal. Please try again.");
                             }
@@ -115,8 +143,12 @@ export default function AccountPage() {
             <div className="bg-red-950/20 border border-red-900/50 rounded-xl p-6">
                 <h2 className="text-lg font-bold text-red-500 mb-2">Danger Zone</h2>
                 <p className="text-gray-400 text-sm mb-4">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                <button className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md font-medium text-sm">
-                    Delete Account
+                <button
+                    onClick={deleteAccount}
+                    disabled={deleting}
+                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md font-medium text-sm disabled:opacity-50"
+                >
+                    {deleting ? "Deleting Account..." : "Delete Account"}
                 </button>
             </div>
 

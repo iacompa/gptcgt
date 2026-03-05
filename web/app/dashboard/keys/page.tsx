@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Copy, Check } from "lucide-react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 
 export default function KeysPage() {
     const [keys, setKeys] = useState<any[]>([]);
@@ -19,8 +19,9 @@ export default function KeysPage() {
 
     const loadKeys = async () => {
         try {
-            const data = await fetchAPI("/api_keys/");
-            setKeys(data);
+            const { data, error } = await apiClient.GET("/api_keys/");
+            if (error) throw error;
+            setKeys((data as any[]) || []);
         } catch (e) {
             console.error(e);
         } finally {
@@ -34,11 +35,11 @@ export default function KeysPage() {
 
         setGenerating(true);
         try {
-            const data = await fetchAPI("/api_keys/", {
-                method: "POST",
-                body: JSON.stringify({ provider: selectedProvider, key: apiKeyInput })
+            const { data, error } = await apiClient.POST("/api_keys/", {
+                body: { provider: selectedProvider, key: apiKeyInput } as any
             });
-            setNewKey({ ...data, raw: apiKeyInput });
+            if (error) throw error;
+            setNewKey({ ...(data as any), raw: apiKeyInput });
             setApiKeyInput("");
             setSelectedProvider("anthropic");
             loadKeys();
@@ -53,7 +54,10 @@ export default function KeysPage() {
     const deleteKey = async (id: string) => {
         if (!confirm("Are you sure you want to revoke this key?")) return;
         try {
-            await fetchAPI(`/api_keys/${id}`, { method: "DELETE" });
+            const { error } = await apiClient.DELETE("/api_keys/{key_id}", {
+                params: { path: { key_id: id } }
+            });
+            if (error) throw error;
             loadKeys();
         } catch (e) {
             console.error(e);
