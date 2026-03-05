@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAPI } from "@/lib/api";
+import { apiClient } from "@/lib/api-client";
 import { CreditCard, ShieldAlert } from "lucide-react";
 
 export default function BillingPage() {
@@ -16,8 +16,9 @@ export default function BillingPage() {
 
     const loadStatus = async () => {
         try {
-            const data = await fetchAPI("/billing/status");
-            setStatus(data);
+            const { data, error } = await apiClient.GET("/billing/status");
+            if (error) throw error;
+            setStatus(data as any);
         } catch (e) {
             console.error(e);
         } finally {
@@ -27,11 +28,11 @@ export default function BillingPage() {
 
     const handleCheckout = async (plan: string, quantity: number = 1) => {
         try {
-            const data = await fetchAPI("/billing/checkout", {
-                method: "POST",
-                body: JSON.stringify({ plan, annual: false, quantity })
+            const { data, error } = await apiClient.POST("/billing/checkout", {
+                body: { plan, annual: false, quantity } as any
             });
-            window.location.href = data.url;
+            if (error) throw error;
+            if (data?.url) window.location.href = data.url;
         } catch (e) {
             alert("Checkout failed");
         }
@@ -39,8 +40,9 @@ export default function BillingPage() {
 
     const handlePortal = async () => {
         try {
-            const data = await fetchAPI("/billing/portal", { method: "POST" });
-            window.location.href = data.url;
+            const { data, error } = await apiClient.POST("/billing/portal");
+            if (error) throw error;
+            if (data?.url) window.location.href = data.url;
         } catch (e) {
             alert("Portal access failed");
         }
@@ -48,11 +50,11 @@ export default function BillingPage() {
 
     const handlePurchaseCredits = async () => {
         try {
-            const data = await fetchAPI("/billing/credits", {
-                method: "POST",
-                body: JSON.stringify({ credit_amount: creditAmount })
+            const { data, error } = await apiClient.POST("/billing/credits", {
+                body: { credit_amount: creditAmount } as any
             });
-            window.location.href = data.url;
+            if (error) throw error;
+            if (data?.url) window.location.href = data.url;
         } catch (e) {
             alert("Failed to initiate credit purchase");
         }
@@ -64,10 +66,10 @@ export default function BillingPage() {
         const cap = fd.get("cap") ? parseInt(fd.get("cap") as string) : null;
 
         try {
-            await fetchAPI("/user/me/spending_cap", {
-                method: "PATCH",
-                body: JSON.stringify({ spending_cap: cap })
+            const { error } = await apiClient.PATCH("/user/me/spending_cap", {
+                body: { spending_cap: cap }
             });
+            if (error) throw error;
             loadStatus();
             alert("Spending cap updated");
         } catch (e) {
@@ -180,7 +182,7 @@ export default function BillingPage() {
                             <div className="bg-gray-950 border border-gray-800 rounded-lg p-4 mb-4">
                                 <div className="flex justify-between items-center mb-6">
                                     <span className="text-2xl font-bold text-white">{creditAmount.toLocaleString()} <span className="text-sm text-gray-500 font-normal">Credits</span></span>
-                                    <span className="text-xl text-emerald-400 font-medium">${(creditAmount * 0.04).toFixed(2)}</span>
+                                    <span className="text-xl text-emerald-400 font-medium">${(creditAmount * 0.01).toFixed(2)}</span>
                                 </div>
 
                                 <input
