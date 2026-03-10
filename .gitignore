@@ -7,6 +7,8 @@ build/
 *.egg-info/
 .gptcgt/
 .env
+.env.*
+!.env.example
 *.db
 node_modules/
 .next/
@@ -17,6 +19,8 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 web/.env.local
+web/.env.*
+!web/.env.local.example
 .github/workflows/
 
 # Virtual environment
