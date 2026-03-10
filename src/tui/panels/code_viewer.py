@@ -39,7 +39,6 @@ class SmoothScroll(VerticalScroll):
         self.scroll_relative(y=-3, animate=False)
 
 
-
 class CodeView(Vertical):
     """Displays syntax-highlighted code with per-line selection support, or unified diffs."""
 
@@ -212,9 +211,7 @@ class CodeView(Vertical):
                 for ln in hunk.user_text.splitlines():
                     lines.append(f"[cyan on #003333]+ {ln}[/cyan on #003333]")
             else:
-                status_color = {"pending": "yellow", "approved": "green", "rejected": "red"}.get(
-                    hunk.status, "white"
-                )
+                status_color = {"pending": "yellow", "approved": "green", "rejected": "red"}.get(hunk.status, "white")
                 lines.append(
                     f"[{status_color}]@@ -{hunk.start_line} +{hunk.end_line} @@ ({hunk.status.upper()})[/{status_color}]"  # noqa: E501
                 )
@@ -549,9 +546,7 @@ class CodeViewerPanel(Vertical):
         label = self.query_one("#multi-agent-label", Label)
         ps = self.patch_set
         agent_name = f"{ps.agent_id} ({ps.model_name})" if ps else "Unknown"
-        label.update(
-            f"Viewing: {agent_name} [{self.agent_idx + 1}/{len(self.multi_patch_set.patch_sets)}]"
-        )
+        label.update(f"Viewing: {agent_name} [{self.agent_idx + 1}/{len(self.multi_patch_set.patch_sets)}]")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if self.multi_patch_set:
@@ -626,7 +621,9 @@ class CodeViewerPanel(Vertical):
             # ELO Recording
             try:
                 tracker = EloTracker()
-                winner_id = self.patch_set.model_id if hasattr(self.patch_set, "model_id") else self.patch_set.model_name  # noqa: E501
+                winner_id = (
+                    self.patch_set.model_id if hasattr(self.patch_set, "model_id") else self.patch_set.model_name
+                )  # noqa: E501
                 winner_name = self.patch_set.model_name
 
                 loser_ids = []
@@ -641,7 +638,10 @@ class CodeViewerPanel(Vertical):
                     loser_ids=loser_ids,
                     complexity=len(modified),
                     duration_sec=getattr(self.patch_set, "generation_time", 5.0),
-                    costs={ps.model_id if hasattr(ps, "model_id") else ps.model_name: getattr(ps, "cost", 0.05) for ps in self.multi_patch_set.patch_sets}  # noqa: E501
+                    costs={
+                        ps.model_id if hasattr(ps, "model_id") else ps.model_name: getattr(ps, "cost", 0.05)
+                        for ps in self.multi_patch_set.patch_sets
+                    },  # noqa: E501
                 )
             except Exception as e:
                 logger.debug(f"ELO recording failed: {e}")
@@ -665,16 +665,19 @@ class CodeViewerPanel(Vertical):
             duration = self.patch_set.generation_time if self.patch_set else 0.0
             receipt_cost = self.patch_set.cost_usd if self.patch_set else 0.0
 
-            self.app.push_screen(BuildReceipt(
-                winner_name=winner_name,
-                loser_names=loser_names,
-                duration_sec=duration,
-                cost=receipt_cost,
-                files_changed=len(modified)
-            ))
+            self.app.push_screen(
+                BuildReceipt(
+                    winner_name=winner_name,
+                    loser_names=loser_names,
+                    duration_sec=duration,
+                    cost=receipt_cost,
+                    files_changed=len(modified),
+                )
+            )
 
             # Attempt to refresh global leaderboard if it exists in the tree
             from src.tui.panels.leaderboard import LeaderboardPanel
+
             try:
                 lb = self.app.query_one(LeaderboardPanel)
                 lb.refresh_data()

@@ -60,24 +60,19 @@ class UsageMeter:
         try:
             pool = get_pool()
 
-            # Look up internal UUID
-            internal_id = await pool.fetchval(
-                "SELECT id FROM users WHERE workos_user_id = $1", self.workos_user_id
+            # Look up internal UUID and team context for immutable usage logging
+            user_row = await pool.fetchrow(
+                "SELECT id, team_id FROM users WHERE workos_user_id = $1", self.workos_user_id
             )
 
-            if not internal_id:
+            if not user_row:
                 logger.error(
                     f"Cannot finalize usage: User UUID not found for workos_id {self.workos_user_id}"  # noqa: E501
                 )
                 return
 
-            # Deduct credits via the unified CreditService (row-level FOR UPDATE lock)
-            deduction = await _credit_service.deduct(pool, self.workos_user_id, self.mode)
-
-            if not deduction["success"]:
-                logger.error(
-                    f"Usage metered but deduction failed for {self.workos_user_id}: {deduction.get('reason')}"
-                )
+            # Credits were deducted upfront by check_and_deduct.
+            # We only need to write the usage_events row.
 
             models_array = list(self.models_used) if self.models_used else ["unknown"]
 
@@ -88,10 +83,11 @@ class UsageMeter:
             await pool.execute(
                 """
                 INSERT INTO usage_events
-                (user_id, task_mode, credits_consumed, models_used, input_tokens, output_tokens, success, duration_ms, created_at)  # noqa: E501
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+                (user_id, team_id, task_mode, credits_consumed, models_used, input_tokens, output_tokens, success, duration_ms, created_at)  # noqa: E501
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
                 """,
-                internal_id,
+                user_row["id"],
+                user_row["team_id"],
                 self.mode,
                 self.cost_credits,
                 models_array,
@@ -114,25 +110,22 @@ class UsageMeter:
         self._finalized = True
         try:
             pool = get_pool()
-            internal_id = await pool.fetchval(
-                "SELECT id FROM users WHERE workos_user_id = $1", self.workos_user_id
+            user_row = await pool.fetchrow(
+                "SELECT id, team_id FROM users WHERE workos_user_id = $1", self.workos_user_id
             )
-            if not internal_id:
+            if not user_row:
                 logger.error(f"Cannot record fixed cost: User UUID not found for workos_id {self.workos_user_id}")
                 return
-
-            deduction = await _credit_service.deduct(pool, self.workos_user_id, self.mode)
-            if not deduction["success"]:
-                logger.error(f"Fixed cost deduction failed for {self.workos_user_id}: {deduction.get('reason')}")
 
             duration_ms = int((datetime.now() - self.start_time).total_seconds() * 1000)
             await pool.execute(
                 """
                 INSERT INTO usage_events
-                (user_id, task_mode, credits_consumed, models_used, input_tokens, output_tokens, success, duration_ms, created_at)
-                VALUES ($1, $2, $3, $4, 0, 0, true, $5, now())
+                (user_id, team_id, task_mode, credits_consumed, models_used, input_tokens, output_tokens, success, duration_ms, created_at)
+                VALUES ($1, $2, $3, $4, $5, 0, 0, true, $6, now())
                 """,
-                internal_id,
+                user_row["id"],
+                user_row["team_id"],
                 self.mode,
                 self.cost_credits,
                 [event_type],

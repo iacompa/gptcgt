@@ -166,5 +166,3 @@ class AuthManager:
         KeyChainManager.clear_auth_tokens()
         self._is_authenticated = False
         self._profile = None
-
-

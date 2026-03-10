@@ -44,6 +44,10 @@ dependencies = [
     "stripe>=7.0.0",
     "cryptography>=42.0.0",
     "PyJWT>=2.8.0",
+    "email-validator>=2.1.0",
+    "PyGithub>=2.2.0",
+    "redis>=5.0.0",
+    "bcrypt>=4.0.1",
 ]
 
 [project.urls]
@@ -72,7 +76,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "D"]
-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "D203", "D212", "D415", "D401", "D400", "D205"]
+ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "D203", "D212", "D415", "D401", "D400", "D205", "E501"]
 
 [tool.black]
 line-length = 120

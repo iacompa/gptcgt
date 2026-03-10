@@ -40,7 +40,9 @@ MAX_DELEGATION_WALL_CLOCK_SEC = 120
 
 
 class ChatPipeline:
-    def __init__(self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD, _delegation_depth: int = 0):  # noqa: E501
+    def __init__(
+        self, chat_store: ChatStore, default_tier: QualityTier = QualityTier.STANDARD, _delegation_depth: int = 0
+    ):  # noqa: E501
         self.chat_store = chat_store
         self.default_tier = default_tier
         self.cost_tracker = None
@@ -87,6 +89,7 @@ class ChatPipeline:
         if self.cost_tracker:
             try:
                 from src.billing.spending_caps import SpendingCapService
+
                 SpendingCapService()
                 today_spend = self.cost_tracker.get_today_spend()
                 if today_spend.total_cost >= MAX_DELEGATION_COST_USD * 10:  # User-level daily cap
@@ -119,14 +122,13 @@ class ChatPipeline:
         current_mode = "standard"
         try:
             import textual.app as _tapp
+
             current_mode = _tapp.active_app.get().orchestrator.mode_manager.active_mode.value
         except Exception:
             pass
 
         extra_headers = {"X-GPTCGT-Mode": current_mode}
-        agent = AgentFactory.create_agent(
-            model_def, api_key=api_key, base_url=base_url, extra_headers=extra_headers
-        )
+        agent = AgentFactory.create_agent(model_def, api_key=api_key, base_url=base_url, extra_headers=extra_headers)
         messages = await self._build_context_messages(
             user_text, attached_files, reflection_hint, model_def, SystemPromptBuilder, ContextManager
         )
@@ -135,9 +137,11 @@ class ChatPipeline:
 
         if self.cost_tracker:
             import uuid
+
             task_id = str(uuid.uuid4())
             # F21: Use actual mode and credit cost instead of hardcoded standard/5
             from src.billing.credits import CreditService
+
             _credit_svc = CreditService()
             _actual_mode = current_mode if current_mode else "standard"
             _actual_credits = _credit_svc.CREDIT_COSTS.get(_actual_mode, 5)
@@ -151,8 +155,66 @@ class ChatPipeline:
 
         agent.config.tools = get_tool_definitions()
         agent.config.temperature = 0.2
-        if self.default_tier == QualityTier.LIGHT:
-            agent.config.max_tokens = 1000
+
+        # ── Phase 4+5: CostAutopilot mode selection + policy enforcement ──
+        from src.core.config import ConfigManager
+        usr_cfg = ConfigManager.get_instance().user
+
+        # Build budget health from cost tracker
+        autopilot_decision = None
+        try:
+            from src.core.autopilot import BudgetHealth, CostAutopilot
+
+            budget_health = BudgetHealth(
+                daily_limit_usd=getattr(usr_cfg, "daily_spend_limit", 10.0),
+                session_limit_usd=getattr(usr_cfg, "max_autonomous_budget", 20.0),
+            )
+            if self.cost_tracker:
+                today = self.cost_tracker.get_today_spend()
+                budget_health.daily_spend_usd = today.total_cost
+
+            autopilot = CostAutopilot()
+            autopilot_decision = autopilot.select_mode(complexity, budget_health)
+            logger.info(f"Autopilot: {autopilot_decision.to_text()}")
+        except Exception as e:
+            logger.debug(f"Autopilot skipped: {e}")
+
+        # Policy run-start check
+        try:
+            from src.core.policy import PolicyEnforcer, PolicyParser
+            policy_cfg, _ = PolicyParser.load()
+            enforcer = PolicyEnforcer(policy_cfg)
+            current_spend = 0.0
+            if self.cost_tracker:
+                current_spend = self.cost_tracker.get_today_spend().total_cost
+            allowed, errs = enforcer.check_run_start(current_spend, current_mode)
+            if not allowed:
+                logger.warning(f"Policy blocked run start: {errs}")
+                if error_callback:
+                    await error_callback(f"⛔ Policy violation: {'; '.join(errs)}")
+                return
+        except Exception as e:
+            logger.debug(f"Policy run-start check skipped: {e}")
+
+        # Apply token limits from autopilot decision or static config
+        if current_mode == "architect":
+            agent.config.max_tokens = getattr(usr_cfg, "max_tokens_architect", 3000)
+        elif current_mode == "coder":
+            agent.config.max_tokens = getattr(usr_cfg, "max_tokens_coder", 8000)
+        elif current_mode == "scout":
+            agent.config.max_tokens = getattr(usr_cfg, "max_tokens_scout", 2000)
+        elif current_mode == "tester":
+            agent.config.max_tokens = getattr(usr_cfg, "max_tokens_tester", 4000)
+        else:
+            agent.config.max_tokens = getattr(usr_cfg, "max_tokens_default", 5000)
+
+        # Override with autopilot ceiling if lower
+        if autopilot_decision:
+            autopilot_cap = autopilot_decision.budget.max_tokens_output
+            if autopilot_cap < agent.config.max_tokens:
+                agent.config.max_tokens = autopilot_cap
+                logger.info(f"Autopilot capped tokens to {autopilot_cap}")
+        # ──────────────────────────────────────────────────────────────────
 
         try:
             MAX_FAILOVER_ATTEMPTS = 2
@@ -176,10 +238,11 @@ class ChatPipeline:
                     break  # Success
                 except Exception as stream_err:
                     from src.agents.base import ProviderException
-  # noqa: W293
+
+                    # noqa: W293
                     is_transient = False
                     is_auth = False
-  # noqa: W293
+                    # noqa: W293
                     if isinstance(stream_err, ProviderException):
                         if stream_err.error_type in ("rate_limit", "timeout", "unknown"):
                             is_transient = True
@@ -187,22 +250,41 @@ class ChatPipeline:
                             is_auth = True
                     else:
                         err_str = str(stream_err).lower()
-                        is_transient = any(kw in err_str for kw in (
-                            "rate limit", "rate_limit", "ratelimit", "429",
-                            "timeout", "timed out", "connection",
-                            "temporary", "503", "502", "overloaded",
-                        ))
-                        is_auth = any(kw in err_str for kw in (
-                            "auth", "401", "403", "invalid api key",
-                            "invalid_api_key", "unauthorized",
-                        ))
+                        is_transient = any(
+                            kw in err_str
+                            for kw in (
+                                "rate limit",
+                                "rate_limit",
+                                "ratelimit",
+                                "429",
+                                "timeout",
+                                "timed out",
+                                "connection",
+                                "temporary",
+                                "503",
+                                "502",
+                                "overloaded",
+                            )
+                        )
+                        is_auth = any(
+                            kw in err_str
+                            for kw in (
+                                "auth",
+                                "401",
+                                "403",
+                                "invalid api key",
+                                "invalid_api_key",
+                                "unauthorized",
+                            )
+                        )
 
                     if is_auth or not is_transient or attempt == MAX_FAILOVER_ATTEMPTS:
                         raise stream_err
 
                     failed_models.add(current_model.id)
                     fallback = registry.get_fallback_model(
-                        current_model.id, self.default_tier,
+                        current_model.id,
+                        self.default_tier,
                         provider_preference=current_model.provider.value,
                         excluded=failed_models,
                     )
@@ -210,17 +292,19 @@ class ChatPipeline:
                         raise
 
                     logger.warning(
-                        f"Failover: {current_model.name} failed ({stream_err}), "
-                        f"retrying with {fallback.name}"
+                        f"Failover: {current_model.name} failed ({stream_err}), retrying with {fallback.name}"
                     )
                     try:
                         import textual.app as _tapp  # noqa: I001
                         from src.core.events import OrchestratorNarration
+
                         app = _tapp.active_app.get()
-                        app.post_message(OrchestratorNarration(
-                            f"⚠️ {current_model.name} failed, retrying with {fallback.name}...",
-                            "warning",
-                        ))
+                        app.post_message(
+                            OrchestratorNarration(
+                                f"⚠️ {current_model.name} failed, retrying with {fallback.name}...",
+                                "warning",
+                            )
+                        )
                     except Exception:
                         pass
 
@@ -231,22 +315,24 @@ class ChatPipeline:
                     if fb_key is None and fb_url is None:
                         raise
                     agent = AgentFactory.create_agent(
-                        current_model, api_key=fb_key,
-                        base_url=fb_url, extra_headers=extra_headers,
+                        current_model,
+                        api_key=fb_key,
+                        base_url=fb_url,
+                        extra_headers=extra_headers,
                     )
                     agent.config.tools = get_tool_definitions()
                     agent.config.temperature = 0.2
 
-            await self._handle_post_stream(
-                full_response, current_model, user_text, total_usage, registry
-            )
+            await self._handle_post_stream(full_response, current_model, user_text, total_usage, registry)
         except Exception as e:
             from src.agents.base import ProviderException
-  # noqa: W293
+
+            # noqa: W293
             # Guarantee the UI spinner stops on a hard pipeline crash
             try:
                 import textual.app as _tapp  # noqa: I001
                 from src.core.events import AgentCompleted
+
                 app = _tapp.active_app.get()
                 app.post_message(AgentCompleted())
             except Exception:
@@ -276,10 +362,12 @@ class ChatPipeline:
                     if len(parts) == 2:
                         provider_str, model_name = parts
                         from src.core.model_registry import Provider
+
                         try:
                             valid_provider = Provider(provider_str)
                             logger.info(f"Synthesizing temporary ModelDefinition for {model_id_override}")
                             from src.core.model_registry import ModelDefinition
+
                             model_def = ModelDefinition(
                                 id=model_id_override,
                                 name=model_name.replace("-", " ").title(),
@@ -291,7 +379,10 @@ class ChatPipeline:
                                 quality_tiers=["standard"],
                             )
                         except ValueError:
-                            return None, f"Unsupported provider '{provider_str}' in model override '{model_id_override}'."  # noqa: E501
+                            return (
+                                None,
+                                f"Unsupported provider '{provider_str}' in model override '{model_id_override}'.",
+                            )  # noqa: E501
                     else:
                         return None, f"Malformed model ID '{model_id_override}'. Expected 'provider/model' format."
             else:
@@ -299,13 +390,18 @@ class ChatPipeline:
                 effective_tier = self.default_tier
                 try:
                     import textual.app as _tapp
+
                     current_app = _tapp.active_app.get()
                     if hasattr(current_app, "orchestrator"):
                         mm = current_app.orchestrator.mode_manager
                         if mm.can_auto_tier():
                             recommended = mm.recommend_tier(complexity)
                             if recommended != effective_tier:
-                                tier_labels = {"light": "💡 Light (fast)", "standard": "⚡ Standard", "max": "🔥 Max (reasoning)"}  # noqa: E501
+                                tier_labels = {
+                                    "light": "💡 Light (fast)",
+                                    "standard": "⚡ Standard",
+                                    "max": "🔥 Max (reasoning)",
+                                }  # noqa: E501
                                 label = tier_labels.get(recommended.value, recommended.value)  # noqa: F841
                                 logger.info(f"Auto-tiering: complexity {complexity}/10 → {recommended.value}")
                                 effective_tier = recommended
@@ -313,6 +409,7 @@ class ChatPipeline:
                     logger.debug(f"Auto-tiering skipped: {e}")
 
                 from src.core.router import CodingRouter
+
                 model_def = CodingRouter().route_task("chat", complexity, effective_tier, role="coder")
         except ValueError as e:
             return None, str(e)
@@ -327,6 +424,7 @@ class ChatPipeline:
         auth_manager = None
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "auth_manager"):
                 auth_manager = current_app.auth_manager
@@ -337,26 +435,27 @@ class ChatPipeline:
             access, _ = KeyChainManager.get_auth_tokens()
             if not access:
                 if error_callback:
-                    await error_callback(
-                        "Authentication token missing for managed credits. Please sign in again."
-                    )
+                    await error_callback("Authentication token missing for managed credits. Please sign in again.")
                 return None, None
             return access, "https://api.gptcgt.ai/proxy/v1"
 
         key_name = PROVIDER_KEY_MAP.get(model_def.provider.value)
         api_key = KeyChainManager.get_key(key_name) if key_name else None
-  # noqa: W293
+        # noqa: W293
         # Extract explicitly defined base_url for custom/local endpoints
         base_url = getattr(model_def, "base_url", None)
-  # noqa: W293
+        # noqa: W293
         # Strict validation of base_url
         if base_url:
             import urllib.parse
+
             try:
                 res = urllib.parse.urlparse(base_url)
                 if res.scheme not in ("http", "https") or not res.netloc:
                     if error_callback:
-                        await error_callback(f"Invalid custom base_url: '{base_url}'. Must include valid scheme (http/https) and host.")  # noqa: E501
+                        await error_callback(
+                            f"Invalid custom base_url: '{base_url}'. Must include valid scheme (http/https) and host."
+                        )  # noqa: E501
                     return None, None
             except Exception:
                 if error_callback:
@@ -365,21 +464,24 @@ class ChatPipeline:
 
         if key_name and not api_key:
             from src.core.model_registry import Provider
-  # noqa: W293
+
+            # noqa: W293
             # If CUSTOM provider and it explicitly says api_key_required=False, allow it.
             if model_def.provider == Provider.CUSTOM:
                 if not getattr(model_def, "api_key_required", False):
                     return None, base_url
                 else:
                     if error_callback:
-                        await error_callback(f"Missing API key for custom endpoint '{model_def.id}'. Either provide a key, or set 'api_key_required = false' in your config.")  # noqa: E501
+                        await error_callback(
+                            f"Missing API key for custom endpoint '{model_def.id}'. Either provide a key, or set 'api_key_required = false' in your config."
+                        )  # noqa: E501
                     return None, None
-  # noqa: W293
+            # noqa: W293
             # Normal provider failure
             if error_callback:
                 await error_callback(f"Missing API key for {model_def.provider.value}.")
             return None, None
-  # noqa: W293
+        # noqa: W293
         return api_key, base_url
 
     async def _check_byok_daily_limit(self, base_url, error_callback) -> bool:
@@ -391,6 +493,7 @@ class ChatPipeline:
             return False
         try:
             from src.core.config import ConfigManager
+
             config = ConfigManager.get_instance()
             limit = config.user.daily_spend_limit
             today_spend = self.cost_tracker.get_today_spend().total_cost
@@ -424,6 +527,7 @@ class ChatPipeline:
         # --- Semantic compaction layer ---
         # Summarize old messages so ContextManager has less to truncate
         from src.core.context_compactor import ContextCompactor
+
         compactor = ContextCompactor(max_tokens=getattr(model_def, "max_context_tokens", 100_000))
         keep_full = 20  # keep last 20 messages at full fidelity
         compacted_history = list(history)
@@ -454,6 +558,7 @@ class ChatPipeline:
         try:
             from src.core.memory import AgentMemory
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             agent_mem = AgentMemory(ws.get_project_root())
             agent_context = agent_mem.get_context(model_def.name)
@@ -466,8 +571,7 @@ class ChatPipeline:
         # Inject reflection lesson if present (from ReflectionEngine via ChatPanel)
         if reflection_hint:
             effective_system_prompt = (
-                effective_system_prompt
-                + f"\n\n## Memory Update (Reflection Engine)\n{reflection_hint}"
+                effective_system_prompt + f"\n\n## Memory Update (Reflection Engine)\n{reflection_hint}"
             )
             logger.info("Injected ReflectionEngine lesson into system context.")
 
@@ -502,6 +606,7 @@ class ChatPipeline:
             async for chunk in agent.chat_stream(messages):
                 if cancel_event and cancel_event.is_set():
                     import asyncio
+
                     self._trigger_reflection_on_abort(model_def.name, user_text, iteration_text)
                     raise asyncio.CancelledError("User pressed Panic Button during generation.")
 
@@ -531,17 +636,24 @@ class ChatPipeline:
 
             cmd_msgs = await self._execute_tools(tool_calls, tool_call_callback, thought_callback)
             full_response, did_delegate = await self._handle_handoff(
-                cmd_msgs, full_response, yield_chunk_callback,
-                tool_call_callback, thought_callback, error_callback, cancel_event
+                cmd_msgs,
+                full_response,
+                yield_chunk_callback,
+                tool_call_callback,
+                thought_callback,
+                error_callback,
+                cancel_event,
             )
             if did_delegate:
                 break
 
-            messages.append({
-                "role": "assistant",
-                "content": iteration_text if iteration_text else None,
-                "tool_calls": tool_calls,
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": iteration_text if iteration_text else None,
+                    "tool_calls": tool_calls,
+                }
+            )
             messages.extend(cmd_msgs)
 
         return full_response
@@ -552,6 +664,7 @@ class ChatPipeline:
             import textual.app as _tapp
 
             from src.core.reflection_engine import ReflectionEngine
+
             engine = ReflectionEngine(_tapp.active_app.get())
             engine.reflect_on_friction(
                 model_name=model_name,
@@ -565,8 +678,14 @@ class ChatPipeline:
             pass
 
     async def _handle_handoff(
-        self, cmd_msgs, full_response, yield_chunk_callback,
-        tool_call_callback, thought_callback, error_callback, cancel_event
+        self,
+        cmd_msgs,
+        full_response,
+        yield_chunk_callback,
+        tool_call_callback,
+        thought_callback,
+        error_callback,
+        cancel_event,
     ):
         """Check for swarm delegation handoff signal in tool results. Returns (response, did_delegate)."""
         handoff_payload = None
@@ -590,9 +709,13 @@ class ChatPipeline:
 
         # P0 Fix: Recursion depth guard
         if self._delegation_depth >= MAX_DELEGATION_DEPTH:
-            logger.warning(f"Delegation depth {self._delegation_depth} exceeds max {MAX_DELEGATION_DEPTH}. Aborting sub-dispatch.")  # noqa: E501
+            logger.warning(
+                f"Delegation depth {self._delegation_depth} exceeds max {MAX_DELEGATION_DEPTH}. Aborting sub-dispatch."
+            )  # noqa: E501
             if error_callback:
-                await error_callback(f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted.")  # noqa: E501
+                await error_callback(
+                    f"Delegation depth limit ({MAX_DELEGATION_DEPTH}) reached. Recursive handoff aborted."
+                )  # noqa: E501
             return full_response, False
 
         # Multi-budget guard: check accumulated cost and tokens
@@ -614,6 +737,7 @@ class ChatPipeline:
             attached_files_with_content = []
             try:
                 from src.core.workspace import Workspace
+
                 ws = Workspace.get_instance()
                 for f in files:
                     content = ws.safe_read(f) if ws.safe_exists(f) else ""
@@ -623,12 +747,14 @@ class ChatPipeline:
                 attached_files_with_content = [{"path": f, "content": ""} for f in files]
 
         import time
+
         start_handoff = time.monotonic()
 
         try:
             import textual.app
 
             from src.core.events import SubTaskDelegated
+
             # We don't have the explicit parent ID inside the nested pipeline, so we use 'Orchestrator' or previous agent  # noqa: E501
             _tui_app = textual.app.active_app.get()
             _tui_app.post_message(
@@ -636,7 +762,7 @@ class ChatPipeline:
                     parent_agent_id="agent",
                     child_model_name=target_id,
                     instruction=instruction,
-                    depth=self._delegation_depth + 1
+                    depth=self._delegation_depth + 1,
                 )
             )
         except Exception:
@@ -680,7 +806,7 @@ class ChatPipeline:
         if thought_callback:
             await thought_callback(
                 f"Swarm Handoff: {target_id} ({elapsed:.1f}s)",
-                f"Instruction:\n{instruction}\n\nResult:\n{child_full_text}"
+                f"Instruction:\n{instruction}\n\nResult:\n{child_full_text}",
             )
 
         if action == "delegate":
@@ -691,23 +817,17 @@ class ChatPipeline:
 
     async def _handle_post_stream(self, full_response, model_def, user_text, total_usage, registry) -> None:
         """Persist chat history, record cost, and post PatchSetProposed event."""
-        self.chat_store.add_message(
-            MessageRole.USER, user_text, tokens_used=total_usage["prompt_tokens"]
-        )
+        self.chat_store.add_message(MessageRole.USER, user_text, tokens_used=total_usage["prompt_tokens"])
         self.chat_store.add_message(
             MessageRole.AGENT,
             full_response,
             model_id=model_def.id,
             tokens_used=total_usage["completion_tokens"],
-            cost=registry.calculate_cost(
-                model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"]
-            ),
+            cost=registry.calculate_cost(model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"]),
         )
 
         if self.cost_tracker:
-            cost = registry.calculate_cost(
-                model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"]
-            )
+            cost = registry.calculate_cost(model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"])
             self.cost_tracker.record_model_usage(
                 ModelUsage(
                     model_id=model_def.id,
@@ -726,14 +846,13 @@ class ChatPipeline:
             # Phase 9: Per-task budget enforcement
             self._check_task_budget(cost, total_usage, model_def)
 
-        patch_set = self.diff_extractor.extract(
-            full_response, agent_id="orchestrator", model_name=model_def.name
-        )
+        patch_set = self.diff_extractor.extract(full_response, agent_id="orchestrator", model_name=model_def.name)
         if patch_set.file_count > 0:
             try:
                 import textual.app as _tapp
 
                 from src.core.events import PatchSetProposed
+
                 _tapp.active_app.get().post_message(PatchSetProposed(patch_set=patch_set))
             except Exception as e:
                 logger.debug(f"Could not post PatchSetProposed: {e}")
@@ -741,12 +860,12 @@ class ChatPipeline:
         # Proactive success logging: record routing + cost for learning
         try:
             import textual.app as _tapp
+
             _app = _tapp.active_app.get()
             from src.core.reflection_engine import ReflectionEngine
+
             engine = ReflectionEngine(_app)
-            cost = registry.calculate_cost(
-                model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"]
-            )
+            cost = registry.calculate_cost(model_def.id, total_usage["prompt_tokens"], total_usage["completion_tokens"])
             engine.log_success(
                 model_name=model_def.name,
                 model_id=model_def.id,
@@ -762,6 +881,7 @@ class ChatPipeline:
         try:
             from src.core.memory import SessionHistory
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             history = SessionHistory(ws.get_project_root())
             history.log("user", user_text)
@@ -779,9 +899,7 @@ class ChatPipeline:
         complexity: int = 5,
     ) -> tuple[bool, str, int]:
         """Runs conditional E2B sandbox verification on proposed patches."""
-        patch_set = self.diff_extractor.extract(
-            full_response, agent_id="orchestrator", model_name=model_name
-        )
+        patch_set = self.diff_extractor.extract(full_response, agent_id="orchestrator", model_name=model_name)
         if patch_set.file_count > 0:
             from src.core.workspace import Workspace
             from src.tools.sandbox import E2BSandbox
@@ -793,32 +911,31 @@ class ChatPipeline:
                 ws = Workspace.get_instance()
                 verdict = await sandbox.verify_patch(patch_set, ws.get_project_root(), "python")
                 has_failures = (
-                    verdict.test_result
-                    and not verdict.test_result.all_passed
-                    and verdict.test_result.failures
+                    verdict.test_result and not verdict.test_result.all_passed and verdict.test_result.failures
                 )
                 if has_failures:
                     healing_attempts += 1
                     if yield_chunk_callback:
-                        await yield_chunk_callback(
-                            "\n\n[Tests Failed] 🔄 Self-healing retry initiated...\n"
-                        )
+                        await yield_chunk_callback("\n\n[Tests Failed] 🔄 Self-healing retry initiated...\n")
                     first_failure = verdict.test_result.failures[0]
                     failure_msg = first_failure.get("message", str(first_failure))
                     messages.append({"role": "assistant", "content": full_response})
-                    messages.append({
-                        "role": "user",
-                        "content": (
-                            f"The test sandbox failed with the following errors upon running your code. "
-                            f"Please fix them:\n{failure_msg}\nGenerate the corrected code."
-                        ),
-                    })
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                f"The test sandbox failed with the following errors upon running your code. "
+                                f"Please fix them:\n{failure_msg}\nGenerate the corrected code."
+                            ),
+                        }
+                    )
                     return True, "", healing_attempts
         return False, full_response, healing_attempts
 
     async def _execute_tools(self, tool_calls: list, tool_call_callback, thought_callback) -> list[dict]:
         """Executes LLM requested functions mapping JSON outputs natively."""
         import time
+
         cmd_msgs = []
         for tc in tool_calls:
             from src.tools.tool_registry import execute_tool
@@ -839,13 +956,10 @@ class ChatPipeline:
 
             if thought_callback:
                 await thought_callback(
-                    f"Executed `{fn_name}` tool ({elapsed:.1f}s)",
-                    f"Arguments:\n{args_raw}\n\nResult:\n{result}"
+                    f"Executed `{fn_name}` tool ({elapsed:.1f}s)", f"Arguments:\n{args_raw}\n\nResult:\n{result}"
                 )
 
-            cmd_msgs.append(
-                {"role": "tool", "name": fn_name, "tool_call_id": tc.get("id"), "content": result}
-            )
+            cmd_msgs.append({"role": "tool", "name": fn_name, "tool_call_id": tc.get("id"), "content": result})
         return cmd_msgs
 
     def _check_task_budget(self, task_cost: float, usage: dict, model_def) -> None:
@@ -871,12 +985,14 @@ class ChatPipeline:
             max_spend = getattr(config.user, "max_spend_per_task", 2.0)
             if task_cost >= max_spend:
                 msg = f"Task budget exceeded: ${task_cost:.3f} >= ${max_spend:.2f}"
-                current_app.post_message(BudgetExceeded(
-                    limit_type="task_spend",
-                    limit_value=max_spend,
-                    current_value=task_cost,
-                    task_description=model_def.name,
-                ))
+                current_app.post_message(
+                    BudgetExceeded(
+                        limit_type="task_spend",
+                        limit_value=max_spend,
+                        current_value=task_cost,
+                        task_description=model_def.name,
+                    )
+                )
                 logger.warning(msg)
                 raise RuntimeError(msg)
 
@@ -884,12 +1000,14 @@ class ChatPipeline:
             max_tokens = getattr(config.user, "max_tokens_per_task", 500_000)
             if total_tokens >= max_tokens:
                 msg = f"Task token limit exceeded: {total_tokens} >= {max_tokens}"
-                current_app.post_message(BudgetExceeded(
-                    limit_type="task_tokens",
-                    limit_value=float(max_tokens),
-                    current_value=float(total_tokens),
-                    task_description=model_def.name,
-                ))
+                current_app.post_message(
+                    BudgetExceeded(
+                        limit_type="task_tokens",
+                        limit_value=float(max_tokens),
+                        current_value=float(total_tokens),
+                        task_description=model_def.name,
+                    )
+                )
                 logger.warning(msg)
                 raise RuntimeError(msg)
 
@@ -898,4 +1016,3 @@ class ChatPipeline:
             raise
         except Exception as e:
             logger.debug(f"Task budget check skipped: {e}")
-

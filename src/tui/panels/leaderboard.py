@@ -60,7 +60,7 @@ class LeaderboardPanel(Vertical):
         for i, row in enumerate(leaders):
             # Format row strings for neat display
             table.add_row(
-                f"#{i+1}",
+                f"#{i + 1}",
                 row["id"],
                 f"{row['elo_rating']:.1f}",
                 f"{row['win_rate']}%",

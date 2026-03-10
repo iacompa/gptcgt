@@ -1,6 +1,7 @@
 export default function AcceptableUsePage() {
     return (
-        <div className="relative isolate px-6 py-24 sm:py-32 lg:px-8 max-w-4xl mx-auto">
+        <div className="page-shell py-8">
+            <div className="panel-dark mx-auto max-w-4xl px-6 py-10 sm:px-10">
             <div className="mx-auto max-w-3xl text-base leading-7 text-gray-300">
                 <p className="text-base font-semibold leading-7 text-indigo-400">gptcgt</p>
                 <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Acceptable Use Policy</h1>
@@ -45,6 +46,7 @@ export default function AcceptableUsePage() {
                         Violations of this Acceptable Use Policy may lead to immediate suspension or permanent termination of your account, without refund.
                     </p>
                 </div>
+            </div>
             </div>
         </div>
     );

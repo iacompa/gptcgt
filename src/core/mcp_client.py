@@ -8,380 +8,250 @@ into agent context.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import subprocess  # noqa: F401
-from dataclasses import dataclass, field
-from typing import Any
 
-from src.core.logger import get_logger
+__all__ = [
+    "MCPConnectionPool",
+    "MCPManager",
+]
 
-logger = get_logger("core.mcp_client")
+"""
+MCP Client with connection pooling.
 
+Maintains live process handles per MCP server to avoid spawning a new
+subprocess for every discover/call. Processes are reused across calls
+and cleaned up on shutdown.
+"""
 
-@dataclass
-class MCPToolSchema:
-    """Schema for a tool discovered from an MCP server."""
+import os  # noqa: E402
+import select  # noqa: E402
+import threading  # noqa: E402
 
-    name: str
-    description: str
-    input_schema: dict = field(default_factory=dict)
-    server_name: str = ""
+from src.core.logger import get_logger  # noqa: E402
 
-    def to_openai_function(self) -> dict:
-        """Convert to OpenAI function calling format."""
-        return {
-            "type": "function",
-            "function": {
-                "name": f"mcp_{self.server_name}_{self.name}",
-                "description": f"[MCP:{self.server_name}] {self.description}",
-                "parameters": self.input_schema or {"type": "object", "properties": {}},
-            },
-        }
+logger = get_logger("tools.mcp_client")
+
+# Default timeout (seconds) for reading a line from the MCP server process.
+MCP_READ_TIMEOUT = 30
 
 
-@dataclass
-class MCPServerConfig:
-    """Configuration for a single MCP server."""
-
-    name: str
-    transport: str = "stdio"  # "stdio" or "http"
-    command: str = ""  # For stdio: command to start the server
-    args: list[str] = field(default_factory=list)
-    url: str = ""  # For HTTP: server URL
-    env: dict[str, str] = field(default_factory=dict)
-    enabled: bool = True
-
-    @classmethod
-    def from_dict(cls, data: dict) -> MCPServerConfig:
-        """Create from a dictionary (e.g., from config file)."""
-        return cls(
-            name=data.get("name", "unknown"),
-            transport=data.get("transport", "stdio"),
-            command=data.get("command", ""),
-            args=data.get("args", []),
-            url=data.get("url", ""),
-            env=data.get("env", {}),
-            enabled=data.get("enabled", True),
-        )
-
-
-class MCPClient:
+def _readline_with_timeout(proc: subprocess.Popen, timeout: float = MCP_READ_TIMEOUT) -> str:
     """
-    Client for connecting to MCP servers and exposing their tools to agents.
+    Read a single line from *proc.stdout* with a timeout.
 
-    Usage:
-        client = MCPClient()
+    Uses ``select`` to avoid blocking indefinitely when the child process
+    never writes an expected response (e.g. unknown method, hung server).
+    """
+    fd = proc.stdout.fileno()
+    ready, _, _ = select.select([fd], [], [], timeout)
+    if ready:
+        return proc.stdout.readline()
+    logger.warning("MCP read timed out after %ss", timeout)
+    return ""
 
-        # Connect to a server
-        await client.connect(MCPServerConfig(
-            name="github",
-            transport="stdio",
-            command="npx",
-            args=["-y", "@modelcontextprotocol/server-github"],
-            env={"GITHUB_TOKEN": "..."},
-        ))
 
-        # Get tools for injection into LLM context
-        tools = client.get_all_tool_schemas()
+class MCPConnectionPool:
+    """
+    Maintains a pool of live MCP server processes, keyed by server name.
 
-        # Execute a tool call
-        result = await client.call_tool("mcp_github_search_repos", {"query": "python"})
+    Reuses existing connections instead of spawning a new subprocess
+    for every discover/call_tool invocation.
     """
 
-    def __init__(self) -> None:
-        self._servers: dict[str, MCPServerConnection] = {}
-        self._tools: dict[str, MCPToolSchema] = {}
+    _instance = None
+    _lock = threading.Lock()
 
-    async def connect(self, config: MCPServerConfig) -> bool:
-        """
-        Connect to an MCP server.  # noqa: D213
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._pool: dict[str, subprocess.Popen] = {}
+                    cls._instance._id_counters: dict[str, int] = {}
+        return cls._instance
 
-        Args:
-            config: Server configuration.
+    def _server_key(self, server_cfg: dict) -> str:
+        return server_cfg.get("name", server_cfg.get("command", "unknown"))
 
-        Returns:  # noqa: D413
-            True if connection succeeded.
+    def get_or_create(self, server_cfg: dict) -> subprocess.Popen:
+        """Get an existing connection or create a new one."""
+        key = self._server_key(server_cfg)
 
-        """
-        if not config.enabled:
-            logger.info(f"MCP server '{config.name}' is disabled, skipping.")
-            return False
+        with self._lock:
+            proc = self._pool.get(key)
+            if proc and proc.poll() is None:
+                # Process is still alive
+                return proc
 
-        try:
-            if config.transport == "stdio":
-                conn = StdioMCPConnection(config)
-            elif config.transport == "http":
-                conn = HttpMCPConnection(config)
-            else:
-                logger.error(f"Unknown MCP transport: {config.transport}")
-                return False
+            # Process is dead or doesn't exist — start a new one
+            if proc and proc.poll() is not None:
+                logger.info(f"MCP process for '{key}' died (rc={proc.poll()}), restarting")
 
-            await conn.initialize()
-            self._servers[config.name] = conn
+            proc = self._start_and_init(server_cfg)
+            self._pool[key] = proc
+            self._id_counters[key] = 10  # Start IDs at 10 for pooled connections
+            return proc
 
-            # Discover tools
-            tools = await conn.list_tools()
-            for tool in tools:
-                tool.server_name = config.name
-                key = f"mcp_{config.name}_{tool.name}"
-                self._tools[key] = tool
+    def _start_and_init(self, server_cfg: dict) -> subprocess.Popen:
+        """Spawn the MCP server process and perform the initialize handshake."""
+        cmd = server_cfg.get("command")
+        args = server_cfg.get("args", [])
+        env = server_cfg.get("env", {})
 
-            logger.info(
-                f"MCP server '{config.name}' connected with {len(tools)} tools: "
-                f"{[t.name for t in tools]}"
-            )
-            return True
+        full_env = os.environ.copy()
+        full_env.update(env)
 
-        except Exception as e:
-            logger.error(f"Failed to connect to MCP server '{config.name}': {e}")
-            return False
+        if not cmd:
+            raise ValueError("No command specified for MCP server")
 
-    async def disconnect(self, server_name: str) -> None:
-        """Disconnect from an MCP server."""
-        conn = self._servers.pop(server_name, None)
-        if conn:
-            await conn.close()
-            # Remove tools from this server
-            keys_to_remove = [k for k, v in self._tools.items() if v.server_name == server_name]
-            for k in keys_to_remove:
-                del self._tools[k]
-            logger.info(f"MCP server '{server_name}' disconnected.")
-
-    async def disconnect_all(self) -> None:
-        """Disconnect from all MCP servers."""
-        for name in list(self._servers.keys()):
-            await self.disconnect(name)
-
-    def get_all_tool_schemas(self) -> list[dict]:
-        """Get all MCP tools in OpenAI function calling format."""
-        return [tool.to_openai_function() for tool in self._tools.values()]
-
-    def get_tool_names(self) -> list[str]:
-        """Get names of all connected MCP tools."""
-        return list(self._tools.keys())
-
-    async def call_tool(self, tool_name: str, arguments: dict) -> str:
-        """
-        Execute an MCP tool call.  # noqa: D213
-
-        Args:
-            tool_name: The full tool name (e.g., "mcp_github_search_repos").
-            arguments: Tool arguments.
-
-        Returns:  # noqa: D413
-            Tool result as a string.
-
-        """
-        tool = self._tools.get(tool_name)
-        if not tool:
-            return json.dumps({"error": f"Unknown MCP tool: {tool_name}"})
-
-        conn = self._servers.get(tool.server_name)
-        if not conn:
-            return json.dumps({"error": f"MCP server '{tool.server_name}' not connected"})
-
-        try:
-            result = await conn.call_tool(tool.name, arguments)
-            return json.dumps(result) if isinstance(result, (dict, list)) else str(result)
-        except Exception as e:
-            logger.error(f"MCP tool call failed: {tool_name}: {e}")
-            return json.dumps({"error": str(e)})
-
-    def is_mcp_tool(self, tool_name: str) -> bool:
-        """Check if a tool name belongs to an MCP server."""
-        return tool_name.startswith("mcp_") and tool_name in self._tools
-
-
-class MCPServerConnection:
-    """Base class for MCP server connections."""
-
-    def __init__(self, config: MCPServerConfig) -> None:
-        self.config = config
-
-    async def initialize(self) -> None:
-        """Initialize the connection and perform handshake."""
-        raise NotImplementedError
-
-    async def list_tools(self) -> list[MCPToolSchema]:
-        """List available tools from the server."""
-        raise NotImplementedError
-
-    async def call_tool(self, name: str, arguments: dict) -> Any:
-        """Call a tool on the server."""
-        raise NotImplementedError
-
-    async def close(self) -> None:
-        """Close the connection."""
-        raise NotImplementedError
-
-
-class StdioMCPConnection(MCPServerConnection):
-    """MCP connection via stdio (subprocess)."""
-
-    def __init__(self, config: MCPServerConfig) -> None:
-        super().__init__(config)
-        self._process: asyncio.subprocess.Process | None = None
-        self._request_id = 0
-
-    async def initialize(self) -> None:
-        """Start the subprocess and send initialize request."""
-        env = {**dict(__import__("os").environ), **self.config.env}
-        cmd = [self.config.command] + self.config.args
-
-        self._process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
+        proc = subprocess.Popen(
+            [cmd] + args,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=full_env,
+            text=True,
+            bufsize=1,
         )
 
-        # Send JSON-RPC initialize
-        response = await self._send_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "gptcgt", "version": "1.0.0"},
-        })
-        logger.debug(f"MCP initialize response: {response}")
-
-        # Send initialized notification
-        await self._send_notification("notifications/initialized", {})
-
-    async def list_tools(self) -> list[MCPToolSchema]:
-        """List tools from the MCP server."""
-        response = await self._send_request("tools/list", {})
-        tools = []
-        for tool_data in response.get("tools", []):
-            tools.append(MCPToolSchema(
-                name=tool_data.get("name", ""),
-                description=tool_data.get("description", ""),
-                input_schema=tool_data.get("inputSchema", {}),
-            ))
-        return tools
-
-    async def call_tool(self, name: str, arguments: dict) -> Any:
-        """Call a tool via JSON-RPC."""
-        response = await self._send_request("tools/call", {
-            "name": name,
-            "arguments": arguments,
-        })
-        # Extract content from MCP response
-        content = response.get("content", [])
-        if content and isinstance(content, list):
-            texts = [c.get("text", "") for c in content if c.get("type") == "text"]
-            return "\n".join(texts) if texts else str(content)
-        return response
-
-    async def _send_request(self, method: str, params: dict) -> dict:
-        """Send a JSON-RPC request and wait for response."""
-        if not self._process or not self._process.stdin or not self._process.stdout:
-            raise ConnectionError("MCP subprocess not running")
-
-        self._request_id += 1
-        request = {
+        # Initialize handshake
+        init_req = {
             "jsonrpc": "2.0",
-            "id": self._request_id,
-            "method": method,
-            "params": params,
-        }
-
-        msg = json.dumps(request) + "\n"
-        self._process.stdin.write(msg.encode())
-        await self._process.stdin.drain()
-
-        # Read response line
-        try:
-            line = await asyncio.wait_for(
-                self._process.stdout.readline(), timeout=30.0
-            )
-            if line:
-                response = json.loads(line.decode())
-                if "error" in response:
-                    raise Exception(f"MCP error: {response['error']}")
-                return response.get("result", {})
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"MCP request timed out: {method}")
-
-        return {}
-
-    async def _send_notification(self, method: str, params: dict) -> None:
-        """Send a JSON-RPC notification (no response expected)."""
-        if not self._process or not self._process.stdin:
-            return
-
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        }
-        msg = json.dumps(notification) + "\n"
-        self._process.stdin.write(msg.encode())
-        await self._process.stdin.drain()
-
-    async def close(self) -> None:
-        """Terminate the subprocess."""
-        if self._process:
-            self._process.terminate()
-            try:
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                self._process.kill()
-
-
-class HttpMCPConnection(MCPServerConnection):
-    """MCP connection via HTTP (SSE/streamable-http)."""
-
-    def __init__(self, config: MCPServerConfig) -> None:
-        super().__init__(config)
-        self._session = None
-
-    async def initialize(self) -> None:
-        """Initialize HTTP connection."""
-        try:
-            import httpx
-            self._session = httpx.AsyncClient(
-                base_url=self.config.url,
-                timeout=30.0,
-            )
-            # Send initialize
-            response = await self._session.post("/initialize", json={
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "clientInfo": {"name": "gptcgt", "version": "0.1.0"},
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "gptcgt", "version": "1.0.0"},
-            })
-            response.raise_for_status()
-            logger.debug(f"MCP HTTP initialize: {response.status_code}")
-        except ImportError:
-            logger.warning("httpx not installed — HTTP MCP transport unavailable")
-            raise
+            },
+        }
+        proc.stdin.write(json.dumps(init_req) + "\n")
+        notify = {"jsonrpc": "2.0", "method": "notifications/initialized"}
+        proc.stdin.write(json.dumps(notify) + "\n")
+        proc.stdin.flush()
 
-    async def list_tools(self) -> list[MCPToolSchema]:
-        """List tools via HTTP."""
-        if not self._session:
+        while True:
+            line = _readline_with_timeout(proc)
+            if not line:
+                proc.terminate()
+                raise RuntimeError("MCP process died or timed out during init")
+            try:
+                msg = json.loads(line)
+                if msg.get("id") == 1:
+                    break
+            except ValueError:
+                continue
+
+        logger.info(f"MCP connection established for '{self._server_key(server_cfg)}'")
+        return proc
+
+    def next_id(self, server_cfg: dict) -> int:
+        """Get the next JSON-RPC request ID for this server."""
+        key = self._server_key(server_cfg)
+        with self._lock:
+            self._id_counters.setdefault(key, 10)
+            self._id_counters[key] += 1
+            return self._id_counters[key]
+
+    def close(self, server_cfg: dict) -> None:
+        """Terminate a specific server connection."""
+        key = self._server_key(server_cfg)
+        with self._lock:
+            proc = self._pool.pop(key, None)
+            if proc and proc.poll() is None:
+                proc.terminate()
+                logger.info(f"Closed MCP connection for '{key}'")
+
+    def close_all(self) -> None:
+        """Terminate all pooled connections (call on app shutdown)."""
+        with self._lock:
+            for key, proc in self._pool.items():
+                if proc.poll() is None:
+                    proc.terminate()
+                    logger.info(f"Closed MCP connection for '{key}'")
+            self._pool.clear()
+            self._id_counters.clear()
+
+
+class MCPManager:
+    """MCP Client with connection pooling via MCPConnectionPool."""
+
+    _pool = MCPConnectionPool()
+
+    @classmethod
+    def _send_request(cls, server_cfg: dict, method: str, params: dict, retry: bool = True) -> dict:
+        """Centralized JSON-RPC logic with retry support."""
+        proc = cls._pool.get_or_create(server_cfg)
+        req_id = cls._pool.next_id(server_cfg)
+
+        req = {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "method": method,
+            "params": params,
+        }
+        # Dump directly without newline, but append it after to write to STDIN properly
+        proc.stdin.write(json.dumps(req) + "\n")
+        proc.stdin.flush()
+
+        while True:
+            line = _readline_with_timeout(proc)
+            if not line:
+                if retry:
+                    logger.warning(f"MCP timeout for {method}, retrying...")
+                    cls._pool.close(server_cfg)
+                    return cls._send_request(server_cfg, method, params, retry=False)
+                raise RuntimeError(f"MCP Process for {method} Terminated Unexpectedly or Timed Out")
+            try:
+                msg = json.loads(line)
+                if msg.get("id") == req_id:
+                    return msg
+            except ValueError:
+                continue
+
+    @classmethod
+    def discover(cls, server_cfg: dict) -> list[dict]:
+        """Discover available tools from an MCP server."""
+        try:
+            msg = cls._send_request(server_cfg, "tools/list", {})
+            mcp_tools = msg.get("result", {}).get("tools", [])
+
+            tools: list[dict] = []
+            prefix = server_cfg.get("name", "mcp")
+            for mt in mcp_tools:
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": f"{prefix}__{mt['name']}",
+                        "description": mt.get("description", ""),
+                        "parameters": mt.get("inputSchema", {}),
+                    },
+                })
+            return tools
+        except Exception as e:
+            logger.error(f"MCP discover failed: {e}")
+            cls._pool.close(server_cfg)
             return []
-        response = await self._session.post("/tools/list", json={})
-        data = response.json()
-        return [
-            MCPToolSchema(
-                name=t.get("name", ""),
-                description=t.get("description", ""),
-                input_schema=t.get("inputSchema", {}),
-            )
-            for t in data.get("tools", [])
-        ]
 
-    async def call_tool(self, name: str, arguments: dict) -> Any:
-        """Call a tool via HTTP."""
-        if not self._session:
-            return {"error": "Not connected"}
-        response = await self._session.post("/tools/call", json={
-            "name": name,
-            "arguments": arguments,
-        })
-        return response.json()
+    @classmethod
+    def call_tool(cls, server_cfg: dict, tool_name: str, arguments: dict) -> str:
+        """Call a tool on an MCP server via the pooled connection."""
+        try:
+            params = {
+                "name": tool_name.split("__", 1)[-1],
+                "arguments": arguments,
+            }
+            msg = cls._send_request(server_cfg, "tools/call", params)
+            res = msg.get("result", {})
+            if res.get("isError"):
+                return f"Error: {res.get('content')}"
+            return json.dumps(res.get("content"))
+        except Exception as e:
+            cls._pool.close(server_cfg)
+            return f"Error executing MCP tool: {e!s}"
 
-    async def close(self) -> None:
-        """Close the HTTP session."""
-        if self._session:
-            await self._session.aclose()
+    @classmethod
+    def close_all(cls) -> None:
+        """Shut down all pooled connections. Call on app teardown."""
+        cls._pool.close_all()

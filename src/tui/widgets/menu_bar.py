@@ -147,7 +147,7 @@ class MenuBar(Horizontal):
                     MenuItem("Default (20/50/30)", action="size_default"),
                     MenuItem("Wide Code (15/60/25)", action="size_wide_code"),
                     MenuItem("Wide Chat (15/40/45)", action="size_wide_chat"),
-            MenuItem("Equal (33/34/33)", action="size_equal"),
+                    MenuItem("Equal (33/34/33)", action="size_equal"),
                 ],
             ),
             MenuItem(is_separator=True),

@@ -1,7 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Key, CreditCard, Users, User, LogOut, MessageSquare, Github } from "lucide-react";
+import {
+    Activity,
+    Bot,
+    CreditCard,
+    Github,
+    Key,
+    LogOut,
+    MessageSquare,
+    User,
+    Users,
+    Wallet,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export function DashboardNav({ session }: { session: any }) {
@@ -18,48 +29,83 @@ export function DashboardNav({ session }: { session: any }) {
         { name: "Account", href: "/dashboard/account", icon: User },
     ];
 
+    const initials = (session?.user?.name || session?.user?.email || "U")
+        .split(" ")
+        .map((part: string) => part.charAt(0))
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
-        <div className="w-64 border-r border-gray-800 bg-gray-900/30 flex flex-col h-full">
-            <div className="p-6">
+        <div className="space-y-4">
+            <div className="panel p-5">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
-                        {session?.user?.name?.charAt(0) || "U"}
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent-strong)]">
+                        {initials}
                     </div>
-                    <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-white truncate">{session?.user?.name || "Developer"}</p>
-                        <p className="text-xs text-gray-500 truncate">{session?.user?.email || ""}</p>
+                    <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-950">
+                            {session?.user?.name || "Developer"}
+                        </p>
+                        <p className="truncate text-sm text-[var(--text-muted)]">{session?.user?.email || ""}</p>
+                    </div>
+                </div>
+                <div className="soft-divider my-5" />
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                    <div className="panel-muted p-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
+                            <Bot className="h-4 w-4 text-[var(--accent)]" />
+                            Routing cockpit
+                        </div>
+                        <p className="mt-2 text-sm text-[var(--text-muted)]">
+                            Chat, Hub, usage, and billing in one place.
+                        </p>
+                    </div>
+                    <div className="panel-muted p-4">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
+                            <Wallet className="h-4 w-4 text-[var(--amber)]" />
+                            Spend visible
+                        </div>
+                        <p className="mt-2 text-sm text-[var(--text-muted)]">
+                            Wallet and cap signals stay close to the work.
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <nav className="flex-1 px-4 space-y-1">
-                {navigation.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive
-                                ? "bg-gray-800 text-white"
-                                : "text-gray-300 hover:bg-gray-800 hover:text-white"
+            <div className="panel p-4">
+                <p className="eyebrow px-2">Workspace</p>
+                <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 xl:flex-col">
+                    {navigation.map((item) => {
+                        const isOverview = item.href === "/dashboard";
+                        const isActive = isOverview
+                            ? pathname === item.href
+                            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                className={`flex min-w-fit items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition xl:min-w-0 ${
+                                    isActive
+                                        ? "bg-slate-950 text-white shadow-[0_12px_24px_rgba(15,23,42,0.16)]"
+                                        : "text-[var(--text-muted)] hover:bg-white/70 hover:text-slate-950"
                                 }`}
-                        >
-                            <item.icon className="text-gray-400 group-hover:text-gray-300 mr-3 flex-shrink-0 h-5 w-5" />
-                            {item.name}
-                        </Link>
-                    );
-                })}
-            </nav>
-
-            <div className="p-4 border-t border-gray-800">
+                            >
+                                <item.icon className={`h-4 w-4 ${isActive ? "text-amber-300" : ""}`} />
+                                {item.name}
+                            </Link>
+                        );
+                    })}
+                </nav>
+                <div className="soft-divider my-4" />
                 <button
                     onClick={async () => {
                         await fetch("/api/auth/signout", { method: "POST" });
                         window.location.href = "/";
                     }}
-                    className="text-gray-400 hover:text-red-400 flex items-center gap-2 text-sm px-2 transition-colors w-full"
+                    className="btn-ghost w-full justify-start text-red-700 hover:bg-red-50"
                 >
-                    <LogOut className="h-4 w-4" /> Sign Out
+                    <LogOut className="h-4 w-4" /> Sign out
                 </button>
             </div>
         </div>

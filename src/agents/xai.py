@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-import tiktoken
-
 from src.agents.base import AgentResponse, BaseAgent
 from src.agents.litellm_client import LiteLLMClient
 from src.auth.keychain import KeyChainManager
@@ -33,13 +31,6 @@ class XAIAgent(BaseAgent):
             extra_headers=self.config.extra_headers,
         ):
             yield chunk
-
-    def count_tokens(self, text: str) -> int:
-        try:
-            enc = tiktoken.get_encoding("cl100k_base")
-            return len(enc.encode(text))
-        except Exception:
-            return len(text) // 4
 
     def get_provider_name(self) -> str:
         return "xai"

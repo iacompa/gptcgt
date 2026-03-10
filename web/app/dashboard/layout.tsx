@@ -16,13 +16,12 @@ export default async function DashboardLayout({
     }
 
     return (
-        <div className="flex h-full">
-            {/* Sidebar Component */}
-            <DashboardNav session={session} />
-
-            {/* Main content */}
-            <div className="flex-1 overflow-auto bg-gray-950 p-8">
-                <div className="max-w-5xl mx-auto">
+        <div className="page-shell">
+            <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
+                <aside className="xl:sticky xl:top-24 xl:h-fit">
+                    <DashboardNav session={session} />
+                </aside>
+                <div className="panel min-w-0 overflow-hidden p-5 sm:p-8">
                     {children}
                 </div>
             </div>

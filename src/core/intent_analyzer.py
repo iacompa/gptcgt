@@ -46,10 +46,14 @@ class IntentAnalyzer:
 
         # Basic complexity:
         base_comp = 2
-        if len(user_text) > 100: base_comp += 1  # noqa: E701
-        if len(user_text) > 500: base_comp += 2  # noqa: E701
-        if len(attached_files) > 2: base_comp += 2  # noqa: E701
-        if len(attached_files) > 5: base_comp += 2  # noqa: E701
+        if len(user_text) > 100:
+            base_comp += 1  # noqa: E701
+        if len(user_text) > 500:
+            base_comp += 2  # noqa: E701
+        if len(attached_files) > 2:
+            base_comp += 2  # noqa: E701
+        if len(attached_files) > 5:
+            base_comp += 2  # noqa: E701
         comp_val = max(1, min(10, base_comp))
 
         default_return = {
@@ -77,7 +81,9 @@ class IntentAnalyzer:
                     k_name = PROVIDER_KEY_MAP.get(provider_str)
                     found_key = KeyChainManager.get_key(k_name) if k_name else None
                     if found_key:
-                        embedding_model = "text-embedding-3-small" if provider_str == "openai" else "gemini/text-embedding-004"  # noqa: E501
+                        embedding_model = (
+                            "text-embedding-3-small" if provider_str == "openai" else "gemini/text-embedding-004"
+                        )  # noqa: E501
                         api_key = found_key
                         break
 
@@ -98,7 +104,7 @@ class IntentAnalyzer:
                 TaskIntent.EDIT.value: "change the padding to 10px rename this variable fix this bug update the UI",
                 TaskIntent.CREATE.value: "build a new react component write a unit test add a python script",
                 TaskIntent.DEBUG.value: "why is this crashing fix the null pointer exception solve the build error traceback",  # noqa: E501
-                TaskIntent.ARCHITECT.value: "design a scalable backend refactor the entire application create a new project from scratch"  # noqa: E501
+                TaskIntent.ARCHITECT.value: "design a scalable backend refactor the entire application create a new project from scratch",  # noqa: E501
             }
 
             # Request embeddings
@@ -107,7 +113,7 @@ class IntentAnalyzer:
             # Pass api_key directly — never mutate os.environ
             response = litellm.embedding(model=embedding_model, input=inputs, api_key=api_key)
 
-            embeddings = [item['embedding'] for item in response.data]
+            embeddings = [item["embedding"] for item in response.data]
             user_emb = embeddings[0]
             example_embs = embeddings[1:]
 
@@ -115,7 +121,8 @@ class IntentAnalyzer:
                 dot = sum(a * b for a, b in zip(v1, v2))
                 norma = sum(a * a for a in v1) ** 0.5
                 normb = sum(b * b for b in v2) ** 0.5
-                if norma == 0 or normb == 0: return 0.0  # noqa: E701
+                if norma == 0 or normb == 0:
+                    return 0.0  # noqa: E701
                 return dot / (norma * normb)
 
             best_intent = TaskIntent.CHAT.value

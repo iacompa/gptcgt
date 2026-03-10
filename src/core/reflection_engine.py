@@ -69,6 +69,7 @@ class ReflectionEngine:
             if self.workspace.safe_exists(target_file):
                 try:
                     import json
+
                     existing_memory = json.loads(self.workspace.safe_read(target_file))
                 except Exception:
                     pass
@@ -85,6 +86,7 @@ class ReflectionEngine:
             light_model = cheapest_available
 
             from src.core.system_prompt import SystemPromptBuilder
+
             system_prompt = SystemPromptBuilder.build(
                 role_type="engineer",
                 custom_instructions=(
@@ -98,7 +100,7 @@ class ReflectionEngine:
                     "}\n"
                     "Do NOT include markdown block formatting, just the raw JSON."
                 ),
-                model_name=light_model.name
+                model_name=light_model.name,
             )
 
             user_prompt = f"""
@@ -118,9 +120,7 @@ TASK: Extract the lesson learned as JSON.
             api_key = KeyChainManager.get_key(key_name) if key_name else None
 
             if not api_key:
-                logger.warning(
-                    f"Reflection Engine skipped: No API key for LIGHT model {light_model.name}"
-                )
+                logger.warning(f"Reflection Engine skipped: No API key for LIGHT model {light_model.name}")
                 self._clear_ui_state(model_name)
                 return
 
@@ -183,7 +183,9 @@ TASK: Extract the lesson learned as JSON.
                     k_name = PROVIDER_KEY_MAP.get(provider_str)
                     found_key = KeyChainManager.get_key(k_name) if k_name else None
                     if found_key:
-                        embedding_model = "text-embedding-3-small" if provider_str == "openai" else "gemini/text-embedding-004"  # noqa: E501
+                        embedding_model = (
+                            "text-embedding-3-small" if provider_str == "openai" else "gemini/text-embedding-004"
+                        )  # noqa: E501
                         emb_api_key = found_key
                         break
 
@@ -195,11 +197,8 @@ TASK: Extract the lesson learned as JSON.
                     elif "gemini" in embedding_model:
                         os.environ["GEMINI_API_KEY"] = emb_api_key
 
-                    response = litellm.embedding(
-                        model=embedding_model,
-                        input=[lesson_data.get("action_taken", "")]
-                    )
-                    embedding_vector = response.data[0]['embedding']
+                    response = litellm.embedding(model=embedding_model, input=[lesson_data.get("action_taken", "")])
+                    embedding_vector = response.data[0]["embedding"]
                 except Exception as e:
                     logger.debug(f"Reflection embedding failed: {e}")
 
@@ -212,7 +211,7 @@ TASK: Extract the lesson learned as JSON.
                 "action_taken": lesson_data.get("action_taken", ""),
                 "outcome": lesson_data.get("outcome", "friction_logged"),
                 "agent": model_name,
-                "embedding": embedding_vector
+                "embedding": embedding_vector,
             }
 
             existing_memory.append(lesson_entry)
@@ -227,6 +226,7 @@ TASK: Extract the lesson learned as JSON.
             # Also persist to per-agent MD file for structured context injection
             try:
                 from src.core.memory import AgentMemory
+
                 agent_mem = AgentMemory(self.workspace.get_project_root())
                 agent_mem.record_interaction(
                     agent_id=model_name,
@@ -242,6 +242,7 @@ TASK: Extract the lesson learned as JSON.
             # inject it into the next dispatch as a system context hint.
             try:
                 from src.core.events import ReflectionRetryHint
+
                 self.app.call_from_thread(
                     self.app.post_message,
                     ReflectionRetryHint(
@@ -294,6 +295,7 @@ TASK: Extract the lesson learned as JSON.
             if self.workspace.safe_exists(target_file):
                 try:
                     import json
+
                     existing = json.loads(self.workspace.safe_read(target_file))
                 except Exception:
                     pass
@@ -301,6 +303,7 @@ TASK: Extract the lesson learned as JSON.
 
             # For successes, we don't need a vector embedding, just log telemetry
             from datetime import datetime
+
             log_entry = {
                 "timestamp": datetime.now().isoformat(),
                 "task_id": "unknown",  # We can update this signature later if needed
@@ -309,7 +312,7 @@ TASK: Extract the lesson learned as JSON.
                 "action_taken": f"SUCCESS: model={model_id}, tier={tier}",
                 "outcome": f"success_cost_${cost_usd:.4f}_tokens_{input_tokens}_{output_tokens}_hit_{hit_rate:.0f}%",
                 "agent": model_name,
-                "type": "telemetry"
+                "type": "telemetry",
             }
 
             existing.append(log_entry)
@@ -317,10 +320,12 @@ TASK: Extract the lesson learned as JSON.
                 existing = existing[-50:]
 
             import json
+
             self.workspace.safe_write(target_file, json.dumps(existing, indent=2))
 
             # Also persist to per-agent MD file
             from src.core.memory import AgentMemory
+
             agent_mem = AgentMemory(self.workspace.get_project_root())
             agent_mem.record_interaction(
                 agent_id=model_name,

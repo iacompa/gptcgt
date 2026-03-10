@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from src.tools.mcp_client import MCPManager
+from src.core.mcp_client import MCPManager
 
 MOCK_SERVER_SCRIPT = """\
 import json

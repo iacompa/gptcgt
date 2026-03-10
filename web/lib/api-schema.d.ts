@@ -577,6 +577,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Available Models
+         * @description Return a sorted list of all available models based on active API keys.
+         */
+        get: operations["get_available_models_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/proxy/record_usage": {
         parameters: {
             query?: never;
@@ -803,6 +823,17 @@ export interface components {
              * @default member
              */
             role: string;
+        };
+        /** ModelResponse */
+        ModelResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /** Tier */
+            tier: string;
         };
         /** ProfileUpdateRequest */
         ProfileUpdateRequest: {
@@ -1790,6 +1821,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_available_models_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelResponse"][];
                 };
             };
         };

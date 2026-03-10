@@ -164,9 +164,7 @@ def notify(
         if len(container.children) >= 5:
             container.children[0].remove()
 
-        toast = Toast(
-            ToastMessage(title, message, severity, timeout, action_label, action_callback)
-        )
+        toast = Toast(ToastMessage(title, message, severity, timeout, action_label, action_callback))
         container.mount(toast)
         logger.debug(f"Pushed toast notification: {title}")
     except Exception as e:

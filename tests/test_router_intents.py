@@ -1,17 +1,13 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
 from src.core.model_registry import QualityTier
-from src.core.orchestrator import Orchestrator
 from src.core.router import CodingRouter, TaskIntent
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_heuristic_intent_assignments():
-    orch = Orchestrator(MagicMock())
-    orch.mode_manager = AsyncMock()
-
     async def get_intent(text):
         # Temporarily mock the IntentAnalyzer to force fallback for deterministic tests
         from src.core.intent_analyzer import IntentAnalyzer

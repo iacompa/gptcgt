@@ -27,7 +27,6 @@ class ProviderException(Exception):
         self.provider = provider
 
 
-
 @dataclass
 class AgentConfig:
     """Configuration passed to every agent upon initialization."""
@@ -93,10 +92,15 @@ class BaseAgent(ABC):
         """
         pass
 
-    @abstractmethod
     def count_tokens(self, text: str) -> int:
-        """Count tokens for the specific model to manage context limits."""
-        pass
+        """Count tokens using tiktoken cl100k_base. Override for provider-specific counting."""
+        try:
+            import tiktoken
+
+            enc = tiktoken.get_encoding("cl100k_base")
+            return len(enc.encode(text))
+        except Exception:
+            return len(text) // 4
 
     @abstractmethod
     def get_provider_name(self) -> str:

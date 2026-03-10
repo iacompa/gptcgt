@@ -43,6 +43,7 @@ class TaskIntent(str, Enum):
     DEBUG = "debug"
     ARCHITECT = "architect"
 
+
 class CodingRouter:
     def __init__(self):
         self.registry = ModelRegistry()
@@ -52,8 +53,8 @@ class CodingRouter:
         except Exception:
             self.history_file = Path(".gptcgt/routing_history.json")
         self.outcomes: list[RoutingOutcome] = self._load_history()
-        self._elo_cache: dict[str, float] = {}      # model_id -> elo_rating
-        self._elo_cache_ts: float = 0.0              # epoch seconds of last load
+        self._elo_cache: dict[str, float] = {}  # model_id -> elo_rating
+        self._elo_cache_ts: float = 0.0  # epoch seconds of last load
 
     def _load_history(self) -> list[RoutingOutcome]:
         if not self.history_file.exists():
@@ -78,6 +79,7 @@ class CodingRouter:
             return
         try:
             from src.core.elo_tracker import EloTracker
+
             tracker = EloTracker()
             leaderboard = tracker.get_leaderboard()
             self._elo_cache = {row["id"]: row["elo_rating"] for row in leaderboard}
@@ -125,6 +127,7 @@ class CodingRouter:
         # are passed directly as parameters; no side effects from construction.
 
         from src.core.config import ConfigManager
+
         config = ConfigManager.get_instance()
 
         explicit_model_str = None
@@ -142,6 +145,7 @@ class CodingRouter:
                 if "/" in explicit_model_str:
                     prov_str, name = explicit_model_str.split("/", 1)
                     from src.core.model_registry import Provider
+
                     try:
                         prov = Provider(prov_str.lower())
                     except ValueError:
@@ -153,14 +157,12 @@ class CodingRouter:
                         provider=prov,
                         input_cost_per_mtok=0.0,
                         output_cost_per_mtok=0.0,
-                        max_context_tokens=128000
+                        max_context_tokens=128000,
                     )
 
         candidates = self.registry.get_available_models()
         if provider_family:
-            candidates = [
-                m for m in candidates if m.provider.value.lower() == provider_family.lower()
-            ]
+            candidates = [m for m in candidates if m.provider.value.lower() == provider_family.lower()]
 
         if not candidates:
             # Fallback if the requested family has no models configured locally
@@ -175,38 +177,23 @@ class CodingRouter:
 
         # Simple questions or trivial coding tasks can explicitly drop to the cheapest tier
         if complexity <= 3:
-            light_cands = [
-                m
-                for m in candidates
-                if QualityTier.LIGHT.value in m.quality_tiers
-            ]
+            light_cands = [m for m in candidates if QualityTier.LIGHT.value in m.quality_tiers]
             if light_cands:
                 return light_cands[0]  # ELO-sorted, highest-rated first
 
-            std_cands = [
-                m
-                for m in candidates
-                if QualityTier.STANDARD.value in m.quality_tiers
-            ]
+            std_cands = [m for m in candidates if QualityTier.STANDARD.value in m.quality_tiers]
             if std_cands:
                 return std_cands[0]  # ELO-sorted
 
         # High complexity coding
-        if (
-            intent in [TaskIntent.EDIT.value, TaskIntent.CREATE.value, TaskIntent.DEBUG.value]
-            and complexity > 7
-        ):
-            max_cands = [
-                m for m in candidates if global_tier.value in m.quality_tiers
-            ]
+        if intent in [TaskIntent.EDIT.value, TaskIntent.CREATE.value, TaskIntent.DEBUG.value] and complexity > 7:
+            max_cands = [m for m in candidates if global_tier.value in m.quality_tiers]
             if max_cands:
                 # For max quality, take top ELO winner rather than most expensive
                 return max_cands[0]
 
         # Fallback to current tier default
-        tier_cands = [
-            m for m in candidates if global_tier.value in m.quality_tiers
-        ]
+        tier_cands = [m for m in candidates if global_tier.value in m.quality_tiers]
         if tier_cands:
             return tier_cands[0]  # ELO-sorted
 

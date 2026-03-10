@@ -2,9 +2,11 @@
 // Created: Phase 6 Polish & Launch Prep
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="min-h-screen bg-gray-950 py-16 px-4">
-            <div className="max-w-3xl mx-auto prose prose-invert prose-headings:text-white prose-p:text-gray-300">
-                {children}
+        <div className="page-shell py-12">
+            <div className="panel-dark mx-auto max-w-4xl px-6 py-10 sm:px-10">
+                <div className="prose prose-invert max-w-3xl prose-headings:text-white prose-p:text-slate-300 prose-li:text-slate-300">
+                    {children}
+                </div>
             </div>
         </div>
     );

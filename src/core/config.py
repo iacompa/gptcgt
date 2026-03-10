@@ -64,7 +64,11 @@ class UserConfig:
     daily_spending_warning: float = 5.0
     daily_spend_limit: float = 10.0  # BYOK daily hard stop limit
     max_spend_per_task: float = 2.0  # USD cap per individual task/iteration
-    max_tokens_per_task: int = 500_000  # Token cap per task
+    max_tokens_architect: int = 3000
+    max_tokens_coder: int = 8000
+    max_tokens_scout: int = 2000
+    max_tokens_tester: int = 4000
+    max_tokens_default: int = 5000
 
     # Autonomous
     allow_auto_tiering: bool = True  # Let agents pick their own model tier
@@ -109,6 +113,7 @@ class ProjectConfig:
     # Agent preferences
     preferred_orchestrator_model: str = ""
     preferred_coding_model: str = ""
+    max_context_tokens_per_agent: int | None = None  # Override for config.user.max_context_tokens_per_agent
 
     # Git integration
     auto_branch_for_changes: bool = False

@@ -1,6 +1,8 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Label
 
+__test__ = False
+
 
 class TestApp(App):
     CSS_PATH = "src/tui/themes/midnight.tcss"

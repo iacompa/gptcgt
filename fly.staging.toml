@@ -1,0 +1,20 @@
+app = "gptcgt-staging"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "api/Dockerfile"
+
+[env]
+  ENVIRONMENT = "staging"
+  PORT = "8080"
+  WORKOS_CLIENT_ID = "client_staging"
+  WORKOS_ISSUER = "gptcgt-staging"
+  WORKOS_AUDIENCE = "gptcgt-api-staging"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]

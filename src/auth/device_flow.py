@@ -20,9 +20,7 @@ class DeviceFlowClient:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(
-                    f"{self.base_url}/auth/device", params={"client_id": client_id}
-                )
+                response = await client.post(f"{self.base_url}/auth/device", params={"client_id": client_id})
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPError:
@@ -39,9 +37,7 @@ class DeviceFlowClient:
         async with httpx.AsyncClient() as client:
             for attempt in range(max_attempts):
                 try:
-                    response = await client.post(
-                        f"{self.base_url}/auth/token", json={"device_code": device_code}
-                    )
+                    response = await client.post(f"{self.base_url}/auth/token", json={"device_code": device_code})
 
                     if response.status_code == 200:
                         data = response.json()
@@ -52,6 +48,8 @@ class DeviceFlowClient:
                     elif response.status_code == 400:
                         data = response.json()
                         error = data.get("error")
+                        if error is None and isinstance(data.get("detail"), dict):
+                            error = data["detail"].get("error")
                         if error == "authorization_pending":
                             await asyncio.sleep(interval)
                             continue

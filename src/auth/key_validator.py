@@ -40,6 +40,7 @@ class KeyValidator:
         if env_var_name == "E2B_API_KEY":
             try:
                 from e2b_code_interpreter import Sandbox
+
                 logger.debug("Testing E2B Sandbox key connection...")
                 sb = Sandbox(api_key=api_key, template="python-3.11")
                 sb.kill()
@@ -64,9 +65,7 @@ class KeyValidator:
         try:
             # We use acompletion with a tiny max_tokens to minimize cost/delay
             # litellm will route this appropriately based on the prefix and passed key.
-            await litellm.acompletion(
-                model=model_id, messages=messages, api_key=api_key, max_tokens=5, timeout=10.0
-            )
+            await litellm.acompletion(model=model_id, messages=messages, api_key=api_key, max_tokens=5, timeout=10.0)
             logger.debug(f"Key validation success for {env_var_name}")
             return True, "Valid"
 
