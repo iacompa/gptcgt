@@ -20,6 +20,9 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 reports/
+research_archive/
+private/
+scratch/
 ruff_audit.txt
 comprehensive_audit_results.txt
 error.txt
