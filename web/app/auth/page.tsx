@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, LockKeyhole, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, Github, LockKeyhole, ShieldCheck, Wallet } from "lucide-react";
 import { useToast } from "@/components/toaster";
 
 export default function AuthPage() {
@@ -9,6 +9,7 @@ export default function AuthPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [ssoLoading, setSsoLoading] = useState<string | null>(null);
     const { pushToast } = useToast();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +48,12 @@ export default function AuthPage() {
         }
     };
 
+    const handleSso = (provider: "google" | "github") => {
+        setError("");
+        setSsoLoading(provider);
+        window.location.href = `/api/auth/signin?provider=${provider}`;
+    };
+
     return (
         <div className="page-shell">
             <div className="grid gap-8 lg:grid-cols-[0.9fr_0.7fr] lg:items-start">
@@ -83,6 +90,33 @@ export default function AuthPage() {
                         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                             Sign in to your account
                         </h2>
+                    </div>
+
+                    <div className="space-y-3">
+                        <button
+                            type="button"
+                            onClick={() => handleSso("google")}
+                            disabled={Boolean(ssoLoading)}
+                            className="btn-primary w-full justify-center"
+                        >
+                            {ssoLoading === "google" ? "Redirecting to Google..." : "Continue with Google"}
+                            {ssoLoading !== "google" && <ArrowRight className="h-4 w-4" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSso("github")}
+                            disabled={Boolean(ssoLoading)}
+                            className="btn-secondary w-full justify-center"
+                        >
+                            <Github className="h-4 w-4" />
+                            {ssoLoading === "github" ? "Redirecting to GitHub..." : "Continue with GitHub"}
+                        </button>
+                    </div>
+
+                    <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-[0.24em] text-[var(--text-soft)]">
+                        <div className="h-px flex-1 bg-[var(--border)]" />
+                        <span>Legacy password access</span>
+                        <div className="h-px flex-1 bg-[var(--border)]" />
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">
@@ -132,6 +166,11 @@ export default function AuthPage() {
                             {!loading && <ArrowRight className="h-4 w-4" />}
                         </button>
                     </form>
+
+                    <p className="mt-4 text-sm text-[var(--text-muted)]">
+                        Production accounts should use Google or GitHub SSO. Password sign-in is only available for
+                        legacy accounts or local development.
+                    </p>
 
                     <p className="mt-6 text-sm text-[var(--text-muted)]">
                         Not a member yet?{" "}
