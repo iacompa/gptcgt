@@ -134,9 +134,21 @@ class BetterstackConfig(ServiceConfig):
 
 @dataclass
 class CloudflareR2Config(ServiceConfig):
-    account_id: str = field(default_factory=lambda: os.environ.get("R2_ACCOUNT_ID", ""))
-    access_key: str = field(default_factory=lambda: os.environ.get("R2_ACCESS_KEY", ""))
-    secret_key: str = field(default_factory=lambda: os.environ.get("R2_SECRET_KEY", ""))
+    account_id: str = field(
+        default_factory=lambda: os.environ.get("R2_ACCOUNT_ID", os.environ.get("CLOUDFLARE_R2_ACCOUNT_ID", ""))
+    )
+    access_key: str = field(
+        default_factory=lambda: os.environ.get("R2_ACCESS_KEY", os.environ.get("CLOUDFLARE_R2_ACCESS_KEY", ""))
+    )
+    secret_key: str = field(
+        default_factory=lambda: os.environ.get("R2_SECRET_KEY", os.environ.get("CLOUDFLARE_R2_SECRET_KEY", ""))
+    )
+    endpoint_url: str = field(
+        default_factory=lambda: os.environ.get("R2_ENDPOINT_URL", os.environ.get("CLOUDFLARE_R2_ENDPOINT_URL", ""))
+    )
+    bucket: str = field(
+        default_factory=lambda: os.environ.get("R2_BUCKET", os.environ.get("CLOUDFLARE_R2_BUCKET", ""))
+    )
 
     @property
     def is_configured(self) -> bool:
