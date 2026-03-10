@@ -7,13 +7,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy only proxy requirements first (better Docker layer caching)
-COPY proxy/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy proxy code and shared dependencies
-COPY proxy/ /app/proxy/
+# Install Python dependencies from the canonical project metadata
+COPY pyproject.toml README.md /app/
 COPY src/ /app/src/
+RUN pip install --no-cache-dir .
+
+# Copy proxy code
+COPY proxy/ /app/proxy/
 
 EXPOSE 8001
 

@@ -72,9 +72,7 @@ class AgentBlackboard:
 
     def write(self, key: str, value: Any, author: str, confidence: float = 1.0, ttl_seconds: int = 0) -> None:
         """Write a key, triggering pub/sub subscribers."""
-        entry = BlackboardEntry(
-            key=key, value=value, author=author, confidence=confidence, ttl_seconds=ttl_seconds
-        )
+        entry = BlackboardEntry(key=key, value=value, author=author, confidence=confidence, ttl_seconds=ttl_seconds)
 
         subs = []
         with self._lock:
@@ -140,9 +138,7 @@ class AgentBlackboard:
             parts = ["# Agent Blackboard (Shared State)"]
             for key, entry in self._entries.items():
                 val_preview = str(entry.value)[:500]
-                parts.append(
-                    f"## {key} (by {entry.author}, confidence={entry.confidence:.0%})\n{val_preview}"
-                )
+                parts.append(f"## {key} (by {entry.author}, confidence={entry.confidence:.0%})\n{val_preview}")
             return "\n\n".join(parts)
 
     @property

@@ -5,6 +5,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
+
 class LayoutEditorOverlay(ModalScreen[None]):
     """
     Overlay to select panel placements (Left, Center, Right, Top, Bottom).
@@ -68,8 +69,9 @@ class LayoutEditorOverlay(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         positions = {}
         if hasattr(self.app, "config"):
-            positions = getattr(self.app.config.user, "panel_positions",
-                                {"files": "left", "code": "center", "chat": "right"})
+            positions = getattr(
+                self.app.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}
+            )
 
         with Vertical(id="layout-dialog"):
             yield Label("[b]Customize Layout Positions[/b]\nChanges apply instantly.", id="layout-title")
@@ -108,8 +110,9 @@ class LayoutEditorOverlay(ModalScreen[None]):
         """Update position badges and button disabled states after a move."""
         positions = {}
         if hasattr(self.app, "config"):
-            positions = getattr(self.app.config.user, "panel_positions",
-                                {"files": "left", "code": "center", "chat": "right"})
+            positions = getattr(
+                self.app.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}
+            )
 
         for panel in ["files", "code", "chat"]:
             current_pos = positions.get(panel, "left")
@@ -122,6 +125,6 @@ class LayoutEditorOverlay(ModalScreen[None]):
             for direction in ["left", "center", "right", "top", "bottom"]:
                 try:
                     btn = self.query_one(f"#btn-{panel}-{direction}", Button)
-                    btn.disabled = (current_pos == direction)
+                    btn.disabled = current_pos == direction
                 except Exception:
                     pass

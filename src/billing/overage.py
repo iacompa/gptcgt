@@ -78,9 +78,7 @@ class OverageManager:
     def get_overage_warning_message(self) -> str | None:
         pct_used = self.state.used_credits / max(1, self.state.plan_credits)
         if pct_used >= 1.0:
-            return "Monthly credits exhausted" + (
-                " (Overage Active)" if self.state.overage_enabled else " (Blocked)"
-            )
+            return "Monthly credits exhausted" + (" (Overage Active)" if self.state.overage_enabled else " (Blocked)")
         if pct_used >= 0.95:
             return f"⚠️ {self.state.remaining_credits} credits remaining. Consider enabling overage billing."  # noqa: E501
         if pct_used >= 0.80:

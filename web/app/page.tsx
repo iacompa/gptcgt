@@ -1,34 +1,111 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { HeroAnimation } from "@/components/hero-animation";
+import { ArrowRight, Coins, GitBranch, ShieldCheck, Sparkles } from "lucide-react";
+import { ProductPreview } from "@/components/product-preview";
 
 export default function Home() {
     return (
-        <div className="relative isolate px-6 pt-14 lg:px-8 max-w-7xl mx-auto">
-            <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80">
-                <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]" />
-            </div>
+        <div className="page-shell page-stack">
+            <section className="grid gap-10 pb-8 pt-4 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+                <div className="space-y-7">
+                    <div className="space-y-4">
+                        <p className="eyebrow">Productive orchestration</p>
+                        <h1 className="display-title">
+                            Make the web app feel as sharp as the terminal.
+                        </h1>
+                        <p className="copy-lg max-w-2xl">
+                            Route multiple models across the same repo, track the cost before you commit, and keep proof artifacts attached to every higher-risk change.
+                        </p>
+                    </div>
 
-            <div className="mx-auto max-w-4xl py-24 sm:py-32 lg:py-40 text-center">
-                <HeroAnimation />
-                <h1 className="mt-8 text-5xl font-extrabold tracking-tight sm:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-gray-100 to-gray-400 pb-2">
-                    Run multiple AIs on your code.
-                </h1>
-                <p className="mt-6 text-xl leading-8 text-gray-400">
-                    Pick the best solution with proof. Shows you exactly what it costs.
-                </p>
-                <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-6">
-                    <Link
-                        href="/dashboard"
-                        className="rounded-md bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 flex items-center gap-2 transition-all"
-                    >
-                        Go to Dashboard <ArrowRight size={20} />
-                    </Link>
-                    <div className="px-6 py-3 rounded-md bg-black/40 border border-gray-700 font-mono text-gray-300 flex items-center gap-2">
-                        <span className="text-gray-500">$</span> pip install <span className="flex"><span className="text-emerald-400">gpt</span><span className="text-orange-400">c</span><span className="text-blue-400">g</span><span className="text-purple-400">t</span></span>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                        <Link href="/dashboard" className="btn-primary">
+                            Open workspace <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <Link href="/pricing" className="btn-secondary">
+                            Compare plans
+                        </Link>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="panel-muted p-4">
+                            <p className="metric-label">Routing</p>
+                            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Multi-model</p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">Compare cost, latency, and proof score before choosing.</p>
+                        </div>
+                        <div className="panel-muted p-4">
+                            <p className="metric-label">Proof</p>
+                            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Attached</p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">Guardrails, diffs, and checks stay close to the run.</p>
+                        </div>
+                        <div className="panel-muted p-4">
+                            <p className="metric-label">Spend</p>
+                            <p className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">Visible</p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">Caps and ledger views built into the workflow.</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+                <ProductPreview />
+            </section>
+
+            <section className="grid gap-4 lg:grid-cols-3">
+                <div className="panel p-6">
+                    <div className="badge badge-accent">
+                        <GitBranch className="h-3.5 w-3.5" /> Hub
+                    </div>
+                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        Browse repos, queue runs, and inspect logs without leaving the browser.
+                    </h2>
+                    <p className="mt-3 copy-sm">
+                        The Hub is where GitHub connection, workspace context, run logs, and PR creation finally belong together.
+                    </p>
+                </div>
+                <div className="panel p-6">
+                    <div className="badge badge-amber">
+                        <Coins className="h-3.5 w-3.5" /> Billing
+                    </div>
+                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        Spend controls should be legible, not hidden behind settings pages.
+                    </h2>
+                    <p className="mt-3 copy-sm">
+                        Team wallet state, renewals, top-ups, caps, and usage trends live in one connected workspace.
+                    </p>
+                </div>
+                <div className="panel p-6">
+                    <div className="badge bg-slate-900/5 text-slate-700">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Safety
+                    </div>
+                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        Automation should feel controlled, reversible, and transparent.
+                    </h2>
+                    <p className="mt-3 copy-sm">
+                        Proof checks, repo previews, billing signals, and explicit confirmation paths reduce the “black box” feeling.
+                    </p>
+                </div>
+            </section>
+
+            <section className="panel grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.85fr_1.15fr]">
+                <div>
+                    <p className="eyebrow">Workflow</p>
+                    <h2 className="section-title mt-3">A better UI means fewer mental context switches.</h2>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="panel-muted p-5">
+                        <Sparkles className="h-5 w-5 text-[var(--accent)]" />
+                        <h3 className="mt-4 text-lg font-semibold text-slate-950">Start with intent</h3>
+                        <p className="mt-2 copy-sm">Prompt, model, repo, and spend information belong in the same decision surface.</p>
+                    </div>
+                    <div className="panel-muted p-5">
+                        <GitBranch className="h-5 w-5 text-[var(--amber)]" />
+                        <h3 className="mt-4 text-lg font-semibold text-slate-950">Stay in context</h3>
+                        <p className="mt-2 copy-sm">Logs, file tree, and PR state should be visible without modal jumps or browser prompts.</p>
+                    </div>
+                    <div className="panel-muted p-5">
+                        <ShieldCheck className="h-5 w-5 text-slate-900" />
+                        <h3 className="mt-4 text-lg font-semibold text-slate-950">Finish with confidence</h3>
+                        <p className="mt-2 copy-sm">Proof artifacts and billing outcomes need to be obvious before a user takes the last irreversible action.</p>
+                    </div>
+                </div>
+            </section>
         </div>
     );
 }

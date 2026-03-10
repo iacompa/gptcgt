@@ -184,6 +184,7 @@ class Arbiter:
         arbiter_memory = ""
         try:
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             mem_path = ws.get_project_root() / ".gptcgt" / "agents" / "arbiter.md"
             if ws.safe_exists(mem_path):
@@ -191,13 +192,16 @@ class Arbiter:
                     import textual.app as _tapp
 
                     from src.core.events import AgentStatusUpdate
+
                     current_app = _tapp.active_app.get()
-                    current_app.post_message(AgentStatusUpdate(
-                        agent_id="arbiter",
-                        model_name="Arbiter",
-                        status="thinking",
-                        detail="Reading arbiter memory rules..."
-                    ))
+                    current_app.post_message(
+                        AgentStatusUpdate(
+                            agent_id="arbiter",
+                            model_name="Arbiter",
+                            status="thinking",
+                            detail="Reading arbiter memory rules...",
+                        )
+                    )
                 except Exception:
                     pass
                 arbiter_memory = ws.safe_read(mem_path)
@@ -250,6 +254,7 @@ class Arbiter:
             if language == "python" and slot.patch_set.patches:
                 try:
                     import ast
+
                     ast_changed_any = False
                     for fp in slot.patch_set.patches:
                         if not fp.file_path.endswith(".py") or fp.is_new_file:
@@ -281,20 +286,24 @@ class Arbiter:
             if not ast_changed:
                 if on_progress:
                     await on_progress(
-                        "verification", slot.agent_id,
+                        "verification",
+                        slot.agent_id,
                         "AST unchanged. Running local lint + security (skipping tests).",
                     )
                 # TRUTHFUL: No tests were run. Report 0/0.
                 # Must still run linter and security to catch whitespace errors and secrets in comments.
                 from src.tools.sandbox import TestResult, VerificationResult
+
                 verification_result = await self._sandbox._verify_local_only(
-                    slot.patch_set, project_root, language,
+                    slot.patch_set,
+                    project_root,
+                    language,
                     VerificationResult(
                         agent_id=slot.agent_id,
                         model_name=slot.model_name,
                         syntax_valid=True,
                         test_result=TestResult(total=0, passed=0),  # Honest: no tests run
-                    )
+                    ),
                 )
 
                 # IMPORTANT: Run security scan even on comment-only changes
@@ -307,18 +316,18 @@ class Arbiter:
                     lsp_task = None
             else:
                 if on_progress:
-                    await on_progress(
-                        "verification", slot.agent_id, "Running lint + tests + security scan..."
-                    )
+                    await on_progress("verification", slot.agent_id, "Running lint + tests + security scan...")
 
                 def handle_stdout(text: str):
                     if on_progress:
                         import asyncio
+
                         asyncio.create_task(on_progress("verify_stream", slot.agent_id, text))
 
                 def handle_stderr(text: str):
                     if on_progress:
                         import asyncio
+
                         asyncio.create_task(on_progress("verify_stream", slot.agent_id, f"ERR: {text}"))
 
                 # Stage 2+3: Sandbox verification (lint + tests)
@@ -329,7 +338,7 @@ class Arbiter:
                         language,
                         test_command,
                         on_stdout=handle_stdout,
-                        on_stderr=handle_stderr
+                        on_stderr=handle_stderr,
                     )
                 )
 
@@ -339,20 +348,14 @@ class Arbiter:
                 # LSP reference verification (bonus check, runs in parallel too)
                 lsp_task = None
                 if self._lsp:
-                    lsp_task = asyncio.create_task(
-                        self._lsp.verify_patch_references(slot.patch_set, language)
-                    )
+                    lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
 
                 # Await all parallel checks
-                verification_result, security_findings = await asyncio.gather(
-                    sandbox_task, security_task
-                )
+                verification_result, security_findings = await asyncio.gather(sandbox_task, security_task)
 
             # Phase 19: Dynamically pardon false-positives using Arbiter Memory
             if arbiter_memory and (verification_result.test_result or security_findings):
-                await self._apply_memory_pardons(
-                    verification_result, security_findings, arbiter_memory
-                )
+                await self._apply_memory_pardons(verification_result, security_findings, arbiter_memory)
 
             if lsp_task:
                 score.reference_verification = await lsp_task
@@ -378,6 +381,7 @@ class Arbiter:
             # Wire TesterAgent: generate + run targeted tests from the diff
             try:
                 from src.agents.tester_agent import TesterAgent
+
                 tester = TesterAgent()
                 diff_text = slot.response_text[:5000] if slot.response_text else ""
                 if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
@@ -390,7 +394,9 @@ class Arbiter:
                         # Blend TesterAgent results with existing test score (60/40 weight)
                         tester_score = tester_result.pass_rate
                         test_score = (test_score * 0.6) + (tester_score * 0.4)
-                        logger.info(f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}")  # noqa: E501
+                        logger.info(
+                            f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}"
+                        )  # noqa: E501
             except Exception as e:
                 logger.debug(f"TesterAgent invocation skipped: {e}")
             score.stage_scores["test_pass_rate"] = test_score
@@ -433,7 +439,9 @@ class Arbiter:
             confidence = 0.5
 
             # Linter check
-            linter_clean = bool(verification_result.lint_result and getattr(verification_result.lint_result, 'new_violations', 0) == 0)  # noqa: E501
+            linter_clean = bool(
+                verification_result.lint_result and getattr(verification_result.lint_result, "new_violations", 0) == 0
+            )  # noqa: E501
             if linter_clean:
                 confidence += 0.2
 
@@ -461,18 +469,21 @@ class Arbiter:
                 linter_clean=linter_clean,
                 tests_passed=tests_passed,
                 security_clean=security_clean,
-                calibrated_confidence_score=confidence
+                calibrated_confidence_score=confidence,
             )
 
             # Elimination based on Frontier Safety Rules
             if confidence < 0.85:
                 score.eliminated = True
-                score.elimination_reason = f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."  # noqa: E501
+                score.elimination_reason = (
+                    f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."  # noqa: E501
+                )
                 # Push failure to reflection engine implicitly for next iterations
                 try:
                     import textual.app as _tapp
 
                     from src.core.reflection_engine import ReflectionEngine
+
                     _app = _tapp.active_app.get()
                     engine = ReflectionEngine(_app)
                     engine.reflect_on_friction(
@@ -514,9 +525,7 @@ class Arbiter:
         # ═══════════════════════════════════════════════════
         weights = self._get_weights_for_intent(intent)
         for s in non_eliminated:
-            s.total_score = sum(
-                s.stage_scores.get(stage, 0) * weight for stage, weight in weights.items()
-            )
+            s.total_score = sum(s.stage_scores.get(stage, 0) * weight for stage, weight in weights.items())
 
         # Sort by total score (best first)
         scores.sort(key=lambda s: (not s.eliminated, s.total_score), reverse=True)
@@ -534,10 +543,7 @@ class Arbiter:
 
             if verdict.winner:
                 winner_id = verdict.winner.model_id
-                loser_ids = [
-                    s.model_id for s in scores
-                    if s.model_id != winner_id and not s.eliminated
-                ]
+                loser_ids = [s.model_id for s in scores if s.model_id != winner_id and not s.eliminated]
 
                 # ANTI-GAMING: Skip ELO update if only 1 agent participated
                 # Single-agent runs shouldn't distort rankings
@@ -593,7 +599,7 @@ class Arbiter:
             }
         elif intent == "chat" or intent == "question":
             return {
-                "structural_validity": 0.80, # Just don't break the syntax
+                "structural_validity": 0.80,  # Just don't break the syntax
                 "lint_cleanliness": 0.10,
                 "test_pass_rate": 0.0,
                 "security_score": 0.10,
@@ -647,9 +653,7 @@ class Arbiter:
             try:
                 # Build what the file would look like after applying this patch
                 if fp.is_new_file:
-                    patched_content = "\n".join(
-                        line for hunk in fp.hunks for line in hunk.modified_lines
-                    )
+                    patched_content = "\n".join(line for hunk in fp.hunks for line in hunk.modified_lines)
                 else:
                     original = full_path.read_text(errors="replace")
                     lines = original.splitlines()
@@ -694,8 +698,13 @@ class Arbiter:
 
         # AST node types that increase cyclomatic complexity
         BRANCH_NODES = (
-            _ast.If, _ast.For, _ast.While, _ast.ExceptHandler,
-            _ast.With, _ast.Assert, _ast.BoolOp,
+            _ast.If,
+            _ast.For,
+            _ast.While,
+            _ast.ExceptHandler,
+            _ast.With,
+            _ast.Assert,
+            _ast.BoolOp,
         )
         # Python 3.10+
         try:
@@ -748,8 +757,10 @@ class Arbiter:
                     max_nesting_after = max(max_nesting_after, a_nesting)
                 else:
                     # Fallback: keyword heuristic for JS/TS/etc.
-                    keywords = branch_keywords_js if ext in (".js", ".jsx", ".ts", ".tsx") else re.compile(
-                        r"\b(if|elif|else|for|while|except|and|or|case|match)\b"
+                    keywords = (
+                        branch_keywords_js
+                        if ext in (".js", ".jsx", ".ts", ".tsx")
+                        else re.compile(r"\b(if|elif|else|for|while|except|and|or|case|match)\b")
                     )
                     for line in hunk.original_lines:
                         total_before += len(keywords.findall(line))
@@ -772,9 +783,7 @@ class Arbiter:
     # VERDICT GENERATION
     # ═════════════════════════════════════════════════════════
 
-    def _produce_verdict(
-        self, dispatch_id: str, scores: list[ArbiterScore], total_ms: int
-    ) -> ArbiterVerdict:
+    def _produce_verdict(self, dispatch_id: str, scores: list[ArbiterScore], total_ms: int) -> ArbiterVerdict:
         """Generate the human-readable verdict with evidence."""
         non_eliminated = [s for s in scores if not s.eliminated]
 
@@ -848,16 +857,12 @@ class Arbiter:
             if abs(w_cx - r_cx) > 0.5:
                 w_dir = "reduced" if w_cx < 0 else "increased" if w_cx > 0 else "unchanged"
                 r_dir = "reduced" if r_cx < 0 else "increased" if r_cx > 0 else "unchanged"
-                evidence.append(
-                    f"{winner.model_name} {w_dir} complexity. "
-                    f"{runner_up.model_name} {r_dir} complexity."
-                )
+                evidence.append(f"{winner.model_name} {w_dir} complexity. {runner_up.model_name} {r_dir} complexity.")
 
             # LSP reference check
             if winner.reference_verification and not winner.reference_verification.complete:
                 evidence.append(
-                    f"⚠️ {winner.model_name} missed {len(winner.reference_verification.missed)} "
-                    f"cross-file references."
+                    f"⚠️ {winner.model_name} missed {len(winner.reference_verification.missed)} cross-file references."
                 )
 
         # Build summary
@@ -909,17 +914,11 @@ class Arbiter:
             if rule:
                 before_count = len(security_findings)
                 security_findings[:] = [
-                    f for f in security_findings
-                    if not (
-                        hasattr(f, "rule_id") and f.rule_id == rule
-                    )
+                    f for f in security_findings if not (hasattr(f, "rule_id") and f.rule_id == rule)
                 ]
                 removed = before_count - len(security_findings)
                 if removed > 0:
-                    logger.info(
-                        f"Exempted {removed} security finding(s) "
-                        f"matching rule '{rule}': {reason}"
-                    )
+                    logger.info(f"Exempted {removed} security finding(s) matching rule '{rule}': {reason}")
 
     async def _apply_memory_pardons(
         self,
@@ -954,14 +953,8 @@ class Arbiter:
             return
 
         # Filter out findings that are too severe to pardon
-        pardonable_findings = [
-            f for f in security_findings
-            if f.severity in ("low", "info")
-        ]
-        non_pardonable = [
-            f for f in security_findings
-            if f.severity not in ("low", "info")
-        ]
+        pardonable_findings = [f for f in security_findings if f.severity in ("low", "info")]
+        non_pardonable = [f for f in security_findings if f.severity not in ("low", "info")]
 
         if pardonable_findings:
             self._apply_deterministic_exemptions(verification, pardonable_findings, exemptions)

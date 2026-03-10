@@ -142,9 +142,7 @@ class CostBreakdownTracker:
 
             # Update running totals
             self._today.total_cost += usage.total_cost
-            self._today.by_model[usage.model_id] = (
-                self._today.by_model.get(usage.model_id, 0.0) + usage.total_cost
-            )
+            self._today.by_model[usage.model_id] = self._today.by_model.get(usage.model_id, 0.0) + usage.total_cost
             self._today.by_mode[self._current_task.operation_mode] = (
                 self._today.by_mode.get(self._current_task.operation_mode, 0.0) + usage.total_cost
             )
@@ -166,6 +164,7 @@ class CostBreakdownTracker:
             import textual.app as _tapp
 
             from src.core.events import CreditsUpdated
+
             _cur_app = _tapp.active_app.get()
             # Use real values from auth_manager if available, else fall back to 0
             credits_remaining = 0
@@ -173,10 +172,12 @@ class CostBreakdownTracker:
             if hasattr(_cur_app, "auth_manager"):
                 credits_remaining = getattr(_cur_app.auth_manager, "credits_remaining", 0)
                 credits_monthly = getattr(_cur_app.auth_manager, "credits_monthly", 0)
-            _cur_app.post_message(CreditsUpdated(
-                credits_remaining=credits_remaining,
-                credits_monthly=credits_monthly,
-            ))
+            _cur_app.post_message(
+                CreditsUpdated(
+                    credits_remaining=credits_remaining,
+                    credits_monthly=credits_monthly,
+                )
+            )
         except Exception as e:
             logger.debug(f"Could not post CreditsUpdated event: {e}")
 
@@ -187,14 +188,20 @@ class CostBreakdownTracker:
 
     def get_monthly_spend(self) -> float:
         today = date.today()
-        return sum(
-            t.total_cost for t in self._task_history
-            if hasattr(t, '_recorded_date') and t._recorded_date
-            and t._recorded_date.month == today.month and t._recorded_date.year == today.year
-        ) or self._today.total_cost  # fallback to today if no date metadata
+        return (
+            sum(
+                t.total_cost
+                for t in self._task_history
+                if hasattr(t, "_recorded_date")
+                and t._recorded_date
+                and t._recorded_date.month == today.month
+                and t._recorded_date.year == today.year
+            )
+            or self._today.total_cost
+        )  # fallback to today if no date metadata
 
     def get_session_spend(self) -> float:
-        return sum(t.total_cost for t in self._task_history[self._session_start_idx:])
+        return sum(t.total_cost for t in self._task_history[self._session_start_idx :])
 
     def get_model_ranking(self) -> list[dict]:
         # Based on today only for now in local state

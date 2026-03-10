@@ -85,7 +85,7 @@ def execute_tool(tool_name: str, arguments: dict[str, Any]) -> str:
         server_name = tool_name.split("__")[0]
         try:
             from src.core.config import ConfigManager
-            from src.tools.mcp_client import MCPManager
+            from src.core.mcp_client import MCPManager
             c = ConfigManager.get_instance().user
             mcp_servers = getattr(c, "mcp_servers", [])
             target_server = next((s for s in mcp_servers if s.get("name") == server_name), None)
@@ -129,7 +129,7 @@ def get_tool_definitions() -> list[dict]:
             c = ConfigManager.get_instance().user
             mcp_servers = getattr(c, "mcp_servers", [])
             if mcp_servers:
-                from src.tools.mcp_client import MCPManager
+                from src.core.mcp_client import MCPManager
                 for s in mcp_servers:
                     if s.get("enabled", True):
                         discovered = MCPManager.discover(s)

@@ -233,9 +233,7 @@ class ProjectContextGenerator:
                     ".next",
                 }
                 file_count = sum(
-                    1
-                    for _ in item.rglob("*")
-                    if _.is_file() and not any(ex in _.parts for ex in EXCLUDED_DIRS)
+                    1 for _ in item.rglob("*") if _.is_file() and not any(ex in _.parts for ex in EXCLUDED_DIRS)
                 )
                 lines.append(f"- `{item.name}/` — {file_count} files")
             elif item.is_file() and item.name in (

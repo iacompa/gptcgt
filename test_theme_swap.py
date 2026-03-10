@@ -2,6 +2,8 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Label
 
+__test__ = False
+
 
 class TestApp(App):
     CSS = "Label { background: blue; padding: 2; }"

@@ -68,9 +68,7 @@ async def purchase_credits(request: Request, body: CreditPurchaseRequest):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if body.credit_amount < 100 or body.credit_amount > 50000:
-        raise HTTPException(
-            status_code=400, detail="Credit amount must be between 100 and 50000."
-        )
+        raise HTTPException(status_code=400, detail="Credit amount must be between 100 and 50000.")
 
     pool = get_pool()
     async with pool.acquire() as conn:
@@ -78,10 +76,10 @@ async def purchase_credits(request: Request, body: CreditPurchaseRequest):
         if not row:
             raise HTTPException(status_code=404, detail="User not found")
 
-    price_cents = body.credit_amount * 4  # $0.04 per credit
-    result = await stripe_service.create_credit_purchase_session(
-        pool, user_id, body.credit_amount, price_cents
-    )
+    from src.billing.spending_caps import CREDIT_TO_DOLLAR
+
+    price_cents = int(body.credit_amount * CREDIT_TO_DOLLAR * 100)
+    result = await stripe_service.create_credit_purchase_session(pool, user_id, body.credit_amount, price_cents)
     if "error" in result:
         raise HTTPException(status_code=500, detail=result.get("error"))
 
@@ -96,9 +94,7 @@ async def create_portal(request: Request):
 
     pool = get_pool()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT stripe_customer_id FROM users WHERE workos_user_id = $1", user_id
-        )
+        row = await conn.fetchrow("SELECT stripe_customer_id FROM users WHERE workos_user_id = $1", user_id)
         if not row or not row["stripe_customer_id"]:
             raise HTTPException(status_code=400, detail="User has no Stripe customer ID")
 
@@ -115,11 +111,20 @@ async def get_status(request: Request):
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    from src.services.cache import cache_manager
+
+    cache_key = f"billing_status:{user_id}"
+    cached_val = await cache_manager.get(cache_key)
+    if cached_val:
+        return BillingStatusResponse(**cached_val)
+
     pool = get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """SELECT u.plan, u.credits_remaining, u.credits_monthly,
-               u.subscription_status, u.current_period_end, u.overage_enabled, u.spending_cap,
+               u.subscription_status, u.current_period_end,
+               COALESCE(t.overage_enabled, u.overage_enabled) as effective_overage_enabled,
+               u.spending_cap,
                u.team_role, u.allocated_quota, u.billing_access, t.shared_credits_remaining
                FROM users u
                LEFT JOIN teams t ON u.team_id = t.id
@@ -137,18 +142,21 @@ async def get_status(request: Request):
     shared = row["shared_credits_remaining"]
     effective_credits = shared if shared is not None else (row["credits_remaining"] or 0)
 
-    return BillingStatusResponse(
+    response = BillingStatusResponse(
         plan=row["plan"] or "free",
         credits_remaining=effective_credits,
         credits_monthly=row["credits_monthly"] or 0,
         subscription_status=row["subscription_status"] or "none",
         current_period_end=period_end,
-        overage_enabled=row["overage_enabled"] or False,
+        overage_enabled=row["effective_overage_enabled"] or False,
         spending_cap=row["spending_cap"],
         team_role=row["team_role"] or "owner",
         allocated_quota=row["allocated_quota"],
-        billing_access=row["billing_access"] if row["billing_access"] is not None else True
+        billing_access=row["billing_access"] if row["billing_access"] is not None else True,
     )
+
+    await cache_manager.set(cache_key, response.model_dump(), ttl=30)
+    return response
 
 
 @router.post("/webhook")

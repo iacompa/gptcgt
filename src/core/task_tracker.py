@@ -51,9 +51,7 @@ class Task:
     def progress_pct(self) -> float:
         if not self.subtasks:
             return 0.0
-        done = sum(
-            1 for s in self.subtasks if s.status in (TaskStatus.COMPLETED, TaskStatus.SKIPPED)
-        )
+        done = sum(1 for s in self.subtasks if s.status in (TaskStatus.COMPLETED, TaskStatus.SKIPPED))
         return (done / len(self.subtasks)) * 100.0
 
     @property

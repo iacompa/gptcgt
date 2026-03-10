@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 
 import stripe
 
@@ -6,6 +8,7 @@ from api.config import settings
 from src.services.registry import services
 
 logger = logging.getLogger(__name__)
+PostCommitAction = tuple[str, Callable[[], Awaitable[None]]]
 
 
 # Price mapping based on registry
@@ -55,12 +58,11 @@ class StripeService:
                     "workos_user_id": workos_user_id,
                     "type": "subscription",
                     "plan": plan,
+                    "quantity": str(quantity),
                 },
             }
             # Remove None values
             session_params = {k: v for k, v in session_params.items() if v is not None}
-
-            import asyncio
 
             session = await asyncio.to_thread(stripe.checkout.Session.create, **session_params)
             return {"url": session.url}
@@ -68,9 +70,7 @@ class StripeService:
             logger.error(f"Stripe checkout error: {e}")
             raise
 
-    async def create_credit_purchase_session(
-        self, db_pool, workos_user_id: str, amount: int, price_cents: int
-    ) -> dict:
+    async def create_credit_purchase_session(self, db_pool, workos_user_id: str, amount: int, price_cents: int) -> dict:
         """Create a Checkout Session for one-off PAYG credits."""
         try:
             row = await db_pool.fetchrow(
@@ -108,8 +108,6 @@ class StripeService:
             }
             session_params = {k: v for k, v in session_params.items() if v is not None}
 
-            import asyncio
-
             session = await asyncio.to_thread(stripe.checkout.Session.create, **session_params)
             return {"url": session.url}
         except Exception as e:
@@ -124,8 +122,6 @@ class StripeService:
             )
             if not row or not row["stripe_customer_id"]:
                 return {"error": "No active Stripe customer"}
-
-            import asyncio
 
             session = await asyncio.to_thread(
                 stripe.billing_portal.Session.create,
@@ -143,80 +139,83 @@ class StripeService:
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
         except ValueError:
-            raise ValueError("Invalid payload")
+            return {"status": "invalid_payload", "error": "Invalid payload"}
         except stripe.SignatureVerificationError:
-            raise ValueError("Invalid signature")
+            return {"status": "invalid_signature", "error": "Invalid signature"}
 
         event_type = event["type"]
         data = event["data"]["object"]
 
         event_id = event.get("id", "")
+        post_commit_actions: list[PostCommitAction] = []
 
-        # Postgres-backed idempotency — survives restarts + multi-instance
+        # P1-03: Postgres-backed transactional status machine idempotency
         try:
-            existing = await db_pool.fetchval(
-                "SELECT 1 FROM webhook_events WHERE event_id = $1", event_id
-            )
-            if existing:
-                return {"status": "duplicate"}
-            await db_pool.execute(
-                "INSERT INTO webhook_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING",
-                event_id,
-            )
-        except Exception:
-            # Table may not exist yet — create it
+            async with db_pool.acquire() as conn:
+                async with conn.transaction():
+                    try:
+                        await conn.execute(
+                            "INSERT INTO webhook_events (event_id, status) VALUES ($1, 'received') ON CONFLICT DO NOTHING",
+                            event_id,
+                        )
+                        existing = await conn.fetchrow("SELECT status FROM webhook_events WHERE event_id = $1 FOR UPDATE", event_id)
+                        if existing and existing["status"] == "processed":
+                            return {"status": "duplicate"}
+
+                        logger.info(f"Processing Stripe webhook: {event_type}")
+
+                        if event_type == "checkout.session.completed":
+                            post_commit_actions.extend(await self._handle_checkout(conn, data))
+                        elif event_type == "customer.subscription.updated":
+                            await self._handle_subscription_update(conn, data)
+                        elif event_type == "customer.subscription.deleted":
+                            post_commit_actions.extend(await self._handle_subscription_cancel(conn, data))
+                        elif event_type == "invoice.paid":
+                            await self._handle_invoice_paid(conn, data)
+                        elif event_type == "invoice.payment_failed":
+                            customer_id = data.get("customer")
+                            if customer_id:
+                                user_row = await conn.fetchrow("SELECT email FROM users WHERE stripe_customer_id = $1", customer_id)
+                                if user_row and user_row["email"]:
+                                    from src.services.email import email_service
+                                    post_commit_actions.append(
+                                        (
+                                            "send_payment_failed_email",
+                                            lambda email=user_row["email"]: email_service.send_payment_failed(email),
+                                        )
+                                    )
+
+                        await conn.execute("UPDATE webhook_events SET status = 'processed', processed_at = CURRENT_TIMESTAMP WHERE event_id = $1", event_id)
+
+                    except Exception as pg_exc:
+                        logger.error(f"Transaction failed processing webhook {event_id}: {pg_exc}")
+                        raise
+        except Exception as e:
+            logger.error(f"Webhook processing error: {e}")
+            raise
+
+        for action_name, action in post_commit_actions:
             try:
-                await db_pool.execute("""
-                    CREATE TABLE IF NOT EXISTS webhook_events (
-                        event_id TEXT PRIMARY KEY,
-                        processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                await db_pool.execute(
-                    "INSERT INTO webhook_events (event_id) VALUES ($1) ON CONFLICT DO NOTHING",
-                    event_id,
-                )
-            except Exception as e:
-                logger.warning(f"Webhook dedup table error (non-fatal): {e}")
-
-        logger.info(f"Processing Stripe webhook: {event_type}")
-
-        if event_type == "checkout.session.completed":
-            await self._handle_checkout(db_pool, data)
-        elif event_type == "customer.subscription.updated":
-            await self._handle_subscription_update(db_pool, data)
-        elif event_type == "customer.subscription.deleted":
-            await self._handle_subscription_cancel(db_pool, data)
-        elif event_type == "invoice.paid":
-            await self._handle_invoice_paid(db_pool, data)
-        elif event_type == "invoice.payment_failed":
-            customer_id = data.get("customer")
-            if customer_id:
-                user_row = await db_pool.fetchrow(
-                    "SELECT email FROM users WHERE stripe_customer_id = $1", customer_id
-                )
-                if user_row and user_row["email"]:
-                    from src.services.email import email_service
-
-                    await email_service.send_payment_failed(user_row["email"])
+                await action()
+            except Exception as side_effect_error:
+                logger.error(f"Post-commit Stripe side effect '{action_name}' failed: {side_effect_error}")
 
         return {"status": "success"}
 
-    async def _handle_checkout(self, db_pool, session: dict) -> None:
+    async def _handle_checkout(self, conn, session: dict) -> list[PostCommitAction]:
         """Handle successful checkout (either subscription or packs)."""
         workos_user_id = session.get("client_reference_id")
         if not workos_user_id:
             workos_user_id = session.get("metadata", {}).get("workos_user_id")
         if not workos_user_id:
-            return
+            return []
 
         customer_id = session.get("customer")
         action_type = session.get("metadata", {}).get("type")
+        post_commit_actions: list[PostCommitAction] = []
 
         # Fetch email for notifications
-        user_row = await db_pool.fetchrow(
-            "SELECT email FROM users WHERE workos_user_id = $1", workos_user_id
-        )
+        user_row = await conn.fetchrow("SELECT email FROM users WHERE workos_user_id = $1", workos_user_id)
         email = user_row["email"] if user_row else None
 
         from src.services.analytics import track_async
@@ -225,9 +224,11 @@ class StripeService:
         if action_type == "subscription":
             sub_id = session.get("subscription")
             plan = session.get("metadata", {}).get("plan", "pro")
-            credits_monthly = 2000 if plan == "team" else 1000  # Default allocations
+            quantity = int(session.get("metadata", {}).get("quantity", "1"))
+            base_credits = 2000 if plan == "team" else 1000
+            credits_monthly = base_credits * quantity
 
-            await db_pool.execute(
+            await conn.execute(
                 """
                 UPDATE users
                 SET stripe_customer_id = $1, stripe_subscription_id = $2,
@@ -243,35 +244,50 @@ class StripeService:
             )
 
             # Also deposit subscription credits into the Team Wallet
-            user_team_row = await db_pool.fetchrow(
+            user_team_row = await conn.fetchrow(
                 "SELECT team_id FROM users WHERE workos_user_id = $1", workos_user_id
             )
             if user_team_row and user_team_row["team_id"]:
-                await db_pool.execute(
+                await conn.execute(
                     """
                     UPDATE teams
-                    SET shared_credits_remaining = $1, plan = $2
-                    WHERE id = $3
+                    SET shared_credits_remaining = $1, plan = $2, seats_purchased = $3
+                    WHERE id = $4
                     """,
                     credits_monthly,
                     plan,
+                    quantity,
                     user_team_row["team_id"],
                 )
 
             if email:
-                await email_service.send_subscription_started(email, plan)
-            await track_async(workos_user_id, "subscription_started", {"plan": plan})
+                post_commit_actions.append(
+                    (
+                        "send_subscription_started_email",
+                        lambda email=email, plan=plan: email_service.send_subscription_started(email, plan),
+                    )
+                )
+            post_commit_actions.append(
+                (
+                    "track_subscription_started",
+                    lambda workos_user_id=workos_user_id, plan=plan: track_async(
+                        workos_user_id,
+                        "subscription_started",
+                        {"plan": plan},
+                    ),
+                )
+            )
         elif action_type == "credits":
             amount = int(session.get("metadata", {}).get("amount", "0"))
 
             # Fetch the user's team workspace
-            user_team_row = await db_pool.fetchrow(
+            user_team_row = await conn.fetchrow(
                 "SELECT team_id FROM users WHERE workos_user_id = $1", workos_user_id
             )
 
             if user_team_row and user_team_row["team_id"]:
                 # Deposit the purchased credits into the Team Wallet
-                await db_pool.execute(
+                await conn.execute(
                     """
                     UPDATE teams
                     SET shared_credits_remaining = shared_credits_remaining + $1
@@ -282,7 +298,7 @@ class StripeService:
                 )
             else:
                 # Solo user — deposit credits to personal balance
-                await db_pool.execute(
+                await conn.execute(
                     """
                     UPDATE users
                     SET credits_remaining = credits_remaining + $1
@@ -291,39 +307,68 @@ class StripeService:
                     amount,
                     workos_user_id,
                 )
+        return post_commit_actions
 
-    async def _handle_subscription_update(self, db_pool, subscription: dict) -> None:
-        """Update subscription status (e.g. past_due, active)."""
+    async def _handle_subscription_update(self, conn, subscription: dict) -> None:
+        """Update subscription status (e.g. past_due, active) and sync seat quantity."""
         customer_id = subscription.get("customer")
         status = subscription.get("status")
         period_end = subscription.get("current_period_end")
 
-        # We need to find by customer_id because webhooks often lack metadata on the root object
-        await db_pool.execute(
-            """
-            UPDATE users
-            SET subscription_status = $1,
-                current_period_end = to_timestamp($2)
-            WHERE stripe_customer_id = $3
-            """,
-            status,
-            period_end,
-            customer_id,
-        )
+        # Extract quantity to handle seat changes
+        items = subscription.get("items", {}).get("data", [])
+        quantity = items[0].get("quantity", 1) if items else 1
 
-    async def _handle_subscription_cancel(self, db_pool, subscription: dict) -> None:
-        """Handle cancellation -> downgrade to Free."""
+        user_row = await conn.fetchrow("SELECT plan FROM users WHERE stripe_customer_id = $1", customer_id)
+
+        if user_row:
+            plan = user_row["plan"]
+            base_credits = 2000 if plan == "team" else 1000
+            new_monthly = base_credits * quantity
+
+            await conn.execute(
+                """
+                UPDATE users
+                SET subscription_status = $1,
+                    current_period_end = to_timestamp($2),
+                    credits_monthly = $3
+                WHERE stripe_customer_id = $4
+                """,
+                status,
+                period_end,
+                new_monthly,
+                customer_id,
+            )
+
+            user_team_row = await conn.fetchrow(
+                "SELECT team_id FROM users WHERE stripe_customer_id = $1",
+                customer_id,
+            )
+            if user_team_row and user_team_row["team_id"]:
+                await conn.execute(
+                    """
+                    UPDATE teams
+                    SET plan = $1, seats_purchased = $2
+                    WHERE id = $3
+                    """,
+                    plan,
+                    quantity,
+                    user_team_row["team_id"],
+                )
+
+    async def _handle_subscription_cancel(self, conn, subscription: dict) -> list[PostCommitAction]:
+        """Handle cancellation -> downgrade to Free and zero out team wallet credits (H2)."""
         customer_id = subscription.get("customer")
 
-        user_row = await db_pool.fetchrow(
-            "SELECT workos_user_id, email FROM users WHERE stripe_customer_id = $1", customer_id
+        user_row = await conn.fetchrow(
+            "SELECT workos_user_id, email, team_id FROM users WHERE stripe_customer_id = $1", customer_id
         )
 
-        await db_pool.execute(
+        await conn.execute(
             """
             UPDATE users
             SET plan = 'free',
-                subscription_status = 'canceled',
+                subscription_status = 'cancelled',
                 credits_monthly = 0,
                 stripe_subscription_id = NULL
             WHERE stripe_customer_id = $1
@@ -332,18 +377,34 @@ class StripeService:
         )
 
         if user_row:
+            if user_row["team_id"]:
+                await conn.execute(
+                    "UPDATE teams SET plan = 'free', shared_credits_remaining = 0, seats_purchased = 1 WHERE id = $1",
+                    user_row["team_id"]
+                )
+
             from src.services.analytics import track_async
 
-            await track_async(user_row["workos_user_id"], "subscription_canceled", {})
+            return [
+                (
+                    "track_subscription_canceled",
+                    lambda workos_user_id=user_row["workos_user_id"]: track_async(
+                        workos_user_id,
+                        "subscription_canceled",
+                        {},
+                    ),
+                )
+            ]
+        return []
 
-    async def _handle_invoice_paid(self, db_pool, invoice: dict) -> None:
+    async def _handle_invoice_paid(self, conn, invoice: dict) -> None:
         """Trigger monthly credit replenishment when an invoice is fully paid."""
         reason = invoice.get("billing_reason")
         if reason == "subscription_cycle":
             customer_id = invoice.get("customer")
 
             # Reset credits to their monthly allowance (both user and team wallet)
-            await db_pool.execute(
+            await conn.execute(
                 """
                 UPDATE users
                 SET credits_remaining = credits_monthly
@@ -352,7 +413,7 @@ class StripeService:
                 customer_id,
             )
             # Also reset the Team Wallet
-            await db_pool.execute(
+            await conn.execute(
                 """
                 UPDATE teams t
                 SET shared_credits_remaining = u.credits_monthly

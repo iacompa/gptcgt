@@ -29,6 +29,10 @@ def verify_access_token(
     if not algorithm:
         raise jwt.InvalidTokenError("Missing JWT alg header")
 
+    # M1: Explicit allowlist
+    if algorithm not in ("HS256", "RS256"):
+        raise jwt.InvalidTokenError(f"Unsupported JWT algorithm: {algorithm}")
+
     base_options = {
         "require": ["sub", "exp"],
         "verify_exp": True,

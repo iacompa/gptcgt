@@ -1,8 +1,8 @@
 import time
 
 # Canonical credit-to-dollar conversion rate — MUST match billing.py and proxy
-# 1 credit = $0.04 (aligned with Stripe checkout pricing)
-CREDIT_TO_DOLLAR = 0.04
+# 1 credit = $0.01 (aligned with Stripe checkout pricing)
+CREDIT_TO_DOLLAR = 0.01
 
 
 class SpendingCapService:
@@ -23,13 +23,23 @@ class SpendingCapService:
     ]
 
     async def get_cap_status(self, db_pool, workos_user_id: str) -> dict:
-        """Current spend vs cap."""
+        """Current spend vs cap based on immutable usage events for the current month."""
         row = await db_pool.fetchrow(
             """
-            SELECT u.spending_cap, u.credits_monthly,
-                   COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as effective_credits
+            SELECT
+                u.spending_cap,
+                u.credits_monthly,
+                COALESCE(
+                    (
+                        SELECT SUM(ue.credits_consumed)
+                        FROM usage_events ue
+                        WHERE ue.user_id = u.id
+                          AND ue.created_at >= date_trunc('month', now())
+                          AND ue.created_at < date_trunc('month', now()) + interval '1 month'
+                    ),
+                    0
+                ) AS credits_used_month
             FROM users u
-            LEFT JOIN teams t ON u.team_id = t.id
             WHERE u.workos_user_id = $1
             """,
             workos_user_id,
@@ -42,8 +52,7 @@ class SpendingCapService:
             return {"has_cap": False, "warning_level": None}
 
         monthly = row["credits_monthly"]
-        remaining = row["effective_credits"]
-        used = monthly - remaining
+        used = max(0, row["credits_used_month"] or 0)
         spent_dollars = used * CREDIT_TO_DOLLAR
         pct = spent_dollars / cap if cap > 0 else 0
 
@@ -55,6 +64,8 @@ class SpendingCapService:
         return {
             "has_cap": True,
             "cap_dollars": cap,
+            "credits_monthly": monthly,
+            "credits_used_month": used,
             "spent_dollars": round(spent_dollars, 2),
             "percent_used": round(pct * 100, 1),
             "warning_level": warning_level,
@@ -72,21 +83,43 @@ class SpendingCapService:
         if projected > status["cap_dollars"]:
             from src.services.analytics import track_async
 
-            await track_async(
-                workos_user_id, "spending_cap_hit", {"cap_dollars": status["cap_dollars"]}
-            )
+            await track_async(workos_user_id, "spending_cap_hit", {"cap_dollars": status["cap_dollars"]})
 
             # Send cap warning email (at most once per 24 hours per user)
-            last_warned = self._cap_warned_users.get(workos_user_id, 0)
+            from src.services.registry import services
+            last_warned = 0.0
+            redis_client = None
+
+            if services.redis.is_configured:
+                try:
+                    import redis.asyncio as redis
+                    redis_client = redis.from_url(services.redis.url, decode_responses=True)
+                    last_warned_str = await redis_client.get(f"cap_warning:{workos_user_id}")
+                    last_warned = float(last_warned_str) if last_warned_str else 0.0
+                except Exception:
+                    last_warned = self._cap_warned_users.get(workos_user_id, 0.0)
+            else:
+                last_warned = self._cap_warned_users.get(workos_user_id, 0.0)
+
             if time.time() - last_warned > self._CAP_WARN_COOLDOWN:
                 from src.services.email import email_service
 
-                user_row = await db_pool.fetchrow(
-                    "SELECT email FROM users WHERE workos_user_id = $1", workos_user_id
-                )
+                user_row = await db_pool.fetchrow("SELECT email FROM users WHERE workos_user_id = $1", workos_user_id)
                 if user_row:
                     await email_service.send_warning_cap(user_row["email"], status["cap_dollars"])
-                self._cap_warned_users[workos_user_id] = time.time()
+
+                # Persist new cooldown
+                if redis_client:
+                    try:
+                        await redis_client.setex(
+                            f"cap_warning:{workos_user_id}",
+                            self._CAP_WARN_COOLDOWN,
+                            str(time.time())
+                        )
+                    except Exception:
+                        self._cap_warned_users[workos_user_id] = time.time()
+                else:
+                    self._cap_warned_users[workos_user_id] = time.time()
 
             return {
                 "allowed": False,
@@ -107,6 +140,4 @@ class SpendingCapService:
 
     async def remove_cap(self, db_pool, workos_user_id: str) -> None:
         """Remove spending cap (unlimited)."""
-        await db_pool.execute(
-            "UPDATE users SET spending_cap = NULL WHERE workos_user_id = $1", workos_user_id
-        )
+        await db_pool.execute("UPDATE users SET spending_cap = NULL WHERE workos_user_id = $1", workos_user_id)

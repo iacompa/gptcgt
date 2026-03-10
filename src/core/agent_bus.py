@@ -108,10 +108,7 @@ class AgentMessageBus:
         """Get messages addressed to a specific agent in an iteration."""
         if iteration is None:
             iteration = self._iteration
-        return [
-            m for m in self._messages
-            if m.iteration == iteration and m.to_agent in (agent, "all")
-        ]
+        return [m for m in self._messages if m.iteration == iteration and m.to_agent in (agent, "all")]
 
     def get_full_log(self) -> list[AgentMessage]:
         """Get the complete message log across all iterations."""
@@ -141,12 +138,14 @@ class AgentMessageBus:
             from src.core.events import AgentConversation
 
             app = _tapp.active_app.get()
-            app.post_message(AgentConversation(
-                from_agent=msg.from_agent,
-                to_agent=msg.to_agent,
-                content=msg.content,
-                msg_type=msg.msg_type,
-                iteration=msg.iteration,
-            ))
+            app.post_message(
+                AgentConversation(
+                    from_agent=msg.from_agent,
+                    to_agent=msg.to_agent,
+                    content=msg.content,
+                    msg_type=msg.msg_type,
+                    iteration=msg.iteration,
+                )
+            )
         except Exception:
             pass  # Silently fail if no UI is running (tests, CLI mode)

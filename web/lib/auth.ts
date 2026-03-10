@@ -10,6 +10,14 @@ export interface Session {
     accessToken: string;
 }
 
+function getJwtIssuer(): string {
+    return process.env.WORKOS_ISSUER || "gptcgt";
+}
+
+function getJwtAudience(): string {
+    return process.env.WORKOS_AUDIENCE || "gptcgt-api";
+}
+
 // SECURITY: No fallback secret. JWT_SECRET MUST be set in environment.
 function getJwtSecret(): string {
     const secret = process.env.JWT_SECRET;
@@ -38,6 +46,8 @@ export async function getSession(): Promise<Session | null> {
         const secret = getJwtSecret();
         const payload = jwt.verify(token, secret, {
             algorithms: ["HS256"],
+            issuer: getJwtIssuer(),
+            audience: getJwtAudience(),
         }) as any;
 
         if (!payload.sub || !payload.email) {
@@ -64,8 +74,8 @@ export function createSessionToken(subject: string, email: string, name?: string
             sub: subject,
             email,
             name: name || email.split("@")[0],
-            iss: "gptcgt",
-            aud: "gptcgt-api",
+            iss: getJwtIssuer(),
+            aud: getJwtAudience(),
         },
         secret,
         { expiresIn: "7d", algorithm: "HS256" }

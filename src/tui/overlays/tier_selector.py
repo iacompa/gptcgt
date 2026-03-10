@@ -84,9 +84,12 @@ class TierSelectorOverlay(ModalScreen):
 
     def compose(self) -> ComposeResult:
         from textual.containers import Horizontal as _H
+
         with Vertical(id="tier-dialog"):
             yield Label("Select Quality Tier", id="tier-title")
-            yield Label("Press [bold]1[/bold] / [bold]2[/bold] / [bold]3[/bold] or click to select", classes="tier-shortcut")  # noqa: E501
+            yield Label(
+                "Press [bold]1[/bold] / [bold]2[/bold] / [bold]3[/bold] or click to select", classes="tier-shortcut"
+            )  # noqa: E501
 
             # ── Light ──────────────────────────────────
             is_light = self.current_tier == QualityTier.LIGHT

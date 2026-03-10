@@ -26,6 +26,16 @@ class Hunk:
     user_edited: bool = False
     user_text: str | None = None
 
+    @property
+    def old_lines(self) -> list[str]:
+        """Backward-compatible alias for pre-rename callers."""
+        return self.original_lines
+
+    @property
+    def new_lines(self) -> list[str]:
+        """Backward-compatible alias for pre-rename callers."""
+        return self.modified_lines
+
 
 @dataclass
 class FilePatch:
@@ -50,10 +60,10 @@ class PatchSet:
     patches: list[FilePatch] = field(default_factory=list)
     agent_id: str = ""
     model_name: str = ""
-    model_id: str = ""            # e.g. "openai/gpt-4o" — populated by dispatcher
+    model_id: str = ""  # e.g. "openai/gpt-4o" — populated by dispatcher
     raw_response: str = ""
     generation_time: float = 0.0  # Wall-clock seconds from dispatch to completion
-    cost_usd: float = 0.0         # USD cost of this generation (from AgentSlot)
+    cost_usd: float = 0.0  # USD cost of this generation (from AgentSlot)
 
     @property
     def file_count(self) -> int:
@@ -87,9 +97,7 @@ class DiffExtractor:
         re.MULTILINE,
     )
     _HUNK_HDR = re.compile(r"^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@")
-    _SEARCH_REPLACE = re.compile(
-        r"<<<<<<+\s*SEARCH\s*\n(.*?)\n={5,}\n(.*?)\n>{5,}\s*REPLACE", re.DOTALL
-    )
+    _SEARCH_REPLACE = re.compile(r"<<<<<<+\s*SEARCH\s*\n(.*?)\n={5,}\n(.*?)\n>{5,}\s*REPLACE", re.DOTALL)
 
     def extract(self, text: str, agent_id: str = "", model_name: str = "") -> PatchSet:
         ps = PatchSet(agent_id=agent_id, model_name=model_name, raw_response=text)
@@ -120,6 +128,7 @@ class DiffExtractor:
     def _validate_syntax(self, patch_set: PatchSet) -> None:
         """Dry-runs patches against existing files to catch AST syntax errors."""
         import ast
+
         ws = Workspace.get_instance()
 
         for fp in patch_set.patches:
@@ -201,9 +210,7 @@ class DiffExtractor:
                 ln += 1
         if not orig and not mod:
             return None
-        return Hunk(
-            start_line=start, end_line=max(end, start - 1), original_lines=orig, modified_lines=mod
-        )
+        return Hunk(start_line=start, end_line=max(end, start - 1), original_lines=orig, modified_lines=mod)
 
     def _extract_search_replace(self, text: str) -> list[FilePatch]:
         patches_by_file: dict[str, FilePatch] = {}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { UserPlus, Mail, Shield, CheckCircle2, Trash2, Clock, Users, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, Mail, Shield, Trash2, UserPlus, Users } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toaster";
 
 interface TeamMember {
     id: string;
@@ -25,15 +27,26 @@ export default function TeamPage() {
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteRole, setInviteRole] = useState("member");
     const [inviting, setInviting] = useState(false);
-    const [inviteError, setInviteError] = useState("");
-    const [inviteSuccess, setInviteSuccess] = useState("");
     const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+    const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
+    const [isRemoving, setIsRemoving] = useState(false);
+    const { pushToast } = useToast();
 
-    const members = profile ? [
-        { id: "self", email: profile.email, role: profile.team_role || "Owner", status: "Active", joined: "—" },
-        ...teamMembers,
-    ] : [];
+    const members = profile
+        ? teamMembers.some((member) => member.email === profile.email)
+            ? teamMembers
+            : [
+                  {
+                      id: "self",
+                      email: profile.email,
+                      role: profile.team_role || "Owner",
+                      status: "Active",
+                      joined: "—",
+                  },
+                  ...teamMembers,
+              ]
+        : [];
 
     const loadTeamData = useCallback(async () => {
         try {
@@ -43,14 +56,15 @@ export default function TeamPage() {
             ]);
             const rawMembers = (rawMembersRes.data as any[]) || [];
             const invites = (invitesRes.data as any[]) || [];
-            const mapped = (rawMembers || []).map((m: any) => ({
-                ...m,
-                status: "Active",
-            }));
-            setTeamMembers(mapped);
+            setTeamMembers(
+                rawMembers.map((member: any) => ({
+                    ...member,
+                    status: "Active",
+                }))
+            );
             setPendingInvites(invites || []);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
         }
     }, []);
 
@@ -60,55 +74,76 @@ export default function TeamPage() {
             if (error) throw error;
             const profileData = data as any;
             setProfile(profileData);
-
             if (profileData.plan === "team" || profileData.plan === "enterprise") {
                 await loadTeamData();
             }
-        } catch (e) {
-            console.error(e);
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Could not load team profile",
+                description: error.message,
+            });
         } finally {
             setLoading(false);
         }
-    }, [loadTeamData]);
+    }, [loadTeamData, pushToast]);
 
     useEffect(() => {
-        loadProfile();
+        void loadProfile();
     }, [loadProfile]);
 
-    const handleInvite = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleInvite = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!inviteEmail.trim() || inviting) return;
-
         setInviting(true);
-        setInviteError("");
-        setInviteSuccess("");
 
         try {
             const { error } = await apiClient.POST("/team/invites/invite", {
-                body: { email: inviteEmail, role: inviteRole } as any
+                body: { email: inviteEmail, role: inviteRole } as any,
             });
             if (error) throw error;
-            setInviteSuccess(`Invite sent to ${inviteEmail}`);
+            pushToast({
+                tone: "success",
+                title: "Invite sent",
+                description: `Invitation sent to ${inviteEmail}.`,
+            });
             setInviteEmail("");
             await loadTeamData();
-            setTimeout(() => setInviteSuccess(""), 5000);
-        } catch (err: any) {
-            setInviteError(err.message || "Failed to send invite");
+        } catch (error: any) {
+            pushToast({
+                tone: "error",
+                title: "Failed to send invite",
+                description: error.message || "Please verify the email address and permissions.",
+            });
         } finally {
             setInviting(false);
         }
     };
 
-    const handleRemoveMember = async (userId: string) => {
-        if (!confirm("Remove this member from the team?")) return;
+    const removeMember = async () => {
+        if (!memberToRemove) return;
+        setIsRemoving(true);
         try {
             const { error } = await apiClient.DELETE("/team/invites/member", {
-                body: { target_user_id: userId } as any
+                body: { target_user_id: memberToRemove.id } as any,
             });
             if (error) throw error;
+            pushToast({
+                tone: "success",
+                title: "Member removed",
+                description: `${memberToRemove.email} was removed from the team workspace.`,
+            });
+            setMemberToRemove(null);
             await loadTeamData();
-        } catch (err: any) {
-            alert(err.message || "Failed to remove member");
+        } catch (error: any) {
+            pushToast({
+                tone: "error",
+                title: "Failed to remove member",
+                description: error.message,
+            });
+        } finally {
+            setIsRemoving(false);
         }
     };
 
@@ -116,168 +151,180 @@ export default function TeamPage() {
     const isOwnerOrAdmin = profile?.team_role === "owner" || profile?.team_role === "admin";
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full" />
-            </div>
-        );
+        return <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">Loading team workspace...</div>;
     }
 
     return (
-        <div className="max-w-5xl">
-            <div className="flex justify-between items-end mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold">Team Members</h1>
-                    <p className="text-gray-400 mt-1">Manage organization access and unified billing.</p>
+        <div className="page-stack">
+            <section className="hero-panel p-6 sm:p-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="eyebrow">Team</p>
+                        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                            Manage shared access without losing sight of billing or role ownership.
+                        </h1>
+                        <p className="mt-3 max-w-3xl copy-lg">
+                            Team membership, invites, and shared wallet behavior belong in the same operational surface.
+                        </p>
+                    </div>
+                    {isTeamPlan && (
+                        <div className="badge badge-accent">
+                            <Users className="h-3.5 w-3.5" /> {members.length} members
+                        </div>
+                    )}
                 </div>
-                {isTeamPlan && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5" />
-                        {members.length} {members.length === 1 ? "member" : "members"}
-                    </span>
-                )}
-            </div>
+            </section>
 
             {!isTeamPlan && (
-                <div className="bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl p-8 mb-8 flex flex-col items-center justify-center text-center">
-                    <Shield className="w-12 h-12 text-indigo-400 mb-4" />
-                    <h2 className="text-xl font-bold mb-2">Upgrade to Team</h2>
-                    <p className="text-gray-300 max-w-lg mb-6">
-                        Unlock organization keys, unified billing, and collaborative orchestrations by upgrading your plan.
-                    </p>
-                    <ul className="text-sm text-gray-400 space-y-2 mb-8 text-left">
-                        <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Add up to 10 members</li>
-                        <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Shared proxy cap management</li>
-                        <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Single invoice for all developers</li>
-                    </ul>
-                    <a href="/pricing" className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/20 transition-colors">
-                        View Plans & Pricing
-                    </a>
-                </div>
+                <section className="panel p-6 sm:p-8">
+                    <div className="flex flex-col items-start gap-4 sm:flex-row">
+                        <div className="rounded-2xl bg-[var(--accent-soft)] p-3 text-[var(--accent-strong)]">
+                            <Shield className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Upgrade to a team workspace</h2>
+                            <p className="mt-3 max-w-2xl text-sm text-[var(--text-muted)]">
+                                Shared keys, unified billing, and collaborative orchestrations only make sense when the team surface is built around them.
+                            </p>
+                            <div className="mt-5 flex flex-wrap gap-3">
+                                <span className="badge badge-accent">Shared wallet</span>
+                                <span className="badge badge-accent">Member roles</span>
+                                <span className="badge badge-accent">Unified billing</span>
+                            </div>
+                            <a href="/pricing" className="btn-primary mt-6 inline-flex">
+                                View plans
+                            </a>
+                        </div>
+                    </div>
+                </section>
             )}
 
-            {/* Invite Form — functional for team plans */}
             {isTeamPlan && isOwnerOrAdmin && (
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-                    <div className="flex justify-between items-center mb-1">
-                        <h3 className="font-bold">Invite Member</h3>
+                <section className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <UserPlus className="h-5 w-5 text-[var(--accent)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Invite a teammate</h2>
                     </div>
-                    <p className="text-sm text-gray-400 mb-4">Send an email invitation to join your organization workspace.</p>
-
-                    <form onSubmit={handleInvite} className="flex gap-3">
-                        <div className="relative flex-1">
-                            <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-500" />
+                    <p className="mt-3 text-sm text-[var(--text-muted)]">
+                        Invite an engineer into the shared workspace and give them the right level of access from the start.
+                    </p>
+                    <form onSubmit={handleInvite} className="mt-5 grid gap-4 lg:grid-cols-[1fr_160px_auto]">
+                        <div className="relative">
+                            <Mail className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-[var(--text-soft)]" />
                             <input
                                 type="email"
                                 value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
+                                onChange={(event) => setInviteEmail(event.target.value)}
                                 placeholder="colleague@domain.com"
                                 required
-                                className="w-full bg-gray-950 border border-gray-700 rounded-md pl-10 pr-4 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+                                className="field pl-11"
                             />
                         </div>
                         <select
                             value={inviteRole}
-                            onChange={(e) => setInviteRole(e.target.value)}
-                            className="bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white focus:outline-none focus:border-indigo-500 w-32"
+                            onChange={(event) => setInviteRole(event.target.value)}
+                            className="select-field"
                         >
                             <option value="member">Member</option>
                             <option value="admin">Admin</option>
                         </select>
-                        <button
-                            type="submit"
-                            disabled={inviting || !inviteEmail.trim()}
-                            className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 transition-colors"
-                        >
-                            <UserPlus size={18} />
-                            {inviting ? "Sending..." : "Send Invite"}
+                        <button type="submit" disabled={inviting || !inviteEmail.trim()} className="btn-primary">
+                            {inviting ? "Sending..." : "Send invite"}
                         </button>
                     </form>
-
-                    {inviteError && (
-                        <div className="mt-3 text-sm text-red-400 bg-red-950/30 border border-red-900/50 rounded-md p-2 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 flex-shrink-0" /> {inviteError}
-                        </div>
-                    )}
-                    {inviteSuccess && (
-                        <div className="mt-3 text-sm text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 rounded-md p-2 flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {inviteSuccess}
-                        </div>
-                    )}
-                </div>
+                </section>
             )}
 
-            {/* Pending Invites */}
             {isTeamPlan && pendingInvites.length > 0 && (
-                <div className="bg-gray-900/60 border border-gray-800 rounded-xl p-5 mb-6">
-                    <h3 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
-                        <Clock className="w-4 h-4" /> Pending Invitations
-                    </h3>
-                    <div className="space-y-2">
+                <section className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-[var(--amber)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Pending invitations</h2>
+                    </div>
+                    <div className="mt-5 space-y-3">
                         {pendingInvites.map((invite) => (
-                            <div key={invite.id} className="flex items-center justify-between bg-gray-900 rounded-lg px-4 py-2.5">
+                            <div key={invite.id} className="panel-muted flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <span className="text-sm font-medium">{invite.email}</span>
-                                    <span className="ml-3 text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded">
-                                        {invite.role}
-                                    </span>
+                                    <p className="text-sm font-semibold text-slate-950">{invite.email}</p>
+                                    <p className="mt-1 text-sm text-[var(--text-muted)]">Role: {invite.role}</p>
                                 </div>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-sm text-[var(--text-soft)]">
                                     Sent {new Date(invite.created_at).toLocaleDateString()}
                                 </span>
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
             )}
 
-            {/* Members Table */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-800 text-gray-400">
-                        <tr>
-                            <th className="px-6 py-3 font-medium">USER</th>
-                            <th className="px-6 py-3 font-medium">ROLE</th>
-                            <th className="px-6 py-3 font-medium">STATUS</th>
-                            <th className="px-6 py-3 font-medium text-right">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                        {members.map((member) => (
-                            <tr key={member.id} className="hover:bg-gray-800/50">
-                                <td className="px-6 py-4 font-medium">{member.email}</td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded text-xs font-semibold ${member.role === "owner" || member.role === "Owner"
-                                        ? "bg-amber-500/10 text-amber-400"
-                                        : member.role === "admin"
-                                            ? "bg-indigo-500/10 text-indigo-400"
-                                            : "bg-gray-700/50 text-gray-400"
-                                        }`}>
-                                        {member.role}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="flex items-center gap-1 text-emerald-400">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                        {member.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {isOwnerOrAdmin && member.id !== "self" && member.role !== "owner" && member.role !== "Owner" && (
-                                        <button
-                                            onClick={() => handleRemoveMember(member.id)}
-                                            className="text-gray-500 hover:text-red-400 transition-colors p-1"
-                                            title="Remove member"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </td>
+            {isTeamPlan && (
+                <section className="table-shell">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th className="text-right">Action</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {members.map((member) => (
+                                <tr key={member.id}>
+                                    <td className="font-medium text-slate-900">{member.email}</td>
+                                    <td>
+                                        <span
+                                            className={`badge ${
+                                                member.role === "owner" || member.role === "Owner"
+                                                    ? "badge-amber"
+                                                    : member.role === "admin"
+                                                      ? "badge-accent"
+                                                      : "bg-slate-900/5 text-slate-700"
+                                            }`}
+                                        >
+                                            {member.role}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span className="inline-flex items-center gap-2 text-sm text-[var(--accent-strong)]">
+                                            <CheckCircle2 className="h-4 w-4" /> {member.status}
+                                        </span>
+                                    </td>
+                                    <td className="text-right">
+                                        {isOwnerOrAdmin &&
+                                            member.id !== "self" &&
+                                            member.role !== "owner" &&
+                                            member.role !== "Owner" && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMemberToRemove(member)}
+                                                    className="btn-ghost ml-auto text-red-700 hover:bg-red-50"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    Remove
+                                                </button>
+                                            )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </section>
+            )}
+
+            <ConfirmDialog
+                open={!!memberToRemove}
+                title="Remove teammate?"
+                description={
+                    memberToRemove
+                        ? `This removes ${memberToRemove.email} from the shared workspace and revokes their team access.`
+                        : ""
+                }
+                confirmLabel="Remove member"
+                busy={isRemoving}
+                onCancel={() => setMemberToRemove(null)}
+                onConfirm={removeMember}
+            />
         </div>
     );
 }

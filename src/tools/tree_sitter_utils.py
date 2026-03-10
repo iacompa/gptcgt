@@ -100,9 +100,7 @@ def extract_symbols(file_path: Path, content: str) -> FileSymbols:
     return _extract_with_regex(file_path, content, language, line_count)
 
 
-def _extract_with_tree_sitter(
-    file_path: Path, content: str, language: str, line_count: int
-) -> FileSymbols:
+def _extract_with_tree_sitter(file_path: Path, content: str, language: str, line_count: int) -> FileSymbols:
     """Extract symbols using tree-sitter AST parsing."""
     from tree_sitter_languages import get_parser
 
@@ -214,22 +212,16 @@ def _extract_java(root, content: str, symbols: FileSymbols) -> None:
             symbols.imports.append(_node_text(node, content).strip())
 
 
-def _extract_with_regex(
-    file_path: Path, content: str, language: str, line_count: int
-) -> FileSymbols:
+def _extract_with_regex(file_path: Path, content: str, language: str, line_count: int) -> FileSymbols:
     """Fallback regex extraction when tree-sitter unavailable."""
     symbols = FileSymbols(path=file_path, language=language, line_count=line_count)
     if language == "python":
         symbols.classes = re.findall(r"^class\s+(\w+)", content, re.MULTILINE)
-        symbols.functions = [
-            f for f in re.findall(r"^def\s+(\w+)", content, re.MULTILINE) if not f.startswith("_")
-        ]
+        symbols.functions = [f for f in re.findall(r"^def\s+(\w+)", content, re.MULTILINE) if not f.startswith("_")]
         symbols.imports = re.findall(r"^(?:from\s+\S+\s+)?import\s+.+", content, re.MULTILINE)
     elif language in ("javascript", "typescript", "tsx"):
         symbols.classes = re.findall(r"class\s+(\w+)", content)
-        symbols.functions = re.findall(
-            r"(?:function|const|let)\s+(\w+)\s*(?:=\s*(?:\(|async)|[\(<])", content
-        )
+        symbols.functions = re.findall(r"(?:function|const|let)\s+(\w+)\s*(?:=\s*(?:\(|async)|[\(<])", content)
         symbols.imports = re.findall(r"^import\s+.+", content, re.MULTILINE)
     elif language == "rust":
         symbols.classes = re.findall(r"(?:struct|enum)\s+(\w+)", content)

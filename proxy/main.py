@@ -66,33 +66,10 @@ spending_caps = SpendingCapService()
 
 from fastapi.responses import JSONResponse  # noqa: E402
 
+# ─── Security helpers ────────────────────────────────────────────────
+from src.billing.credits import CreditService, resolve_billing_mode  # noqa: E402
 from src.services.analytics import track_async  # noqa: E402
 from src.services.monitoring import monitor  # noqa: E402
-
-# ─── Security helpers ────────────────────────────────────────────────
-
-def _determine_mode_from_model(model: str | None) -> str:
-    """
-    Determine billing mode from the model name (server-side).
-
-    Prevents billing fraud via client-controlled headers.
-    """
-    if not model:
-        return "standard"
-    model_lower = (model or "").lower()
-    # Scout-tier: small/cheap models
-    scout_keywords = ("haiku", "flash", "mini", "nano", "small", "lite")
-    if any(kw in model_lower for kw in scout_keywords):
-        return "scout"
-    # Ensemble-tier: multiple models or ensemble markers
-    if "ensemble" in model_lower:
-        return "ensemble"
-    # Architect-tier: reasoning/o-series models
-    architect_keywords = ("o1", "o3", "reasoning", "opus")
-    if any(kw in model_lower for kw in architect_keywords):
-        return "architect"
-    return "standard"
-
 
 # Allowlist of safe base commands for sandbox execution
 _SANDBOX_ALLOWED_COMMANDS = frozenset({
@@ -105,8 +82,7 @@ _SANDBOX_ALLOWED_COMMANDS = frozenset({
     "cat", "echo", "ls", "head", "tail", "wc",
 })
 
-# Characters that indicate shell injection attempts
-_SANDBOX_FORBIDDEN_CHARS = frozenset(";|`$(){}\\<>!\n\r")
+# Ensure we do not use global sets, use local set explicitly to prevent drift
 
 
 def _validate_sandbox_command(command: str) -> None:
@@ -214,8 +190,8 @@ async def verify_proxy_auth(request: Request) -> str:
                 token,
                 hs256_secret=secret,
                 jwks_url=os.environ.get("WORKOS_JWKS_URL") or None,
-                issuer=os.environ.get("WORKOS_ISSUER") or None,
-                audience=os.environ.get("WORKOS_AUDIENCE") or None,
+                issuer=os.environ.get("WORKOS_ISSUER") or "gptcgt",
+                audience=os.environ.get("WORKOS_AUDIENCE") or "gptcgt-api",
             )
             return payload["sub"]
         except jwt.PyJWTError as e:
@@ -243,22 +219,30 @@ async def proxy_completions(request: Request, user_id: str = Depends(verify_prox
     pool = get_pool()
     # SECURITY: Determine mode server-side from the model name.
     # Client-controlled X-GPTCGT-Mode was a billing fraud vector.
-    mode = _determine_mode_from_model(model)
+    mode = resolve_billing_mode(model)
 
-    # 2. Credit Check
-    affordability = await credit_service.check_credits(pool, user_id, mode)
-    if not affordability["can_proceed"]:
+    # 2. Spending Cap Check
+    cost = credit_service.CREDIT_COSTS.get(mode, 5)
+    preflight = await credit_service.check_credits(pool, user_id, mode)
+    if not preflight["can_proceed"]:
         raise HTTPException(
             status_code=402,
-            detail=f"Insufficient credits. Requires {affordability['credits_cost']}. Remaining: {affordability['remaining']}",  # noqa: E501
+            detail=f"Insufficient credits. Requires {preflight.get('credits_cost', cost)}. Remaining: {preflight.get('remaining', 0)}",  # noqa: E501
         )
 
-    # 3. Spending Cap Check
-    cap_status = await spending_caps.check_before_task(pool, user_id, affordability["credits_cost"])
+    cap_status = await spending_caps.check_before_task(pool, user_id, cost)
     if not cap_status["allowed"]:
         raise HTTPException(
             status_code=403,
             detail=f"Spending cap exceeded. Reason: {cap_status['reason']}. Spent: ${cap_status['spent_dollars']}",  # noqa: E501
+        )
+
+    # 3. Atomic Credit Check & Deduct
+    affordability = await credit_service.check_and_deduct(pool, user_id, mode)
+    if not affordability["can_proceed"]:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient credits. Requires {affordability.get('credits_cost', cost)}. Remaining: {affordability.get('remaining', 0)}",  # noqa: E501
         )
 
     # Prepare LiteLLM injection
@@ -288,6 +272,9 @@ async def proxy_completions(request: Request, user_id: str = Depends(verify_prox
 
     except Exception as e:
         logger.error(f"LiteLLM Error: {e}")
+        refund = await credit_service.refund_fixed(pool, user_id, affordability["credits_cost"])
+        if not refund.get("success"):
+            logger.error(f"Failed to refund credits after upstream error for {user_id}: {refund}")
         raise HTTPException(status_code=502, detail=f"Upstream provider error: {str(e)}")
 
 
@@ -323,9 +310,9 @@ async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: st
     mode = "sandbox"
     cost = 1  # 1 credit (~$0.001) per sandbox run
 
-    # 2. Credit Check
-    affordability = await credit_service.check_credits(pool, user_id, mode)
-    if affordability["remaining"] < cost:
+    # 2. Credit preflight
+    preflight = await credit_service.check_credits(pool, user_id, mode)
+    if not preflight["can_proceed"]:
         raise HTTPException(status_code=402, detail="Insufficient credits for sandbox execution")
 
     # 3. Spending Cap Check
@@ -367,11 +354,16 @@ async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: st
         _validate_sandbox_command(request_data.command)
 
         result = sandbox.commands.run(
-            f"cd /home/user/project && {request_data.command}",
+            request_data.command,
+            cwd="/home/user/project",
             timeout=45
         )
 
-        # 5. Deduct fixed credit cost
+        deduction = await credit_service.deduct_fixed(pool, user_id, cost)
+        if not deduction.get("success"):
+            raise HTTPException(status_code=402, detail="Unable to finalize sandbox billing")
+
+        # 5. Record successful usage after billing succeeds
         meter = UsageMeter(mode=mode, workos_user_id=user_id, cost_credits=cost)
         await meter.record_fixed_cost("e2b_sandbox_run")
 
@@ -381,9 +373,11 @@ async def proxy_sandbox_execute(request_data: SandboxExecuteRequest, user_id: st
             "exit_code": result.exit_code,
             "duration_ms": result.duration_ms,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Execution error in sandbox: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Sandbox execution failed temporarily. Please try again.")
     finally:
         # 6. Immediate Cleanup
         try:

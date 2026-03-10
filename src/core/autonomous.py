@@ -92,11 +92,14 @@ class AutonomousRunner:
 
         try:
             # Phase 1: Generate the plan
-            self.bus.send(AgentMessage(
-                "orchestrator", "all",
-                f"Starting autonomous mode: '{goal}'",
-                msg_type="system",
-            ))
+            self.bus.send(
+                AgentMessage(
+                    "orchestrator",
+                    "all",
+                    f"Starting autonomous mode: '{goal}'",
+                    msg_type="system",
+                )
+            )
 
             if narration_callback:
                 await narration_callback("🚀 Autonomous mode started", "info")
@@ -106,33 +109,42 @@ class AutonomousRunner:
             subtasks = self._parse_subtasks(plan_text)
 
             if narration_callback:
-                await narration_callback(
-                    f"📋 Plan created with {len(subtasks)} subtasks", "info"
-                )
+                await narration_callback(f"📋 Plan created with {len(subtasks)} subtasks", "info")
 
             # Phase 2: Execute subtasks
             for i, subtask in enumerate(subtasks):
                 if self._is_cancelled():
-                    self.bus.send(AgentMessage(
-                        "orchestrator", "all", "Autonomous mode cancelled by user.",
-                        msg_type="system",
-                    ))
+                    self.bus.send(
+                        AgentMessage(
+                            "orchestrator",
+                            "all",
+                            "Autonomous mode cancelled by user.",
+                            msg_type="system",
+                        )
+                    )
                     break
 
                 if self.state.is_paused:
-                    self.bus.send(AgentMessage(
-                        "orchestrator", "all", "Autonomous mode paused. Waiting for user.",
-                        msg_type="system",
-                    ))
+                    self.bus.send(
+                        AgentMessage(
+                            "orchestrator",
+                            "all",
+                            "Autonomous mode paused. Waiting for user.",
+                            msg_type="system",
+                        )
+                    )
                     break
 
                 # Budget check
                 if self._check_budget_exceeded():
-                    self.bus.send(AgentMessage(
-                        "orchestrator", "all",
-                        f"Budget limit reached (${self.state.total_cost:.2f}). Pausing.",
-                        msg_type="system",
-                    ))
+                    self.bus.send(
+                        AgentMessage(
+                            "orchestrator",
+                            "all",
+                            f"Budget limit reached (${self.state.total_cost:.2f}). Pausing.",
+                            msg_type="system",
+                        )
+                    )
                     if narration_callback:
                         await narration_callback(
                             f"⚠️ Budget limit reached. ${self.state.total_cost:.2f} spent.",
@@ -143,11 +155,14 @@ class AutonomousRunner:
                 # Iteration limit check
                 max_iter = self._get_max_iterations()
                 if i >= max_iter:
-                    self.bus.send(AgentMessage(
-                        "orchestrator", "all",
-                        f"Iteration limit ({max_iter}) reached. Pausing.",
-                        msg_type="system",
-                    ))
+                    self.bus.send(
+                        AgentMessage(
+                            "orchestrator",
+                            "all",
+                            f"Iteration limit ({max_iter}) reached. Pausing.",
+                            msg_type="system",
+                        )
+                    )
                     break
 
                 self.state.current_iteration = i + 1
@@ -155,7 +170,7 @@ class AutonomousRunner:
 
                 if narration_callback:
                     await narration_callback(
-                        f"[Iteration {i+1}/{len(subtasks)}] {subtask[:60]}...",
+                        f"[Iteration {i + 1}/{len(subtasks)}] {subtask[:60]}...",
                         "info",
                     )
 
@@ -173,14 +188,17 @@ class AutonomousRunner:
                 self.state.total_tokens += result.tokens_used
 
             # Phase 3: Summary
-            self.bus.send(AgentMessage(
-                "orchestrator", "all",
-                f"Autonomous mode finished. "
-                f"{len(self.state.completed_subtasks)} done, "
-                f"{len(self.state.failed_subtasks)} failed, "
-                f"${self.state.total_cost:.2f} spent.",
-                msg_type="system",
-            ))
+            self.bus.send(
+                AgentMessage(
+                    "orchestrator",
+                    "all",
+                    f"Autonomous mode finished. "
+                    f"{len(self.state.completed_subtasks)} done, "
+                    f"{len(self.state.failed_subtasks)} failed, "
+                    f"${self.state.total_cost:.2f} spent.",
+                    msg_type="system",
+                )
+            )
 
         except asyncio.CancelledError:
             logger.info("Autonomous mode cancelled")
@@ -194,6 +212,7 @@ class AutonomousRunner:
     async def _ensure_plan(self, goal: str, narration_callback) -> str:
         """Generate a project plan via LLM or read an existing one."""
         from src.core.workspace import Workspace
+
         workspace = Workspace.get_instance()
         plan_path = Path(self.state.plan_path)
 
@@ -201,19 +220,25 @@ class AutonomousRunner:
         if workspace.safe_exists(plan_path):
             existing = workspace.safe_read(plan_path)
             if existing.strip():
-                self.bus.send(AgentMessage(
-                    "orchestrator", "all",
-                    "Found existing project plan. Resuming.",
-                    msg_type="info",
-                ))
+                self.bus.send(
+                    AgentMessage(
+                        "orchestrator",
+                        "all",
+                        "Found existing project plan. Resuming.",
+                        msg_type="info",
+                    )
+                )
                 return existing
 
         # Generate plan via the real LLM pipeline
-        self.bus.send(AgentMessage(
-            "orchestrator", "coder",
-            f"Creating detailed project plan for: {goal}",
-            msg_type="request",
-        ))
+        self.bus.send(
+            AgentMessage(
+                "orchestrator",
+                "coder",
+                f"Creating detailed project plan for: {goal}",
+                msg_type="request",
+            )
+        )
 
         plan_prompt = (
             f"Create a detailed, actionable project plan for the following goal:\n\n"
@@ -237,9 +262,11 @@ class AutonomousRunner:
 
             # Use a LIGHT model for plan generation to save budget
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             planner = ChatPipeline(
-                ChatStore(workspace=ws), default_tier=QualityTier.LIGHT,
+                ChatStore(workspace=ws),
+                default_tier=QualityTier.LIGHT,
             )
 
             async def _capture_chunk(text: str) -> None:
@@ -256,11 +283,14 @@ class AutonomousRunner:
             if plan_text and "- [ ]" in plan_text:
                 # LLM produced a valid plan
                 workspace.safe_write(plan_path, plan_text)
-                self.bus.send(AgentMessage(
-                    "coder", "orchestrator",
-                    f"Plan generated with {plan_text.count('- [ ]')} tasks.",
-                    msg_type="response",
-                ))
+                self.bus.send(
+                    AgentMessage(
+                        "coder",
+                        "orchestrator",
+                        f"Plan generated with {plan_text.count('- [ ]')} tasks.",
+                        msg_type="response",
+                    )
+                )
                 return plan_text
 
         except Exception as e:
@@ -311,6 +341,16 @@ class AutonomousRunner:
         feedback = ""
         registry = ModelRegistry()  # noqa: F841
 
+        baseline_cost = 0.0
+        try:
+            import textual.app as _tapp
+
+            app = _tapp.active_app.get()
+            if hasattr(app, "cost_tracker"):
+                baseline_cost = app.cost_tracker.get_today_spend().total_cost
+        except Exception:
+            pass
+
         for attempt in range(max_attempts):
             if self._is_cancelled():
                 break
@@ -321,38 +361,40 @@ class AutonomousRunner:
             # Per-task budget check
             try:
                 import textual.app as _tapp
+
                 app = _tapp.active_app.get()
                 if hasattr(app, "config"):
                     per_task_limit = getattr(app.config.user, "max_spend_per_task", 5.0)
                     if result.cost_usd >= per_task_limit:
                         logger.warning(f"Per-task budget limit (${per_task_limit}) reached for '{subtask[:20]}'.")
-                        self.bus.send(AgentMessage(
-                            "orchestrator", "coder",
-                            f"Per-task budget limit (${per_task_limit}) reached. Aborting subtask.",
-                            msg_type="error",
-                            iteration=iteration,
-                        ))
+                        self.bus.send(
+                            AgentMessage(
+                                "orchestrator",
+                                "coder",
+                                f"Per-task budget limit (${per_task_limit}) reached. Aborting subtask.",
+                                msg_type="error",
+                                iteration=iteration,
+                            )
+                        )
                         break
             except Exception:
                 pass
 
-            coder_prompt = (
-                f"You are working on an autonomous coding task.\n\n"
-                f"**Subtask:** {subtask}\n"
-            )
+            coder_prompt = f"You are working on an autonomous coding task.\n\n**Subtask:** {subtask}\n"
             if feedback:
                 coder_prompt += (
-                    f"\n**Previous attempt failed.** Here is the feedback:\n"
-                    f"{feedback}\n\n"
-                    f"Fix the issues and try again."
+                    f"\n**Previous attempt failed.** Here is the feedback:\n{feedback}\n\nFix the issues and try again."
                 )
 
-            self.bus.send(AgentMessage(
-                "orchestrator", "coder",
-                f"Implement: {subtask}" + (f" (attempt {attempt+1})" if attempt else ""),
-                msg_type="request",
-                iteration=iteration,
-            ))
+            self.bus.send(
+                AgentMessage(
+                    "orchestrator",
+                    "coder",
+                    f"Implement: {subtask}" + (f" (attempt {attempt + 1})" if attempt else ""),
+                    msg_type="request",
+                    iteration=iteration,
+                )
+            )
 
             response_chunks: list[str] = []
             coder_usage: dict = {"prompt_tokens": 0, "completion_tokens": 0}  # noqa: F841
@@ -366,9 +408,11 @@ class AutonomousRunner:
             try:
                 # Determine tier: use STANDARD for coding tasks
                 from src.core.workspace import Workspace
+
                 ws = Workspace.get_instance()
                 coder_pipeline = ChatPipeline(
-                    ChatStore(workspace=ws), default_tier=QualityTier.STANDARD,
+                    ChatStore(workspace=ws),
+                    default_tier=QualityTier.STANDARD,
                 )
 
                 await coder_pipeline.process_message(
@@ -381,12 +425,15 @@ class AutonomousRunner:
 
             except Exception as e:
                 logger.error(f"Coder pipeline failed: {e}")
-                self.bus.send(AgentMessage(
-                    "coder", "orchestrator",
-                    f"Coder failed: {str(e)[:200]}",
-                    msg_type="error",
-                    iteration=iteration,
-                ))
+                self.bus.send(
+                    AgentMessage(
+                        "coder",
+                        "orchestrator",
+                        f"Coder failed: {str(e)[:200]}",
+                        msg_type="error",
+                        iteration=iteration,
+                    )
+                )
                 feedback = f"Coder threw an exception: {str(e)[:500]}"
                 continue
 
@@ -394,62 +441,107 @@ class AutonomousRunner:
             result.code_output = full_response
 
             if not full_response.strip():
-                self.bus.send(AgentMessage(
-                    "coder", "orchestrator",
-                    "Coder returned empty response.",
-                    msg_type="error",
-                    iteration=iteration,
-                ))
+                self.bus.send(
+                    AgentMessage(
+                        "coder",
+                        "orchestrator",
+                        "Coder returned empty response.",
+                        msg_type="error",
+                        iteration=iteration,
+                    )
+                )
                 feedback = "Empty response from coder. Please generate actual code."
                 continue
 
             # Notify bus with coder completion
-            self.bus.send(AgentMessage(
-                "coder", "tester",
-                f"Implementation complete ({len(full_response)} chars). Please test.",
-                msg_type="response",
-                iteration=iteration,
-            ))
+            self.bus.send(
+                AgentMessage(
+                    "coder",
+                    "tester",
+                    f"Implementation complete ({len(full_response)} chars). Please test.",
+                    msg_type="response",
+                    iteration=iteration,
+                )
+            )
 
             # ── Step 2: Extract diffs (do NOT apply yet) ────────────────────
             extractor = DiffExtractor()
-            patch_set = extractor.extract(
-                full_response, agent_id="auto_coder", model_name="autonomous"
-            )
+            patch_set = extractor.extract(full_response, agent_id="auto_coder", model_name="autonomous")
 
             if patch_set.file_count > 0:
                 # Post PatchSetProposed to UI for visibility
                 try:
                     import textual.app as _tapp  # noqa: I001
                     from src.core.events import PatchSetProposed
-                    _tapp.active_app.get().post_message(
-                        PatchSetProposed(patch_set=patch_set)
-                    )
+
+                    _tapp.active_app.get().post_message(PatchSetProposed(patch_set=patch_set))
                 except Exception:
                     pass
+
+                # ── Phase 3+5: Blast-radius + policy pre-apply gate ──────
+                try:
+                    from src.core.guardrails import GuardrailEvaluator
+                    risk_preview = GuardrailEvaluator().evaluate_patch_set(patch_set)
+                    if not risk_preview.allowed:
+                        feedback = f"Blast-radius blocked: {risk_preview.summary}"
+                        self.bus.send(
+                            AgentMessage(
+                                "guardrail", "coder",
+                                f"BLOCKED: {risk_preview.to_text()}",
+                                msg_type="feedback", iteration=iteration,
+                            )
+                        )
+                        continue
+                except Exception as e:
+                    logger.debug(f"Guardrail check skipped: {e}")
+
+                try:
+                    from src.core.policy import PolicyEnforcer, PolicyParser
+                    policy_cfg, _ = PolicyParser.load()
+                    enforcer = PolicyEnforcer(policy_cfg)
+                    files = [str(p.file_path) for p in patch_set.patches]
+                    lines = sum(len(h.new_lines) + len(h.old_lines) for p in patch_set.patches for h in p.hunks)
+                    allowed, errs = enforcer.check_pre_apply(files, lines)
+                    if not allowed:
+                        feedback = f"Policy blocked: {'; '.join(errs)}"
+                        self.bus.send(
+                            AgentMessage(
+                                "policy", "coder",
+                                f"BLOCKED by policy: {'; '.join(errs)}",
+                                msg_type="feedback", iteration=iteration,
+                            )
+                        )
+                        continue
+                except Exception as e:
+                    logger.debug(f"Policy check skipped: {e}")
+                # ─────────────────────────────────────────────────────────
 
                 # Pre-test: LSP Verification for missed references
                 try:
                     from src.tools.lsp import LSPClient
+
                     workspace = Workspace.get_instance()
                     lsp = LSPClient(workspace.get_project_root())
-  # noqa: W293
+                    # noqa: W293
                     lang = "python"
                     for fp in patch_set.patches:
                         if str(fp.file_path).endswith((".ts", ".tsx", ".js", ".jsx")):
                             lang = "typescript"
                             break
-  # noqa: W293
+                    # noqa: W293
                     verification = await lsp.verify_patch_references(patch_set, lang)
                     if not verification.complete:
                         missed_msg = lsp.format_missed_references(verification)
                         feedback = f"LSP Reference Verification Failed:\n{missed_msg}\nPlease update all references."
-                        self.bus.send(AgentMessage(
-                            "tester", "coder",
-                            f"LSP Verification Failed:\n{missed_msg}",
-                            msg_type="feedback",
-                            iteration=iteration,
-                        ))
+                        self.bus.send(
+                            AgentMessage(
+                                "tester",
+                                "coder",
+                                f"LSP Verification Failed:\n{missed_msg}",
+                                msg_type="feedback",
+                                iteration=iteration,
+                            )
+                        )
                         continue
                 except Exception as e:
                     logger.warning(f"LSP Verification skipped or failed: {e}")
@@ -477,9 +569,7 @@ class AutonomousRunner:
                     )
 
                     result.test_output = (
-                        f"Passed: {test_result.passed}, "
-                        f"Failed: {test_result.failed}, "
-                        f"Errors: {test_result.errors}"
+                        f"Passed: {test_result.passed}, Failed: {test_result.failed}, Errors: {test_result.errors}"
                     )
 
                     # Reject if tests explicitly failed OR if the tester was inconclusive (no keys, no tests generated)
@@ -495,19 +585,25 @@ class AutonomousRunner:
                             f"Tests failed or inconclusive ({test_result.failed}F, {test_result.errors}E): "
                             f"{details[:500]}"
                         )
-                        self.bus.send(AgentMessage(
-                            "tester", "coder",
-                            f"Tests failed: {test_feedback[:200]}",
-                            msg_type="feedback",
-                            iteration=iteration,
-                        ))
+                        self.bus.send(
+                            AgentMessage(
+                                "tester",
+                                "coder",
+                                f"Tests failed: {test_feedback[:200]}",
+                                msg_type="feedback",
+                                iteration=iteration,
+                            )
+                        )
                     else:
-                        self.bus.send(AgentMessage(
-                            "tester", "arbiter",
-                            f"All {test_result.passed} tests passed. Requesting review.",
-                            msg_type="response",
-                            iteration=iteration,
-                        ))
+                        self.bus.send(
+                            AgentMessage(
+                                "tester",
+                                "arbiter",
+                                f"All {test_result.passed} tests passed. Requesting review.",
+                                msg_type="response",
+                                iteration=iteration,
+                            )
+                        )
 
                 except Exception as e:
                     logger.warning(f"TesterAgent skipped: {e}")
@@ -516,12 +612,15 @@ class AutonomousRunner:
                         "Tester unavailable; cannot verify generated changes safely. "
                         "Configure tester dependencies/API keys and retry."
                     )
-                    self.bus.send(AgentMessage(
-                        "tester", "arbiter",
-                        "Tester unavailable; blocking auto-apply until verification is available.",
-                        msg_type="response",
-                        iteration=iteration,
-                    ))
+                    self.bus.send(
+                        AgentMessage(
+                            "tester",
+                            "arbiter",
+                            "Tester unavailable; blocking auto-apply until verification is available.",
+                            msg_type="response",
+                            iteration=iteration,
+                        )
+                    )
 
             if not test_passed:
                 feedback = test_feedback or "Automated tests did not pass."
@@ -536,22 +635,18 @@ class AutonomousRunner:
                     try:
                         from src.core.security import SecurityScanner
                         from src.core.workspace import Workspace
+
                         ws = Workspace.get_instance()
                         project_root = ws.get_project_root()
                         lang = ws.config.project.primary_language or "python"
                         findings = await SecurityScanner().scan_patch(patch_set, lang)
-                        has_blocking = any(
-                            getattr(f, "severity", "").lower() in ("critical", "high")
-                            for f in findings
-                        )
+                        has_blocking = any(getattr(f, "severity", "").lower() in ("critical", "high") for f in findings)
                         verification_badge = "clean" if not has_blocking else "flagged"
                         if has_blocking:
                             feedback = "Security scan found high/critical issues. Revise patch."
                         logger.info(f"Arbiter verification: tests passed, security_findings={len(findings)}")
                     except Exception as e:
-                        logger.warning(
-                            f"Arbiter verification failed: {e}. Blocking auto-apply."
-                        )
+                        logger.warning(f"Arbiter verification failed: {e}. Blocking auto-apply.")
                         verification_badge = "flagged"
                         feedback = "Arbiter verification failed; patch not applied."
 
@@ -564,42 +659,53 @@ class AutonomousRunner:
                     engine = PatchEngine()
                     try:
                         engine.apply_approved(patch_set)
-                        self.bus.send(AgentMessage(
-                            "coder", "orchestrator",
-                            f"Applied {patch_set.total_hunks} hunks across {patch_set.file_count} files.",
-                            msg_type="info",
-                            iteration=iteration,
-                        ))
+                        self.bus.send(
+                            AgentMessage(
+                                "coder",
+                                "orchestrator",
+                                f"Applied {patch_set.total_hunks} hunks across {patch_set.file_count} files.",
+                                msg_type="info",
+                                iteration=iteration,
+                            )
+                        )
                     except Exception as e:
                         logger.warning(f"Patch apply failed: {e}")
                         feedback = f"Patch application failed: {str(e)[:500]}. Fix the diff format."
                         continue
                 else:
                     from src.core.events import RequireUserApproval  # noqa: F401
-                    self.bus.send(AgentMessage(
-                        "arbiter", "orchestrator",
-                        "Arbiter flagged changes. Awaiting user approval.",
-                        msg_type="feedback",
-                        iteration=iteration,
-                    ))
+
+                    self.bus.send(
+                        AgentMessage(
+                            "arbiter",
+                            "orchestrator",
+                            "Arbiter flagged changes. Awaiting user approval.",
+                            msg_type="feedback",
+                            iteration=iteration,
+                        )
+                    )
                     # Wait for user logic goes here
 
-            self.bus.send(AgentMessage(
-                "arbiter", "orchestrator",
-                f"Approved. Subtask '{subtask[:40]}' meets quality standards.",
-                msg_type="approval",
-                iteration=iteration,
-            ))
+            self.bus.send(
+                AgentMessage(
+                    "arbiter",
+                    "orchestrator",
+                    f"Approved. Subtask '{subtask[:40]}' meets quality standards.",
+                    msg_type="approval",
+                    iteration=iteration,
+                )
+            )
 
             result.approved = True
 
             # Track cost from the ChatPipeline
             try:
                 import textual.app as _tapp
+
                 app = _tapp.active_app.get()
                 if hasattr(app, "cost_tracker"):
                     today = app.cost_tracker.get_today_spend()
-                    result.cost_usd = today.total_cost - self.state.total_cost
+                    result.cost_usd = today.total_cost - baseline_cost
             except Exception:
                 pass
 
@@ -634,6 +740,7 @@ class AutonomousRunner:
         """
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "config"):
                 session_limit = getattr(
@@ -650,6 +757,7 @@ class AutonomousRunner:
         """Get the max iterations from config."""
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "config"):
                 return getattr(current_app.config.user, "max_autonomous_iterations", 50)
@@ -666,15 +774,23 @@ class AutonomousRunner:
     def pause(self) -> None:
         """Pause the autonomous loop."""
         self.state.is_paused = True
-        self.bus.send(AgentMessage(
-            "orchestrator", "all", "Autonomous mode paused by user.",
-            msg_type="system",
-        ))
+        self.bus.send(
+            AgentMessage(
+                "orchestrator",
+                "all",
+                "Autonomous mode paused by user.",
+                msg_type="system",
+            )
+        )
 
     def resume(self) -> None:
         """Resume the autonomous loop."""
         self.state.is_paused = False
-        self.bus.send(AgentMessage(
-            "orchestrator", "all", "Autonomous mode resumed.",
-            msg_type="system",
-        ))
+        self.bus.send(
+            AgentMessage(
+                "orchestrator",
+                "all",
+                "Autonomous mode resumed.",
+                msg_type="system",
+            )
+        )

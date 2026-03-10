@@ -1,6 +1,7 @@
 export default function PrivacyPolicyPage() {
     return (
-        <div className="relative isolate px-6 py-24 sm:py-32 lg:px-8 max-w-4xl mx-auto">
+        <div className="page-shell py-8">
+            <div className="panel-dark mx-auto max-w-4xl px-6 py-10 sm:px-10">
             <div className="mx-auto max-w-3xl text-base leading-7 text-gray-300">
                 <p className="text-base font-semibold leading-7 text-indigo-400">gptcgt</p>
                 <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Privacy Policy</h1>
@@ -68,6 +69,7 @@ export default function PrivacyPolicyPage() {
                         You have the right to access, update, or delete your account information at any time. If you wish to permanently delete your account and all associated billing unformation, please contact us at support@gptcgt.ai.
                     </p>
                 </div>
+            </div>
             </div>
         </div>
     );

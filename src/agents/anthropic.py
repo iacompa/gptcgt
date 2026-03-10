@@ -17,9 +17,7 @@ class AnthropicAgent(BaseAgent):
     async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[AgentResponse, None]:
         api_key = self.config.api_key or KeyChainManager.get_key("ANTHROPIC_API_KEY")
         if not api_key:
-            yield AgentResponse(
-                error="ANTHROPIC_API_KEY not found in keychain.", is_streaming=False
-            )
+            yield AgentResponse(error="ANTHROPIC_API_KEY not found in keychain.", is_streaming=False)
             return
 
         async for chunk in LiteLLMClient.stream(
