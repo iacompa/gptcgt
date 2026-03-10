@@ -152,7 +152,7 @@ class ParallelDispatcher:
                 }
                 return
             global_api_key = access
-            global_base_url = "https://api.gptcgt.ai/proxy/v1"
+            global_base_url = "https://gptcgt-api.fly.dev/proxy/v1"
             use_managed = True
 
         # Fetch active mode for proxy routing headers

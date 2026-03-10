@@ -437,7 +437,7 @@ class ChatPipeline:
                 if error_callback:
                     await error_callback("Authentication token missing for managed credits. Please sign in again.")
                 return None, None
-            return access, "https://api.gptcgt.ai/proxy/v1"
+            return access, "https://gptcgt-api.fly.dev/proxy/v1"
 
         key_name = PROVIDER_KEY_MAP.get(model_def.provider.value)
         api_key = KeyChainManager.get_key(key_name) if key_name else None
