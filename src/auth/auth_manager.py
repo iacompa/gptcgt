@@ -21,7 +21,7 @@ class AuthManager:
     This gives a fast startup while still catching expired/revoked tokens.
     """
 
-    def __init__(self, base_url: str = "https://api.gptcgt.ai", client_id: str = "client_default"):
+    def __init__(self, base_url: str = "https://gptcgt-api.fly.dev", client_id: str = "client_default"):
         self.base_url = base_url.rstrip("/")
         self._client_id = client_id
         self._device_client = DeviceFlowClient(base_url)

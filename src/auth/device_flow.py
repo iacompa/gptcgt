@@ -7,7 +7,7 @@ import httpx
 class DeviceFlowClient:
     """Client for handling the OAuth device authorization flow."""
 
-    def __init__(self, base_url: str = "https://api.gptcgt.ai"):
+    def __init__(self, base_url: str = "https://gptcgt-api.fly.dev"):
         self.base_url = base_url.rstrip("/")
 
     async def start_flow(self, client_id: str) -> Dict[str, Any]:

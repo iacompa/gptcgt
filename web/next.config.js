@@ -1,3 +1,5 @@
+const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://gptcgt-api.fly.dev";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
@@ -23,7 +25,7 @@ const nextConfig = {
                             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                             "font-src 'self' https://fonts.gstatic.com",
                             "img-src 'self' data: blob: https:",
-                            "connect-src 'self' https://api.gptcgt.ai https://*.workos.com https://*.stripe.com",
+                            `connect-src 'self' ${publicApiUrl} https://*.workos.com https://*.stripe.com`,
                             "frame-ancestors 'none'",
                             "base-uri 'self'",
                             "form-action 'self'",
