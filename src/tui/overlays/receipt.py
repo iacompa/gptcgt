@@ -60,13 +60,7 @@ class BuildReceipt(ModalScreen[None]):
     """
 
     def __init__(
-        self,
-        winner_name: str,
-        loser_names: list[str],
-        duration_sec: float,
-        cost: float,
-        files_changed: int,
-        **kwargs
+        self, winner_name: str, loser_names: list[str], duration_sec: float, cost: float, files_changed: int, **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self.winner_name = winner_name
@@ -113,6 +107,7 @@ class BuildReceipt(ModalScreen[None]):
             # Just dismiss for now since pyperclip isn't guaranteed, but normally we'd copy
             try:
                 import pyperclip
+
                 receipt_text = (
                     f"✅ VERIFICATION BUNDLE COMPILED\n"
                     f"Winner: {self.winner_name}\n"

@@ -28,9 +28,7 @@ async def list_keys(request: Request):
     pool = get_pool()
 
     # Internal UUID lookup
-    internal_id = await pool.fetchval(
-        "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-    )
+    internal_id = await pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
     if not internal_id:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -72,9 +70,7 @@ async def create_key(req: CreateKeyRequest, request: Request):
         raise HTTPException(status_code=400, detail="Invalid API key payload")
 
     pool = get_pool()
-    internal_id = await pool.fetchval(
-        "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-    )
+    internal_id = await pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
     if not internal_id:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -117,9 +113,7 @@ async def revoke_key(key_id: str, request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     pool = get_pool()
-    internal_id = await pool.fetchval(
-        "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-    )
+    internal_id = await pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
 
     try:
         # Ensure they own it

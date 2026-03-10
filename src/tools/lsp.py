@@ -128,9 +128,7 @@ class LSPClient:
         self._initialized: dict[str, bool] = {}
         self._shutdown_timers: dict[str, asyncio.Task] = {}
 
-    async def verify_patch_references(
-        self, patch_set: PatchSet, language: str
-    ) -> ReferenceVerification:
+    async def verify_patch_references(self, patch_set: PatchSet, language: str) -> ReferenceVerification:
         """
         Verify that all references to modified symbols have been updated.
 
@@ -209,9 +207,7 @@ class LSPClient:
 
         return result
 
-    def _extract_modified_symbols(
-        self, patch_set: PatchSet
-    ) -> dict[str, list[tuple[Path, int, int]]]:
+    def _extract_modified_symbols(self, patch_set: PatchSet) -> dict[str, list[tuple[Path, int, int]]]:
         """
         Extract symbols that were modified in the patch.
         Returns {symbol_name: [(file_path, line, character), ...]}
@@ -232,24 +228,18 @@ class LSPClient:
                     match = re.match(r"\s*def\s+(\w+)\s*\(", line)
                     if match:
                         symbol = match.group(1)
-                        modified.setdefault(symbol, []).append(
-                            (full_path, hunk.start_line + i, line.index(symbol))
-                        )
+                        modified.setdefault(symbol, []).append((full_path, hunk.start_line + i, line.index(symbol)))
                         continue
                     match = re.match(r"\s*class\s+(\w+)", line)
                     if match:
                         symbol = match.group(1)
-                        modified.setdefault(symbol, []).append(
-                            (full_path, hunk.start_line + i, line.index(symbol))
-                        )
+                        modified.setdefault(symbol, []).append((full_path, hunk.start_line + i, line.index(symbol)))
                         continue
                     # TypeScript/JavaScript
                     match = re.match(r"\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)", line)
                     if match:
                         symbol = match.group(1)
-                        modified.setdefault(symbol, []).append(
-                            (full_path, hunk.start_line + i, line.index(symbol))
-                        )
+                        modified.setdefault(symbol, []).append((full_path, hunk.start_line + i, line.index(symbol)))
 
         return modified
 
@@ -307,9 +297,7 @@ class LSPClient:
         logger.info(f"No LSP server available for {language}")
         return False
 
-    async def _find_references(
-        self, language: str, file_path: Path, line: int, character: int
-    ) -> list[Reference]:
+    async def _find_references(self, language: str, file_path: Path, line: int, character: int) -> list[Reference]:
         """Query LSP for all references to the symbol at the given position."""
         refs: list[Reference] = []
 
@@ -332,9 +320,7 @@ class LSPClient:
                     uri = loc.get("uri", "")
                     if uri.startswith("file://"):
                         ref_path = Path(uri[7:])
-                        ref_line = (
-                            loc.get("range", {}).get("start", {}).get("line", 0) + 1
-                        )  # Back to 1-based
+                        ref_line = loc.get("range", {}).get("start", {}).get("line", 0) + 1  # Back to 1-based
                         ref_char = loc.get("range", {}).get("start", {}).get("character", 0)
 
                         # Read the context line

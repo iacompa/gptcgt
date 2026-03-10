@@ -47,26 +47,14 @@ class WorkOSConfig(ServiceConfig):
 @dataclass
 class StripeConfig(ServiceConfig):
     secret_key: str = field(default_factory=lambda: os.environ.get("STRIPE_SECRET_KEY", ""))
-    publishable_key: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
-    )
+    publishable_key: str = field(default_factory=lambda: os.environ.get("STRIPE_PUBLISHABLE_KEY", ""))
     webhook_secret: str = field(default_factory=lambda: os.environ.get("STRIPE_WEBHOOK_SECRET", ""))
 
-    price_pro_monthly: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PRICE_PRO_MONTHLY", "")
-    )
-    price_pro_annual: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PRICE_PRO_ANNUAL", "")
-    )
-    price_team_monthly: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PRICE_TEAM_MONTHLY", "")
-    )
-    price_team_annual: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PRICE_TEAM_ANNUAL", "")
-    )
-    price_enterprise: str = field(
-        default_factory=lambda: os.environ.get("STRIPE_PRICE_ENTERPRISE", "")
-    )
+    price_pro_monthly: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_PRO_MONTHLY", ""))
+    price_pro_annual: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_PRO_ANNUAL", ""))
+    price_team_monthly: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_TEAM_MONTHLY", ""))
+    price_team_annual: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_TEAM_ANNUAL", ""))
+    price_enterprise: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_ENTERPRISE", ""))
 
     currency: str = "usd"
     success_url: str = "https://gptcgt.ai/dashboard/billing?success=1"
@@ -116,12 +104,8 @@ class JWTConfig(ServiceConfig):
 @dataclass
 class ResendConfig(ServiceConfig):
     api_key: str = field(default_factory=lambda: os.environ.get("RESEND_API_KEY", ""))
-    from_email: str = field(
-        default_factory=lambda: os.environ.get("RESEND_FROM_EMAIL", "accounts@gptcgt.ai")
-    )
-    reply_to: str = field(
-        default_factory=lambda: os.environ.get("RESEND_REPLY_TO", "support@gptcgt.ai")
-    )
+    from_email: str = field(default_factory=lambda: os.environ.get("RESEND_FROM_EMAIL", "accounts@gptcgt.ai"))
+    reply_to: str = field(default_factory=lambda: os.environ.get("RESEND_REPLY_TO", "support@gptcgt.ai"))
 
     @property
     def is_configured(self) -> bool:
@@ -131,9 +115,7 @@ class ResendConfig(ServiceConfig):
 @dataclass
 class PostHogConfig(ServiceConfig):
     api_key: str = field(default_factory=lambda: os.environ.get("POSTHOG_API_KEY", ""))
-    host: str = field(
-        default_factory=lambda: os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
-    )
+    host: str = field(default_factory=lambda: os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com"))
 
     @property
     def is_configured(self) -> bool:
@@ -143,9 +125,7 @@ class PostHogConfig(ServiceConfig):
 @dataclass
 class BetterstackConfig(ServiceConfig):
     logs_token: str = field(default_factory=lambda: os.environ.get("BETTERSTACK_LOGS_TOKEN", ""))
-    heartbeat_url: str = field(
-        default_factory=lambda: os.environ.get("BETTERSTACK_HEARTBEAT_URL", "")
-    )
+    heartbeat_url: str = field(default_factory=lambda: os.environ.get("BETTERSTACK_HEARTBEAT_URL", ""))
 
     @property
     def is_configured(self) -> bool:
@@ -176,32 +156,20 @@ class ServiceRegistry:
     """Single source of truth for all external service configurations."""
 
     def __init__(self):
-        self.neon = NeonConfig(
-            name="Neon PostgreSQL", description="Primary serverless database", required=True
-        )
-        self.workos = WorkOSConfig(
-            name="WorkOS", description="Authentication & SSO integration", required=True
-        )
+        self.neon = NeonConfig(name="Neon PostgreSQL", description="Primary serverless database", required=True)
+        self.workos = WorkOSConfig(name="WorkOS", description="Authentication & SSO integration", required=True)
         self.stripe = StripeConfig(name="Stripe", description="Billing and subscription platform")
-        self.llm_keys = LLMProviderKeys(
-            name="LLM Providers", description="Server-side model API keys"
-        )
+        self.llm_keys = LLMProviderKeys(name="LLM Providers", description="Server-side model API keys")
         self.encryption = EncryptionConfig(
             name="Encryption Vault", description="AES-256-GCM key wrapper", required=True
         )
-        self.jwt = JWTConfig(
-            name="JWT Issuer", description="Local auth token generation", required=True
-        )
+        self.jwt = JWTConfig(name="JWT Issuer", description="Local auth token generation", required=True)
 
         # Planned Services
         self.resend = ResendConfig(name="Resend", description="Transactional email delivery")
         self.posthog = PostHogConfig(name="PostHog", description="Product analytics and telemetry")
-        self.betterstack = BetterstackConfig(
-            name="Betterstack", description="Uptime and log monitoring"
-        )
-        self.cloudflare_r2 = CloudflareR2Config(
-            name="Cloudflare R2", description="S3-compatible object storage"
-        )
+        self.betterstack = BetterstackConfig(name="Betterstack", description="Uptime and log monitoring")
+        self.cloudflare_r2 = CloudflareR2Config(name="Cloudflare R2", description="S3-compatible object storage")
         self.redis = RedisConfig(name="Redis", description="Caching and rate limiting")
 
         self.update_statuses()

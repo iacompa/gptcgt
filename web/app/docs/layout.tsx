@@ -21,30 +21,32 @@ const DOCS_NAV = [
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex min-h-[calc(100vh-4rem)] bg-gray-950">
+        <div className="page-shell">
+            <div className="grid min-h-[calc(100vh-10rem)] gap-6 lg:grid-cols-[280px_1fr]">
             {/* Sidebar nav */}
-            <nav className="w-64 border-r border-gray-800 bg-gray-900/30 p-4 hidden md:block sticky top-16 h-[calc(100vh-4rem)] overflow-y-auto">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">Documentation</p>
-                <div className="space-y-0.5">
+                <nav className="panel hidden h-fit p-4 lg:sticky lg:top-24 lg:block">
+                    <p className="eyebrow px-3">Documentation</p>
+                    <div className="mt-3 space-y-1">
                     {DOCS_NAV.map((item) => (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className="flex items-center gap-3 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+                                className="flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-[var(--text-muted)] transition hover:bg-white/70 hover:text-slate-950"
                         >
                             <item.icon className="w-4 h-4 flex-shrink-0" />
                             {item.name}
                         </Link>
                     ))}
-                </div>
-            </nav>
+                    </div>
+                </nav>
 
             {/* Main content */}
-            <main className="flex-1 overflow-auto p-8">
-                <div className="max-w-3xl prose prose-invert prose-headings:text-white prose-p:text-gray-300 prose-a:text-indigo-400 prose-a:hover:text-indigo-300 prose-code:text-indigo-300 prose-code:bg-gray-800/50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-800 prose-strong:text-white prose-li:text-gray-300">
-                    {children}
-                </div>
-            </main>
+                <main className="panel-dark overflow-auto p-6 sm:p-8">
+                    <div className="prose prose-invert max-w-3xl prose-headings:tracking-[-0.03em] prose-headings:text-white prose-p:text-slate-300 prose-a:text-emerald-300 prose-a:no-underline hover:prose-a:text-emerald-200 prose-code:text-emerald-200 prose-code:before:hidden prose-code:after:hidden prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-lg prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/10 prose-strong:text-white prose-li:text-slate-300">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 }

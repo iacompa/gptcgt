@@ -86,7 +86,11 @@ class RepoMap:
     """Builds and maintains the project index."""
 
     def __init__(self, workspace: Workspace | None = None) -> None:
-        workspace = workspace or Workspace.get_instance()
+        if workspace is None:
+            try:
+                workspace = Workspace.get_instance()
+            except RuntimeError:
+                workspace = Workspace(Path.cwd())
         self._root = workspace.get_project_root()
         self._index_dir = self._root / ".gptcgt" / "index"
         self._index: ProjectIndex | None = None
@@ -98,9 +102,7 @@ class RepoMap:
             if ignore_file.exists():
                 try:
                     lines = ignore_file.read_text(encoding="utf-8").splitlines()
-                    self._gitignore_patterns.extend(
-                        ln.strip() for ln in lines if ln.strip() and not ln.startswith("#")
-                    )
+                    self._gitignore_patterns.extend(ln.strip() for ln in lines if ln.strip() and not ln.startswith("#"))
                 except Exception:
                     pass
 
@@ -118,11 +120,7 @@ class RepoMap:
 
     def _iter_source_files(self) -> Iterator[Path]:
         for fp in self._root.rglob("*"):
-            if (
-                fp.is_file()
-                and not self._should_skip(fp)
-                and fp.suffix.lower() in INDEXABLE_EXTENSIONS
-            ):
+            if fp.is_file() and not self._should_skip(fp) and fp.suffix.lower() in INDEXABLE_EXTENSIONS:
                 if fp.stat().st_size <= MAX_FILE_SIZE:
                     yield fp
 
@@ -153,9 +151,7 @@ class RepoMap:
         self._build_dependency_graph(index)
         self._index = index
         self._save_index(index)
-        logger.info(
-            f"Index: {index.total_files} files, {index.total_lines} lines, {index.primary_language}"
-        )
+        logger.info(f"Index: {index.total_files} files, {index.total_lines} lines, {index.primary_language}")
         return index
 
     def _build_dependency_graph(self, index: ProjectIndex) -> None:
@@ -280,17 +276,12 @@ class RepoMap:
             }
             for rel, s in index.files.items()
         }
-        (self._index_dir / "symbols.json").write_text(
-            json.dumps(sym_data, indent=2), encoding="utf-8"
-        )
+        (self._index_dir / "symbols.json").write_text(json.dumps(sym_data, indent=2), encoding="utf-8")
 
         deps_data = {
-            rel: {"imports_from": d.imports_from, "imported_by": d.imported_by}
-            for rel, d in index.dependencies.items()
+            rel: {"imports_from": d.imports_from, "imported_by": d.imported_by} for rel, d in index.dependencies.items()
         }
-        (self._index_dir / "dependencies.json").write_text(
-            json.dumps(deps_data, indent=2), encoding="utf-8"
-        )
+        (self._index_dir / "dependencies.json").write_text(json.dumps(deps_data, indent=2), encoding="utf-8")
 
     def _load_cached_index(self) -> ProjectIndex | None:
         sym_path = self._index_dir / "symbols.json"
@@ -299,9 +290,7 @@ class RepoMap:
             return None
         try:
             sym_data = json.loads(sym_path.read_text(encoding="utf-8"))
-            deps_data = (
-                json.loads(deps_path.read_text(encoding="utf-8")) if deps_path.exists() else {}
-            )
+            deps_data = json.loads(deps_path.read_text(encoding="utf-8")) if deps_path.exists() else {}
             index = ProjectIndex(root=self._root)
             lang_counts: dict[str, int] = {}
             for rel, d in sym_data.items():
@@ -322,9 +311,7 @@ class RepoMap:
             if lang_counts:
                 index.primary_language = max(lang_counts, key=lang_counts.get)
             for rel, d in deps_data.items():
-                index.dependencies[rel] = DependencyInfo(
-                    d.get("imports_from", []), d.get("imported_by", [])
-                )
+                index.dependencies[rel] = DependencyInfo(d.get("imports_from", []), d.get("imported_by", []))
             return index
         except Exception as e:
             logger.warning(f"Failed to load cached index: {e}")

@@ -1,6 +1,6 @@
 import { getServerApiClient } from "@/lib/api-server";
 import { getSession } from "@/lib/auth";
-import { Key, CreditCard, Activity, AlertTriangle, Zap, Users } from "lucide-react";
+import { ArrowRight, AlertTriangle, CreditCard, ShieldCheck, Sparkles, Wallet } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic';
@@ -25,102 +25,161 @@ export default async function DashboardOverview() {
     }
 
     return (
-        <div>
-            <h1 className="text-2xl font-bold mb-2">Welcome back, {session?.user.name || "there"} 👋</h1>
-            <p className="text-gray-400 mb-6 text-sm">{session?.user.email}</p>
+        <div className="page-stack">
+            <section className="hero-panel p-6 sm:p-8">
+                <p className="eyebrow">Workspace overview</p>
+                <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                            Welcome back, {session?.user.name || "there"}.
+                        </h1>
+                        <p className="mt-3 max-w-2xl copy-lg">
+                            Balance, plan state, and next actions are visible here before you jump into chat or a repo run.
+                        </p>
+                    </div>
+                    <div className="rounded-full bg-white/70 px-4 py-2 text-sm text-[var(--text-muted)]">
+                        {session?.user.email}
+                    </div>
+                </div>
+            </section>
 
             {apiError && (
-                <div className="p-4 bg-amber-900/20 border border-amber-600/30 rounded-lg text-amber-200 mb-6">
-                    <p className="font-medium flex items-center gap-2 text-sm"><AlertTriangle className="w-4 h-4" /> API connection issue</p>
-                    <p className="text-xs text-amber-300/70 mt-1">{apiError}</p>
-                    <p className="text-xs text-gray-400 mt-1">Some data may be unavailable. Your session is active.</p>
+                <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-amber-900">
+                    <p className="flex items-center gap-2 text-sm font-medium">
+                        <AlertTriangle className="h-4 w-4" /> API connection issue
+                    </p>
+                    <p className="mt-1 text-sm opacity-80">{apiError}</p>
+                    <p className="mt-1 text-sm opacity-70">Some data may be unavailable. Your session is still active.</p>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 font-medium text-sm">Credits Remaining</h3>
-                        <CreditCard className="text-indigo-400 h-5 w-5" />
-                    </div>
-                    <p className="text-3xl font-bold text-white">
-                        {profile?.credits_remaining ?? "—"}{" "}
-                        <span className="text-sm text-gray-500 font-normal">/ {profile?.credits_monthly ?? "—"}</span>
-                    </p>
-                </div>
-
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 font-medium text-sm">Current Plan</h3>
-                        <Zap className="text-emerald-400 h-5 w-5" />
-                    </div>
-                    <p className="text-3xl font-bold text-white capitalize">
-                        {profile?.plan || "Free"}{" "}
-                        <span className="text-sm text-gray-500 font-normal">Tier</span>
-                    </p>
-                </div>
-
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-400 font-medium text-sm">Spending Cap</h3>
-                        <Activity className="text-amber-400 h-5 w-5" />
-                    </div>
-                    <p className="text-3xl font-bold text-white">
-                        {profile?.spending_cap ? `$${profile.spending_cap}` : "None"}
-                    </p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
-                    <div className="space-y-3">
-                        <Link href="/dashboard/keys" className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition group">
-                            <span className="flex items-center gap-3 text-sm font-medium"><Key size={16} className="text-indigo-400" /> Manage API Keys</span>
-                            <span className="text-gray-400 text-xs group-hover:text-white transition">→</span>
-                        </Link>
-                        <Link href="/dashboard/billing" className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition group">
-                            <span className="flex items-center gap-3 text-sm font-medium"><CreditCard size={16} className="text-emerald-400" /> Manage Subscription</span>
-                            <span className="text-gray-400 text-xs group-hover:text-white transition">→</span>
-                        </Link>
-                        <Link href="/dashboard/team" className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition group">
-                            <span className="flex items-center gap-3 text-sm font-medium"><Users size={16} className="text-purple-400" /> Team Management</span>
-                            <span className="text-gray-400 text-xs group-hover:text-white transition">→</span>
-                        </Link>
-                        <Link href="/dashboard/usage" className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition group">
-                            <span className="flex items-center gap-3 text-sm font-medium"><Activity size={16} className="text-amber-400" /> Usage History</span>
-                            <span className="text-gray-400 text-xs group-hover:text-white transition">→</span>
-                        </Link>
+            <section className="grid gap-4 md:grid-cols-3">
+                <div className="metric-card">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="metric-label">Credits remaining</p>
+                            <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                                {profile?.credits_remaining ?? "—"}
+                            </p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                of {profile?.credits_monthly ?? "—"} this cycle
+                            </p>
+                        </div>
+                        <CreditCard className="h-5 w-5 text-[var(--accent)]" />
                     </div>
                 </div>
+                <div className="metric-card">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="metric-label">Current plan</p>
+                            <p className="mt-3 text-3xl font-semibold capitalize tracking-[-0.04em] text-slate-950">
+                                {profile?.plan || "Free"}
+                            </p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                Billing and access behavior follow this tier.
+                            </p>
+                        </div>
+                        <Sparkles className="h-5 w-5 text-[var(--amber)]" />
+                    </div>
+                </div>
+                <div className="metric-card">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="metric-label">Hard spending cap</p>
+                            <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                                {profile?.spending_cap ? `$${profile.spending_cap}` : "None"}
+                            </p>
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                Overage stops automatically at this threshold.
+                            </p>
+                        </div>
+                        <Wallet className="h-5 w-5 text-slate-900" />
+                    </div>
+                </div>
+            </section>
 
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-lg font-bold mb-4">Getting Started</h3>
-                    <div className="space-y-4">
+            <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="panel p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Quick actions</h2>
+                        <span className="badge badge-accent">Workspace</span>
+                    </div>
+                    <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        <Link href="/dashboard/chat" className="panel-muted p-4 transition hover:bg-white/80">
+                            <p className="text-base font-semibold text-slate-950">Open chat</p>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                Route a prompt through the proxy and compare model behavior.
+                            </p>
+                            <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+                                Start now <ArrowRight className="h-4 w-4" />
+                            </span>
+                        </Link>
+                        <Link href="/dashboard/hub" className="panel-muted p-4 transition hover:bg-white/80">
+                            <p className="text-base font-semibold text-slate-950">Launch a repo run</p>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                Connect GitHub, inspect files, and queue a guided automation run.
+                            </p>
+                            <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+                                Open Hub <ArrowRight className="h-4 w-4" />
+                            </span>
+                        </Link>
+                        <Link href="/dashboard/billing" className="panel-muted p-4 transition hover:bg-white/80">
+                            <p className="text-base font-semibold text-slate-950">Review billing</p>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                Update plans, top up credits, and adjust caps without leaving the workspace.
+                            </p>
+                            <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+                                Go to billing <ArrowRight className="h-4 w-4" />
+                            </span>
+                        </Link>
+                        <Link href="/dashboard/team" className="panel-muted p-4 transition hover:bg-white/80">
+                            <p className="text-base font-semibold text-slate-950">Manage team</p>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                Invite members, review roles, and keep shared usage organized.
+                            </p>
+                            <span className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+                                Open team view <ArrowRight className="h-4 w-4" />
+                            </span>
+                        </Link>
+                    </div>
+                </div>
+
+                <div className="panel p-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Recommended flow</h2>
+                        <ShieldCheck className="h-5 w-5 text-[var(--amber)]" />
+                    </div>
+                    <div className="mt-5 space-y-4">
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</div>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-strong)]">1</div>
                             <div>
-                                <p className="text-sm font-medium">Add your API keys</p>
-                                <p className="text-xs text-gray-400">Bring your own keys from OpenAI, Anthropic, Google, or others.</p>
+                                <p className="text-sm font-medium text-slate-950">Connect keys or use managed credits</p>
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                    Start with BYOK, or route through the managed proxy if you want one bill.
+                                </p>
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</div>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-strong)]">2</div>
                             <div>
-                                <p className="text-sm font-medium">Install the terminal app</p>
-                                <p className="text-xs text-gray-400">Run <code className="bg-gray-800 px-1.5 py-0.5 rounded text-indigo-300">pip install gptcgt</code> to get started.</p>
+                                <p className="text-sm font-medium text-slate-950">Use chat for fast probing</p>
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                    Compare model behavior before escalating to a repo-aware run.
+                                </p>
                             </div>
                         </div>
                         <div className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</div>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-semibold text-[var(--accent-strong)]">3</div>
                             <div>
-                                <p className="text-sm font-medium">Start coding</p>
-                                <p className="text-xs text-gray-400">Open a project folder and launch gptcgt. The AI sees your code in context.</p>
+                                <p className="text-sm font-medium text-slate-950">Launch Hub for repo work</p>
+                                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                                    Move to Hub only when you need diffs, proof, PR output, or log visibility.
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
         </div>
     );
 }

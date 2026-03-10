@@ -135,8 +135,6 @@ class AgentStatusUpdate(Message):
         self.detail = detail
 
 
-
-
 class SubTaskDelegated(Message):
     """Emitted when an agent delegates a sub-task to another agent."""
 
@@ -157,7 +155,6 @@ class AgentDispatched(Message):
         self.agent_id = agent_name  # Alias for ActiveAgentsBar compatibility
         self.model_name = model_name
         self.input_tokens = input_tokens
-
 
 
 class ExecutionPaused(Message):
@@ -196,9 +193,7 @@ class ArbiterVerdictReady(Message):
 
 
 class SpendingCapWarning(Message):
-    def __init__(
-        self, percent_used: float, warning_level: str, cap_dollars: float, spent_dollars: float
-    ) -> None:
+    def __init__(self, percent_used: float, warning_level: str, cap_dollars: float, spent_dollars: float) -> None:
         super().__init__()
         self.percent_used = percent_used
         self.warning_level = warning_level
@@ -214,9 +209,7 @@ class CreditsUpdated(Message):
 
 
 class CreditInsufficient(Message):
-    def __init__(
-        self, credits_remaining: int, credits_needed: int, suggested_mode: str | None = None
-    ) -> None:
+    def __init__(self, credits_remaining: int, credits_needed: int, suggested_mode: str | None = None) -> None:
         super().__init__()
         self.credits_remaining = credits_remaining
         self.credits_needed = credits_needed
@@ -255,9 +248,7 @@ class CodeSelectionCleared(Message):
 class ContextModified(Message):
     """Emitted when context chips change (file added/removed, selection added)."""
 
-    def __init__(
-        self, action: str, file_path: str, line_range: tuple[int, int] | None = None
-    ) -> None:
+    def __init__(self, action: str, file_path: str, line_range: tuple[int, int] | None = None) -> None:
         super().__init__()
         self.action = action  # "add_file", "remove_file", "add_selection", "remove_selection"
         self.file_path = file_path
@@ -270,9 +261,7 @@ class QuickActionTriggered(Message):
     def __init__(self, action: str, context: dict) -> None:
         super().__init__()
         self.action = action  # "explain", "find_bugs", "refactor", "add_tests", etc.
-        self.context = (
-            context  # {"file_path": ..., "selection": ..., "start_line": ..., "end_line": ...}
-        )
+        self.context = context  # {"file_path": ..., "selection": ..., "start_line": ..., "end_line": ...}
 
 
 # Phase 6 Canvas Part 2 Events
@@ -290,9 +279,7 @@ class HunkEditStarted(Message):
 class HunkEditCompleted(Message):
     """Emitted when user finishes editing a hunk (apply or cancel)."""
 
-    def __init__(
-        self, file_path: str, hunk_index: int, edited_text: str, was_cancelled: bool = False
-    ) -> None:
+    def __init__(self, file_path: str, hunk_index: int, edited_text: str, was_cancelled: bool = False) -> None:
         super().__init__()
         self.file_path = file_path
         self.hunk_index = hunk_index

@@ -95,14 +95,17 @@ class DAGEngine:
             logger.debug(f"[DAG] Entering node: {current_node_name}")
             self._post_trace(current_node_name, "running")
             import time
+
             t0 = time.monotonic()
 
             try:
                 next_node_name = await node.execute(state, context)
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
                 self._post_trace(
-                    current_node_name, "done",
-                    elapsed_ms=elapsed_ms, next_node=next_node_name,
+                    current_node_name,
+                    "done",
+                    elapsed_ms=elapsed_ms,
+                    next_node=next_node_name,
                 )
                 current_node_name = next_node_name
             except asyncio.CancelledError:
@@ -111,8 +114,10 @@ class DAGEngine:
             except Exception as e:
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
                 self._post_trace(
-                    current_node_name, "error",
-                    elapsed_ms=elapsed_ms, error=str(e),
+                    current_node_name,
+                    "error",
+                    elapsed_ms=elapsed_ms,
+                    error=str(e),
                 )
                 logger.error(f"[DAG] Error in {current_node_name}: {e}", exc_info=True)
                 if state.error_callback:
@@ -121,18 +126,27 @@ class DAGEngine:
 
     @staticmethod
     def _post_trace(
-        node: str, status: str, elapsed_ms: int = 0,
-        next_node: str | None = None, error: str | None = None,
+        node: str,
+        status: str,
+        elapsed_ms: int = 0,
+        next_node: str | None = None,
+        error: str | None = None,
     ) -> None:
         """Safely post a DAGTraceEvent to the active Textual app."""
         try:
             import textual.app as _tapp
 
             from src.core.events import DAGTraceEvent
+
             app = _tapp.active_app.get()
-            app.post_message(DAGTraceEvent(
-                node=node, status=status,
-                elapsed_ms=elapsed_ms, next_node=next_node, error=error,
-            ))
+            app.post_message(
+                DAGTraceEvent(
+                    node=node,
+                    status=status,
+                    elapsed_ms=elapsed_ms,
+                    next_node=next_node,
+                    error=error,
+                )
+            )
         except Exception:
             pass

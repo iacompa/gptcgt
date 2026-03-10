@@ -40,6 +40,8 @@ class AgentThoughtBlock(Collapsible):
         self.start_timer = time.monotonic()
         self._content_label = Label(content, classes="thought-content")
         self.collapsed = True
+        self._pending_chunks: list[str] = []
+        self._flush_timer = None
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
@@ -48,10 +50,22 @@ class AgentThoughtBlock(Collapsible):
     def append_thought(self, text: str) -> None:
         """Stream data into the thought block dynamically."""
         self.raw_content += text
+        self._pending_chunks.append(text)
+        if self._flush_timer is None:
+            self._flush_timer = self.set_timer(0.08, self._flush_pending_updates)
+
+    def _flush_pending_updates(self) -> None:
+        self._flush_timer = None
+        if not self._pending_chunks:
+            return
+        self._pending_chunks.clear()
         self._content_label.update(self.raw_content)
 
     def complete_thought(self, final_title: str | None = None) -> None:
         """Lock the block and append physical elapsed time to the Title string."""
+        if self._flush_timer is not None:
+            self._flush_timer.stop()
+            self._flush_pending_updates()
         elapsed = time.monotonic() - self.start_timer
         t_title = final_title if final_title else "💭 Thought Process"
         self.title = f"{t_title} ({elapsed:.1f}s)"

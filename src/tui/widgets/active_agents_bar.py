@@ -54,9 +54,7 @@ class ActiveAgentsBar(Static):
             text_widget.update("No agents active")
             return
 
-        header = (
-            f"Activity — {len(active_agents)} agent{'s' if len(active_agents) > 1 else ''} working"
-        )
+        header = f"Activity — {len(active_agents)} agent{'s' if len(active_agents) > 1 else ''} working"
 
         agent_strings = []
         for agent_id, (model_name, status) in active_agents.items():

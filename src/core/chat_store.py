@@ -50,6 +50,7 @@ class ChatMessage:
         d["timestamp"] = datetime.fromisoformat(d["timestamp"])
         # Filter to known fields for forward compatibility
         import dataclasses
+
         known_fields = {f.name for f in dataclasses.fields(cls)}
         d = {k: v for k, v in d.items() if k in known_fields}
         return cls(**d)
@@ -108,13 +109,13 @@ class ChatStore:
         """Truncates the session history keeping the last `keep_count` messages, and prepends the summary."""
         if not self.current_session_id:
             return
-  # noqa: W293
+        # noqa: W293
         if len(self._cache) <= keep_count:
             return
-  # noqa: W293
+        # noqa: W293
         recent = self._cache[-keep_count:]
         self._cache = [summary_msg] + recent
-  # noqa: W293
+        # noqa: W293
         session_file = self._get_session_path(self.current_session_id)
         self._save_to_disk(session_file, self._cache)
 

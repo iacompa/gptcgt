@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CreditCard, ShieldAlert, Trash2, UserRound } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { PricingTable } from "@/components/pricing-table";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useToast } from "@/components/toaster";
 
 export default function AccountPage() {
     const [profile, setProfile] = useState<any>(null);
@@ -10,148 +13,202 @@ export default function AccountPage() {
     const [capInput, setCapInput] = useState("");
     const [savingCap, setSavingCap] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const { pushToast } = useToast();
 
-    useEffect(() => {
-        loadProfile();
-    }, []);
-
-    const loadProfile = async () => {
+    const loadProfile = useCallback(async () => {
         try {
             const { data, error } = await apiClient.GET("/user/me");
             if (error) throw error;
-            if (data) {
-                const pd = data as any;
-                setProfile(pd);
-                if (pd.spending_cap !== null && pd.spending_cap !== undefined) {
-                    setCapInput(pd.spending_cap.toString());
-                }
+            const nextProfile = data as any;
+            setProfile(nextProfile);
+            if (nextProfile?.spending_cap !== null && nextProfile?.spending_cap !== undefined) {
+                setCapInput(nextProfile.spending_cap.toString());
+            } else {
+                setCapInput("");
             }
-        } catch (e) {
-            console.error(e);
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Could not load account profile",
+                description: error.message,
+            });
         } finally {
             setLoading(false);
         }
-    };
+    }, [pushToast]);
+
+    useEffect(() => {
+        void loadProfile();
+    }, [loadProfile]);
 
     const updateCap = async () => {
         setSavingCap(true);
         try {
-            const capVal = capInput === "" ? null : parseInt(capInput);
+            const capValue = capInput === "" ? null : parseInt(capInput, 10);
             const { error } = await apiClient.PATCH("/user/me/spending_cap", {
-                body: { spending_cap: capVal }
+                body: { spending_cap: capValue },
             });
             if (error) throw error;
-            loadProfile();
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update spending cap");
+            await loadProfile();
+            pushToast({
+                tone: "success",
+                title: "Account cap saved",
+                description: capValue === null ? "No monthly limit is set." : `Cap set to $${capValue}.`,
+            });
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Failed to update account cap",
+                description: error.message,
+            });
         } finally {
             setSavingCap(false);
         }
     };
 
     const deleteAccount = async () => {
-        const confirmed = window.confirm(
-            "Are you absolutely sure you want to delete your account? " +
-            "This will instantly cancel any active subscriptions, disable your API keys, and anonymize your identity. " +
-            "This action cannot be undone."
-        );
-        if (!confirmed) return;
-
         setDeleting(true);
         try {
             const { error } = await apiClient.DELETE("/user/me");
             if (error) throw error;
-            // Hard clear the session cookie through the signout handler to ensure frontend wipe
             await fetch("/api/auth/signout", { method: "POST" });
             window.location.href = "/";
-        } catch (e) {
-            console.error("Deletion failed", e);
-            alert("Failed to delete account. Please try again or contact support.");
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Failed to delete account",
+                description: error.message || "Please try again or contact support.",
+            });
             setDeleting(false);
         }
     };
 
-    if (loading) return <div>Loading account...</div>;
-    if (!profile) return <div>Failed to load profile.</div>;
+    if (loading) return <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">Loading account...</div>;
+    if (!profile) return <div className="text-[var(--text-muted)]">Failed to load profile.</div>;
 
     return (
-        <div className="max-w-4xl">
-            <h1 className="text-2xl font-bold mb-6">Account Settings</h1>
+        <div className="page-stack">
+            <section className="hero-panel p-6 sm:p-8">
+                <p className="eyebrow">Account</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                    Keep profile, billing, and destructive actions in one controlled place.
+                </h1>
+                <p className="mt-3 max-w-3xl copy-lg">
+                    This page should make ownership clear: who you are, what plan you are on, and how hard limits or deletion behave.
+                </p>
+            </section>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-                <h2 className="text-lg font-bold mb-4">Profile Information</h2>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Email</label>
-                        <div className="text-white bg-gray-950 px-4 py-2 rounded border border-gray-800">{profile.email}</div>
+            <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-6">
+                    <div className="panel p-6">
+                        <div className="flex items-center gap-2">
+                            <UserRound className="h-5 w-5 text-[var(--accent)]" />
+                            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Profile</h2>
+                        </div>
+                        <div className="mt-5 grid gap-4">
+                            <div>
+                                <p className="metric-label">Email</p>
+                                <div className="mt-2 rounded-[20px] border border-[var(--border)] bg-white/70 px-4 py-3 text-slate-900">
+                                    {profile.email}
+                                </div>
+                            </div>
+                            <div>
+                                <p className="metric-label">Plan</p>
+                                <div className="mt-2 rounded-[20px] border border-[var(--border)] bg-white/70 px-4 py-3 capitalize text-slate-900">
+                                    {profile.plan}
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Plan</label>
-                        <div className="text-white bg-gray-950 px-4 py-2 rounded border border-gray-800 capitalize">{profile.plan}</div>
+
+                    <div className="panel p-6">
+                        <div className="flex items-center gap-2">
+                            <ShieldAlert className="h-5 w-5 text-[var(--amber)]" />
+                            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Account spending cap</h2>
+                        </div>
+                        <p className="mt-3 text-sm text-[var(--text-muted)]">
+                            Enforce a strict dollar limit on pay-as-you-go overage. Leave blank if you want no account-level cap.
+                        </p>
+                        <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
+                            <div className="flex-1">
+                                <label className="mb-2 block text-sm font-medium text-slate-900">Monthly limit ($)</label>
+                                <input
+                                    type="number"
+                                    className="field"
+                                    placeholder="No limit"
+                                    value={capInput}
+                                    onChange={(event) => setCapInput(event.target.value)}
+                                />
+                            </div>
+                            <button type="button" onClick={updateCap} disabled={savingCap} className="btn-secondary">
+                                {savingCap ? "Saving..." : "Save cap"}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-                <h2 className="text-lg font-bold mb-4">Hard Spending Cap</h2>
-                <p className="text-gray-400 text-sm mb-4">Enforce a strict dollar limit on Pay-As-You-Go overage per month. Leave blank for no cap.</p>
-
-                <div className="flex gap-4 items-end">
-                    <div>
-                        <label className="block text-sm text-gray-400 mb-1">Monthly Limit ($)</label>
-                        <input
-                            type="number"
-                            className="bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white focus:outline-none focus:border-indigo-500 w-48"
-                            placeholder="No Limit"
-                            value={capInput}
-                            onChange={(e) => setCapInput(e.target.value)}
-                        />
+                <div className="space-y-6">
+                    <div className="panel p-6">
+                        <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-[var(--accent)]" />
+                            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Plan options</h2>
+                        </div>
+                        <div className="mt-5">
+                            <PricingTable currentPlan={profile.plan} />
+                        </div>
+                        <button
+                            type="button"
+                            className="btn-secondary mt-5"
+                            onClick={async () => {
+                                try {
+                                    const { data, error } = await apiClient.POST("/billing/portal");
+                                    if (error) throw error;
+                                    if (data?.url) {
+                                        window.location.href = data.url;
+                                        return;
+                                    }
+                                    throw new Error("Billing portal URL was not returned.");
+                                } catch (error: any) {
+                                    pushToast({
+                                        tone: "error",
+                                        title: "Could not open billing portal",
+                                        description: error.message,
+                                    });
+                                }
+                            }}
+                        >
+                            Manage billing via Stripe
+                        </button>
                     </div>
-                    <button
-                        onClick={updateCap}
-                        disabled={savingCap}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50"
-                    >
-                        {savingCap ? "Saving..." : "Save Cap"}
-                    </button>
+
+                    <div className="rounded-[28px] border border-red-200 bg-red-50 p-6">
+                        <div className="flex items-center gap-2 text-red-800">
+                            <Trash2 className="h-5 w-5" />
+                            <h2 className="text-xl font-semibold tracking-[-0.03em]">Danger zone</h2>
+                        </div>
+                        <p className="mt-3 text-sm text-red-900/80">
+                            Deleting the account cancels subscriptions, disables stored API keys, and anonymizes your identity. This cannot be undone.
+                        </p>
+                        <button type="button" onClick={() => setConfirmDelete(true)} className="btn-danger mt-5">
+                            Delete account
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <div className="mb-8">
-                <h2 className="text-lg font-bold mb-4">Plan & Billing</h2>
-                <PricingTable currentPlan={profile.plan} />
-
-                <div className="mt-4 flex justify-end">
-                    <button
-                        className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
-                        onClick={async () => {
-                            try {
-                                const { data, error } = await apiClient.POST("/billing/portal");
-                                if (error) throw error;
-                                if (data?.url) window.location.href = data.url;
-                            } catch (e) {
-                                alert("Could not open billing portal. Please try again.");
-                            }
-                        }}
-                    >
-                        Manage Billing via Stripe &rarr;
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-red-950/20 border border-red-900/50 rounded-xl p-6">
-                <h2 className="text-lg font-bold text-red-500 mb-2">Danger Zone</h2>
-                <p className="text-gray-400 text-sm mb-4">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                <button
-                    onClick={deleteAccount}
-                    disabled={deleting}
-                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md font-medium text-sm disabled:opacity-50"
-                >
-                    {deleting ? "Deleting Account..." : "Delete Account"}
-                </button>
-            </div>
-
+            <ConfirmDialog
+                open={confirmDelete}
+                title="Delete account permanently?"
+                description="This immediately cancels active subscriptions, disables API keys, and removes your identity from the product. This action cannot be undone."
+                confirmLabel="Delete account"
+                busy={deleting}
+                onCancel={() => setConfirmDelete(false)}
+                onConfirm={deleteAccount}
+            />
         </div>
     );
 }

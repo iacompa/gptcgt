@@ -121,12 +121,14 @@ class EnhancedStatusBar(Static):
         ]
         if task_str:
             parts.append(task_str)
-        parts.extend([
-            today_str,
-            month_str,
-            budget_str,
-            rem_str,
-        ])
+        parts.extend(
+            [
+                today_str,
+                month_str,
+                budget_str,
+                rem_str,
+            ]
+        )
 
         return " │ ".join(parts)
 
@@ -134,6 +136,7 @@ class EnhancedStatusBar(Static):
         """Read the daily limit from config, with fallback."""
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "config"):
                 return getattr(current_app.config.user, "daily_spend_limit", 10.0)
@@ -149,6 +152,7 @@ class EnhancedStatusBar(Static):
         self.plan_credits = event.credits_monthly
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "cost_tracker"):
                 self.today_cost = current_app.cost_tracker.get_today_spend().total_cost

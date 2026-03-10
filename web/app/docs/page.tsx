@@ -26,9 +26,9 @@ export default function DocsOverview() {
                     { href: "/docs/custom-models", title: "🧩 Custom Models", desc: "Bring your own Ollama, vLLM, or OpenRouter models" },
                     { href: "/docs/faq", title: "❓ FAQ", desc: "Common questions answered" },
                 ].map((card) => (
-                    <Link key={card.href} href={card.href} className="block p-4 rounded-lg border border-gray-800 bg-gray-900/50 hover:border-indigo-500/50 hover:bg-gray-800/50 transition-all group">
-                        <p className="text-white font-semibold text-sm group-hover:text-indigo-400 transition-colors">{card.title}</p>
-                        <p className="text-gray-500 text-xs mt-1">{card.desc}</p>
+                    <Link key={card.href} href={card.href} className="block rounded-[22px] border border-white/10 bg-white/5 p-4 transition-all group hover:border-emerald-400/30 hover:bg-white/10">
+                        <p className="text-sm font-semibold text-white transition-colors group-hover:text-emerald-300">{card.title}</p>
+                        <p className="mt-1 text-xs text-slate-400">{card.desc}</p>
                     </Link>
                 ))}
             </div>

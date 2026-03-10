@@ -24,9 +24,7 @@ class SessionItem(ListItem):
         date_str = dt.strftime("%Y-%m-%d %H:%M")
 
         yield Horizontal(
-            Label(
-                f"{date_str} ({self.session_data['message_count']} msgs)", classes="session-date"
-            ),
+            Label(f"{date_str} ({self.session_data['message_count']} msgs)", classes="session-date"),
             Label(self.session_data["preview"], classes="session-preview"),
         )
 
@@ -143,9 +141,7 @@ class SessionBrowser(ModalScreen):
         if event.button.id == "btn-load":
             # Just switching current session
             self.chat_store.current_session_id = session_id
-            self.chat_store._cache = self.chat_store._load_from_disk(
-                self.chat_store._get_session_path(session_id)
-            )
+            self.chat_store._cache = self.chat_store._load_from_disk(self.chat_store._get_session_path(session_id))
             self.chat_store._update_current_symlink(self.chat_store._get_session_path(session_id))
             self.dismiss(session_id)
 

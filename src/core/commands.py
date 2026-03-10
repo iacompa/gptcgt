@@ -85,11 +85,7 @@ class CommandRegistry:
         Execute by ID, shortcut, or slash.
         Returns True if found and executed, else False.
         """
-        cmd = (
-            self._commands.get(identifier)
-            or self._by_shortcut.get(identifier)
-            or self._by_slash.get(identifier)
-        )
+        cmd = self._commands.get(identifier) or self._by_shortcut.get(identifier) or self._by_slash.get(identifier)
         if cmd:
             if not cmd.enabled:
                 logger.warning(f"Attempted to execute disabled command: {cmd.id}")
@@ -400,15 +396,18 @@ def register_default_commands(app: Any) -> None:
         return None
 
     if hasattr(app, "chat_store"):
+
         def new_session_action():  # noqa: F811
             app.chat_store.new_session()
             # Immediately reload chat panel so user sees the reset
             try:
                 from src.tui.panels.chat import ChatPanel
+
                 chat_panel = app.query_one("#right-panel", ChatPanel)
                 chat_panel._load_session_history()
             except Exception:
                 pass
+
     registry.register(
         Command(
             "chat.new",
@@ -532,4 +531,3 @@ def register_default_commands(app: Any) -> None:
             icon="↪️",
         )
     )
-

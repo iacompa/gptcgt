@@ -63,9 +63,7 @@ class TaskPanel(VerticalScroll):
 
         # Re-render
         with self.app.batch_update():
-            self.mount(
-                Static(f"▼ {active.title} ({int(active.progress_pct)}%)", classes="task-title")
-            )
+            self.mount(Static(f"▼ {active.title} ({int(active.progress_pct)}%)", classes="task-title"))
 
             for st in active.subtasks:
                 icon = "⬚"

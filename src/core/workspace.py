@@ -62,8 +62,7 @@ class Workspace:
         """
         if cls._instance is None:
             raise RuntimeError(
-                "Workspace has not been initialized. "
-                "Call Workspace(project_root) before using get_instance()."
+                "Workspace has not been initialized. Call Workspace(project_root) before using get_instance()."
             )
         return cls._instance
 
@@ -117,12 +116,8 @@ class Workspace:
         try:
             resolved_path.relative_to(self.project_root)
         except ValueError:
-            logger.critical(
-                f"Security boundary violation attempt: {target} escapes {self.project_root}"
-            )
-            raise WorkspaceEscapeError(
-                f"Access denied: {target} is outside the project boundary {self.project_root}"
-            )
+            logger.critical(f"Security boundary violation attempt: {target} escapes {self.project_root}")
+            raise WorkspaceEscapeError(f"Access denied: {target} is outside the project boundary {self.project_root}")
 
         return resolved_path
 

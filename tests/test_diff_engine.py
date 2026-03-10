@@ -1,7 +1,7 @@
 
 import pytest
 
-from src.core.diff_engine import DiffExtractor
+from src.core.diff_engine import DiffExtractor, Hunk
 from src.core.workspace import Workspace
 
 
@@ -93,3 +93,11 @@ def test_syntax_validation_skipped_for_non_python(mock_workspace):
     fp = patch_set.patches[0]
     assert fp.file_path == "test_doc.md"
     assert getattr(fp, "syntax_valid", False) is True
+
+
+def test_hunk_backward_compatible_aliases():
+    """Legacy callers still get old_lines/new_lines after the field rename."""
+    hunk = Hunk(start_line=1, end_line=1, original_lines=["old"], modified_lines=["new"])
+
+    assert hunk.old_lines == ["old"]
+    assert hunk.new_lines == ["new"]

@@ -121,10 +121,7 @@ class SensitiveDataFilter(logging.Filter):
         # Scrub structured data if present
         if hasattr(record, "structured_data") and isinstance(record.structured_data, dict):
             for k, v in record.structured_data.items():
-                if any(
-                    sec in k.lower()
-                    for sec in ["api_key", "apikey", "password", "secret", "token", "auth"]
-                ):
+                if any(sec in k.lower() for sec in ["api_key", "apikey", "password", "secret", "token", "auth"]):
                     record.structured_data[k] = "***REDACTED***"
                 else:
                     val_str = str(v)
@@ -231,9 +228,7 @@ def setup_logging(project_path: Path, debug: bool = False) -> None:
 
     # 2. Debug Log Handler (Time rotated daily, keep 7 days)
     debug_log_file = log_dir / "debug.log"
-    debug_handler = TimedRotatingFileHandler(
-        debug_log_file, when="midnight", interval=1, backupCount=7
-    )
+    debug_handler = TimedRotatingFileHandler(debug_log_file, when="midnight", interval=1, backupCount=7)
     debug_handler.setLevel(logging.DEBUG)
     debug_handler.setFormatter(formatter)
     debug_handler.addFilter(sensitive_filter)

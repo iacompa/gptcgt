@@ -26,9 +26,7 @@ class ModerationService:
             "until": row["suspended_until"].isoformat() if row["suspended_until"] else None,
         }
 
-    async def suspend_user(
-        self, db_pool, workos_user_id: str, reason: str, duration_hours: int = 24
-    ) -> None:
+    async def suspend_user(self, db_pool, workos_user_id: str, reason: str, duration_hours: int = 24) -> None:
         """Temporary suspension."""
         until = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
         await db_pool.execute(
@@ -38,9 +36,7 @@ class ModerationService:
             workos_user_id,
         )
         # Log to audit_log
-        internal_id = await db_pool.fetchval(
-            "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-        )
+        internal_id = await db_pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
         if internal_id:
             await db_pool.execute(
                 "INSERT INTO audit_log (user_id, action, details) VALUES ($1, 'suspend', $2)",
@@ -55,9 +51,7 @@ class ModerationService:
             f"permanent: {reason}",
             workos_user_id,
         )
-        internal_id = await db_pool.fetchval(
-            "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-        )
+        internal_id = await db_pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
         if internal_id:
             await db_pool.execute(
                 "INSERT INTO audit_log (user_id, action, details) VALUES ($1, 'ban', $2)",
@@ -80,13 +74,9 @@ class ModerationService:
         )
         return int(result.split()[-1])  # "UPDATE N"
 
-    async def record_abuse_event(
-        self, db_pool, workos_user_id: str, category: str, details: str
-    ) -> None:
+    async def record_abuse_event(self, db_pool, workos_user_id: str, category: str, details: str) -> None:
         """Log abuse for review."""
-        internal_id = await db_pool.fetchval(
-            "SELECT id FROM users WHERE workos_user_id = $1", workos_user_id
-        )
+        internal_id = await db_pool.fetchval("SELECT id FROM users WHERE workos_user_id = $1", workos_user_id)
         if internal_id:
             await db_pool.execute(
                 "INSERT INTO audit_log (user_id, action, details) VALUES ($1, 'abuse_report', $2)",

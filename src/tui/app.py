@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 import sys
 from pathlib import Path
 
@@ -48,6 +50,17 @@ from src.tui.widgets.task_panel import TaskPanel
 # Overlays are lazy-loaded inside each action method (never needed at startup)
 
 logger = get_logger("tui.app")
+
+
+def _resolve_project_path(project_path: str | Path | None = None) -> Path:
+    """Resolve the workspace root without treating arbitrary argv values as directories."""
+    if project_path is None:
+        return Path.cwd().resolve()
+
+    candidate = Path(project_path).expanduser()
+    if candidate.exists() and candidate.is_file():
+        return candidate.parent.resolve()
+    return candidate.resolve()
 
 
 class GptcgtApp(App[None]):
@@ -97,12 +110,9 @@ class GptcgtApp(App[None]):
         """Open the mode picker overlay (Ctrl+M)."""
         from src.tui.overlays.mode_picker import ModePickerOverlay
 
-        current = (
-            self.orchestrator.mode_manager.active_mode
-            if hasattr(self, "orchestrator")
-            else None
-        )
+        current = self.orchestrator.mode_manager.active_mode if hasattr(self, "orchestrator") else None
         from src.core.mode_manager import OperationMode
+
         current = current or OperationMode.STANDARD
 
         def _apply_mode(chosen_mode: OperationMode | None) -> None:
@@ -110,6 +120,7 @@ class GptcgtApp(App[None]):
                 return
             self.orchestrator.mode_manager.set_mode(chosen_mode)
             from src.tui.widgets.toast import notify
+
             notify(self, "Mode Changed", f"Switched to {chosen_mode.name} mode.", "info")
             self._update_status_bar()
 
@@ -123,24 +134,43 @@ class GptcgtApp(App[None]):
         except Exception as e:
             logger.error(f"Failed to toggle leaderboard: {e}")
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        project_path: str | Path | None = None,
+        startup_task: str | None = None,
+        autonomous_goal: str | None = None,
+        headless_mode: bool = False,
+    ) -> None:
         super().__init__()
         self._active_theme_name = "midnight"
-        self.project_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+        self.project_path = _resolve_project_path(project_path)
+        self.startup_task = startup_task
+        self.autonomous_goal = autonomous_goal
+        self.headless_mode = headless_mode
+        self.config = ConfigManager(self.project_path)
         self._active_file: str | None = None
         self._active_line: int | None = None
 
-    def compose(self) -> ComposeResult:
-        # Temporary instantiation to provide store to ChatPanel
+    def _ensure_workspace(self) -> Workspace:
+        """Reuse the singleton only when it matches the active project root."""
         try:
             ws = Workspace.get_instance()
+            if ws.get_project_root() != self.project_path:
+                Workspace.reset_instance()
+                ws = Workspace(self.project_path)
         except Exception:
             ws = Workspace(self.project_path)
+        return ws
+
+    def compose(self) -> ComposeResult:
+        # Temporary instantiation to provide store to ChatPanel
+        ws = self._ensure_workspace()
 
         self.chat_store = ChatStore(ws)
         self.chat_store.load_active_session()
 
         from src.core.config import ConfigManager  # noqa: F811
+
         if not hasattr(self, "config") or self.config is None:
             self.config = ConfigManager(self.project_path)
 
@@ -156,9 +186,14 @@ class GptcgtApp(App[None]):
         with Horizontal(id="app-grid"):
             # Construct the 3 main clusters
             panels = {
-                "files": Vertical(TaskPanel(id="task-panel"), FileTreePanel(id="left-panel"), id="left-panel-container", classes="left-col"),  # noqa: E501
+                "files": Vertical(
+                    TaskPanel(id="task-panel"),
+                    FileTreePanel(id="left-panel"),
+                    id="left-panel-container",
+                    classes="left-col",
+                ),  # noqa: E501
                 "code": CodeViewerPanel(id="code-viewer"),
-                "chat": ChatPanel(id="right-panel")
+                "chat": ChatPanel(id="right-panel"),
             }
             _conf = getattr(self, "config", ConfigManager.get_instance())
 
@@ -200,6 +235,7 @@ class GptcgtApp(App[None]):
 
             # Yield horizontal panels with resizers
             import uuid
+
             for i, k in enumerate(horiz_keys):
                 yield panels[k]
                 if visible.get(k, True):
@@ -210,10 +246,13 @@ class GptcgtApp(App[None]):
                             next_visible = horiz_keys[j]
                             break
                     if next_visible:
-                        resizer = PanelResizer(panels[k].id, panels[next_visible].id, id=f"resizer-{uuid.uuid4().hex[:6]}")  # noqa: E501
+                        resizer = PanelResizer(
+                            panels[k].id, panels[next_visible].id, id=f"resizer-{uuid.uuid4().hex[:6]}"
+                        )  # noqa: E501
                         yield resizer
 
         from src.tui.widgets.toast import ToastContainer
+
         yield ToastContainer()
 
         yield LeaderboardPanel(id="leaderboard")
@@ -250,6 +289,7 @@ class GptcgtApp(App[None]):
 
         try:
             from src.tui.widgets.hunk_editor import HunkEditor
+
             for he in self.query(HunkEditor):
                 he.text_area.theme = "github_light" if new_theme == "polar" else "vscode_dark"
         except Exception:
@@ -259,12 +299,11 @@ class GptcgtApp(App[None]):
         """Fetch pricing and definitions for user-saved OpenRouter models."""
         try:
             from src.core.model_registry import ModelRegistry, QualityTier
+
             registry = ModelRegistry()
             data = await registry.fetch_openrouter_models()
             for model_id in active_models:
-                registry.register_custom_openrouter_model(
-                    model_id, "", QualityTier.STANDARD, openrouter_data=data
-                )
+                registry.register_custom_openrouter_model(model_id, "", QualityTier.STANDARD, openrouter_data=data)
             logger.info(f"Loaded {len(active_models)} custom OpenRouter models from config.")
         except Exception as e:
             logger.warning(f"Failed to init background OpenRouter models: {e}")
@@ -280,6 +319,7 @@ class GptcgtApp(App[None]):
             # 0.5 Ensure all state managers exist BEFORE anything else
             ws = Workspace.get_instance()
             from src.core.phase_tracker import PhaseTracker
+
             self.phase_tracker = PhaseTracker(ws)
             self.phase_tracker.ensure_loaded()
 
@@ -287,6 +327,7 @@ class GptcgtApp(App[None]):
             self.config.auto_detect_project()
 
             from src.auth.auth_manager import AuthManager
+
             self.auth_manager = AuthManager()
             # Validate stored token in background — catches expired/revoked tokens
             # without blocking UI startup. LogsOut user on confirmed 401.
@@ -306,6 +347,7 @@ class GptcgtApp(App[None]):
                         self.run_worker(self._init_openrouter_models(active_ors), exclusive=False)
                 except Exception:
                     pass
+
             self.call_after_refresh(_load_openrouter_models)
 
             self._register_themes()
@@ -317,9 +359,7 @@ class GptcgtApp(App[None]):
                 "standard": QualityTier.STANDARD,
                 "max": QualityTier.MAX,
             }
-            self.tier_manager.set_tier(
-                tier_map.get(self.config.user.default_quality_tier, QualityTier.STANDARD)
-            )
+            self.tier_manager.set_tier(tier_map.get(self.config.user.default_quality_tier, QualityTier.STANDARD))
 
             self.cost_tracker = CostBreakdownTracker()
             if hasattr(self, "chat_pipeline"):
@@ -354,20 +394,20 @@ class GptcgtApp(App[None]):
             # 3. Creator Mode for empty projects
             def is_project_empty() -> bool:
                 try:
-                    return not any(
-                        e.name not in (".gptcgt", ".git") for e in self.project_path.iterdir()
-                    )
+                    return not any(e.name not in (".gptcgt", ".git") for e in self.project_path.iterdir())
                 except Exception:
                     return False
 
             if is_project_empty():
                 logger.info("Project directory is empty. Initializing Creator Mode layout.")
                 from src.core.mode_manager import OperationMode
+
                 self.apply_layout("chat_focus")
                 self.orchestrator.mode_manager.set_mode(OperationMode.ARCHITECT)
 
             # 4. Crash Recovery — auto-clear stale state (no modal)
             from src.core.crash_recovery import CrashRecoveryManager
+
             recovery = CrashRecoveryManager(self.project_path)
             if recovery.check_for_crash():
                 logger.warning("Unclean shutdown detected — auto-clearing stale state.")
@@ -378,10 +418,11 @@ class GptcgtApp(App[None]):
             self._recovery_mgr = recovery
 
             # 5. Onboarding — non-blocking push (no await)
-            if not self.config.user.setup_completed:
+            if not self.config.user.setup_completed and not self.headless_mode:
                 self.action_push_onboarding()
 
             from src.services.analytics import track
+
             uid = (
                 getattr(self, "auth_manager", None)
                 and getattr(self.auth_manager, "_profile", {})
@@ -389,20 +430,65 @@ class GptcgtApp(App[None]):
                 or "anonymous"
             )
             import platform
+
             track(uid, "app_launched", {"version": "1.0", "platform": platform.platform()})
 
             # 6. Setup Crash Recovery Auto-Save Timer
             self.set_interval(10.0, self._auto_save)
+
+            if self.autonomous_goal:
+                self.call_after_refresh(
+                    lambda: self.run_worker(
+                        self._run_headless_autonomous(self.autonomous_goal),
+                        name="headless-autonomous",
+                        exclusive=True,
+                    )
+                )
+            elif self.startup_task:
+                self.call_after_refresh(
+                    lambda: self.post_message(TaskReceived(task_str=self.startup_task, attached_files=[]))
+                )
 
             logger.info("App ready — all systems initialized.")
 
         except Exception as e:
             logger.error(f"Fatal error during app initialization: {e}", exc_info=True)
             import traceback
+
             err_path = self.project_path / ".gptcgt" / "startup_error.log"
             err_path.parent.mkdir(parents=True, exist_ok=True)
             err_path.write_text(traceback.format_exc())
             self.exit(message=f"Startup error: {e}. See {err_path}")
+
+    async def _run_headless_autonomous(self, goal: str) -> None:
+        """Run autonomous mode from the CLI without going through the interactive chat shell."""
+        from src.core.agent_bus import AgentMessageBus
+        from src.core.autonomous import AutonomousRunner
+
+        bus = AgentMessageBus()
+        runner = AutonomousRunner(bus=bus)
+
+        async def narration_cb(text: str, _ntype: str = "info") -> None:
+            print(text, flush=True)
+
+        async def error_cb(err: str) -> None:
+            print(f"ERROR: {err}", flush=True)
+
+        cancel_event = asyncio.Event()
+        self.cancel_event = cancel_event
+        try:
+            print(f"Starting autonomous goal: {goal}", flush=True)
+            await runner.run(
+                goal=goal,
+                narration_callback=narration_cb,
+                error_callback=error_cb,
+                cancel_event=cancel_event,
+            )
+            print("Autonomous goal finished.", flush=True)
+        finally:
+            self.cancel_event = None
+            if self.headless_mode:
+                self.exit()
 
     def _auto_save(self) -> None:
         """Triggered periodically to save state."""
@@ -524,11 +610,7 @@ class GptcgtApp(App[None]):
 
         # Resolve model info for event posting
         registry = ModelRegistry()
-        app_tier = (
-            self.tier_manager.active_tier
-            if hasattr(self, "tier_manager")
-            else AppQualityTier.STANDARD
-        )
+        app_tier = self.tier_manager.active_tier if hasattr(self, "tier_manager") else AppQualityTier.STANDARD
         registry_tier = RegistryQualityTier(app_tier.value)
         model_def = registry.get_default_for_tier(registry_tier)
         model_id = model_def.id if model_def else "unknown"
@@ -561,17 +643,20 @@ class GptcgtApp(App[None]):
 
         async def cmd_error(msg: str):
             import asyncio
+
             # Wait for Textual to mount the message bubble
             while not agent_msg.is_mounted:
                 await asyncio.sleep(0.05)
 
             agent_msg.append_chunk(f"\n[Error: {msg}]")
             from src.tui.widgets.toast import notify
+
             notify(self, "LLM Error", msg, "error")
 
         file_dicts = []
         try:
             from src.core.workspace import Workspace, WorkspaceEscapeError
+
             ws = Workspace.get_instance()
         except Exception:
             ws = None
@@ -648,6 +733,8 @@ class GptcgtApp(App[None]):
             self.status_bar.is_running = False
             self._update_status_bar()
             chat_panel.set_header_complete(dur_s)
+            if self.headless_mode:
+                self.exit()
 
     async def on_task_received(self, message: TaskReceived) -> None:
         logger.info(f"Task received event: {message.task_str}")
@@ -667,16 +754,19 @@ class GptcgtApp(App[None]):
     def action_push_onboarding(self) -> None:
         """Push the onboarding overlay."""
         from src.tui.overlays.onboarding import OnboardingScreen
+
         self.push_screen(OnboardingScreen())
 
     def action_show_settings(self) -> None:
         """Push the settings overlay."""
         from src.tui.overlays.settings import SettingsScreen
+
         self.push_screen(SettingsScreen())
 
     def action_show_help(self) -> None:
         """Push the help overlay."""
         from src.tui.overlays.help import HelpOverlay
+
         self.push_screen(HelpOverlay())
 
     def on_menu_action(self, event: MenuAction) -> None:
@@ -693,6 +783,7 @@ class GptcgtApp(App[None]):
         if action == "about":
             # Show a brief about toast instead of silent no-op
             from src.tui.widgets.toast import notify
+
             notify(self, "About gptcgt", "Version 0.1.0 — gptcgt.ai", "info")
         elif action == "continue_session":
             # Reload last session
@@ -711,6 +802,7 @@ class GptcgtApp(App[None]):
                 md = "\n\n".join(lines)
                 # Try native clipboard first (macOS)
                 import subprocess
+
                 try:
                     subprocess.run(["pbcopy"], input=md.encode(), check=True)
                     notify(self, "Exported", "Chat copied to clipboard as Markdown.", "success")
@@ -728,6 +820,7 @@ class GptcgtApp(App[None]):
             notify(self, "Cleared", "Chat history cleared.", "subtle")
         elif action == "check_updates":
             import webbrowser
+
             webbrowser.open("https://github.com/gptcgt/gptcgt/releases")
         elif action == "mode_picker":
             self.action_mode_picker()
@@ -735,6 +828,7 @@ class GptcgtApp(App[None]):
             self.action_push_onboarding()
         elif action in ("show_settings_keys", "app.settings"):
             from src.tui.overlays.settings import SettingsScreen
+
             self.push_screen(SettingsScreen())
         elif action == "toggle_left_panel":
             self.action_toggle_left_panel()
@@ -780,13 +874,12 @@ class GptcgtApp(App[None]):
                 self.orchestrator.mode_manager.set_mode(mode)
                 from src.tui.widgets.toast import notify
 
-                self.call_after_refresh(
-                    notify, self, "Mode Changed", f"Switched to {mode.name} mode.", "info"
-                )
+                self.call_after_refresh(notify, self, "Mode Changed", f"Switched to {mode.name} mode.", "info")
             except KeyError:
                 pass
         elif action == "show_billing":
             from src.tui.overlays.settings import SettingsScreen
+
             self.push_screen(SettingsScreen())  # Specific tab later
         elif action == "show_help":
             self.action_show_help()
@@ -806,6 +899,7 @@ class GptcgtApp(App[None]):
             # Route file tree AI context-menu actions
             try:
                 from src.tui.panels.file_tree import FileTreePanel
+
                 file_tree = self.query_one(FileTreePanel)
                 file_tree._handle_ai_tree_action(action)
             except Exception as e:
@@ -830,12 +924,14 @@ class GptcgtApp(App[None]):
 
     async def _rebuild_layout(self) -> None:
         """Dynamically apply layout state to DOM hierarchy and resizers."""
+        import asyncio
+        await asyncio.sleep(0.02)  # tiny debounce to let fast sync state changes settle
         app_grid = self.query_one("#app-grid")
-  # noqa: W293
+        # noqa: W293
         placements = getattr(self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"})
         sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2})
         visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True})
-  # noqa: W293
+        # noqa: W293
         panel_map = {"files": "left-panel-container", "code": "code-viewer", "chat": "right-panel"}
         valid_keys = ["files", "code", "chat"]
         panels = {k: self.query_one(f"#{v}") for k, v in panel_map.items()}
@@ -872,12 +968,14 @@ class GptcgtApp(App[None]):
                 panel.styles.height = "100%"
 
         import uuid
+
         ordered_nodes = []
         for i, k in enumerate(horiz_keys):
             ordered_nodes.append(panels[k])
             if i < len(horiz_keys) - 1:
-                next_k = horiz_keys[i+1]
+                next_k = horiz_keys[i + 1]
                 from src.tui.widgets.panel_resizer import PanelResizer
+
                 resizer = PanelResizer(panels[k].id, panels[next_k].id, id=f"resizer-{uuid.uuid4().hex[:6]}")
                 await app_grid.mount(resizer)
                 resizer.display = visible.get(k, True) and visible.get(next_k, True)
@@ -885,9 +983,10 @@ class GptcgtApp(App[None]):
 
         for i in range(1, len(ordered_nodes)):
             try:
-                app_grid.move_child(ordered_nodes[i], after=ordered_nodes[i-1])
+                app_grid.move_child(ordered_nodes[i], after=ordered_nodes[i - 1])
             except Exception as e:
                 import src.core.logger as log
+
                 log.get_logger("tui.layout").error(f"Failed to move child: {e}")
 
     def action_toggle_left_panel(self) -> None:
@@ -896,7 +995,9 @@ class GptcgtApp(App[None]):
         visible["files"] = not visible.get("files", True)
         self.config.user.visible_panels = visible
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def action_toggle_right_panel(self) -> None:
         """Toggle the chat panel (typically right)."""
@@ -904,7 +1005,9 @@ class GptcgtApp(App[None]):
         visible["chat"] = not visible.get("chat", True)
         self.config.user.visible_panels = visible
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def action_toggle_zen_mode(self) -> None:
         """Hide both files and chat panels."""
@@ -914,22 +1017,26 @@ class GptcgtApp(App[None]):
         visible["chat"] = zen_active
         self.config.user.visible_panels = visible
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def on_panel_resizer_reset_layout(self, event: type) -> None:
         """Double click on resizer resetting sizes to default."""
         sizes = {"files": 0.2, "code": 0.6, "chat": 0.2}
         self.config.user.panel_sizes = sizes
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def on_panel_resizer_resize_complete(self, event: type) -> None:
         """Fired after drag completes, so we can save new fractional widths to config."""
         sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2}).copy()
-  # noqa: W293
+        # noqa: W293
         # event is PanelResizer.ResizeComplete
         panel_map_rev = {"left-panel-container": "files", "code-viewer": "code", "right-panel": "chat"}
-  # noqa: W293
+        # noqa: W293
         if hasattr(event, "left_id") and hasattr(event, "right_id"):
             l_key = panel_map_rev.get(event.left_id)
             r_key = panel_map_rev.get(event.right_id)
@@ -941,30 +1048,46 @@ class GptcgtApp(App[None]):
 
     def action_show_layout_editor(self) -> None:
         from src.tui.overlays.layout_editor import LayoutEditorOverlay
+
         def check_layout(layout_name: str | None) -> None:
             if layout_name:
                 self.apply_layout(layout_name)
+
         self.push_screen(LayoutEditorOverlay(), check_layout)
 
     def apply_layout(self, preset: str) -> None:
         visible = getattr(self.config.user, "visible_panels", {"files": True, "code": True, "chat": True}).copy()
-  # noqa: W293
+        sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2}).copy()
+        positions = getattr(self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}).copy()
+
         if preset == "default":
             visible["files"], visible["code"], visible["chat"] = True, True, True
+            sizes["files"], sizes["code"], sizes["chat"] = 0.2, 0.6, 0.2
+            positions["files"], positions["code"], positions["chat"] = "left", "center", "right"
         elif preset == "code_focus":
             visible["files"], visible["code"], visible["chat"] = False, True, True
+            sizes["code"], sizes["chat"] = 0.7, 0.3
+            positions["code"], positions["chat"] = "left", "right"
         elif preset == "review":
             visible["files"], visible["code"], visible["chat"] = True, True, False
+            sizes["files"], sizes["code"] = 0.25, 0.75
+            positions["files"], positions["code"] = "left", "right"
         elif preset == "chat_focus":
             visible["files"], visible["code"], visible["chat"] = False, False, True
-  # noqa: W293
+            sizes["chat"] = 1.0
+            positions["chat"] = "center"
+
         self.config.user.visible_panels = visible
+        self.config.user.panel_sizes = sizes
+        self.config.user.panel_positions = positions
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def apply_size(self, preset: str) -> None:
         sizes = getattr(self.config.user, "panel_sizes", {"files": 0.2, "code": 0.6, "chat": 0.2}).copy()
-  # noqa: W293
+        # noqa: W293
         if preset == "default":
             sizes["files"], sizes["code"], sizes["chat"] = 0.2, 0.6, 0.2
         elif preset == "wide_code":
@@ -973,24 +1096,28 @@ class GptcgtApp(App[None]):
             sizes["files"], sizes["code"], sizes["chat"] = 0.15, 0.45, 0.4
         elif preset == "equal":
             sizes["files"], sizes["code"], sizes["chat"] = 0.33, 0.33, 0.33
-  # noqa: W293
+        # noqa: W293
         self.config.user.panel_sizes = sizes
         self.config._save_global()
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def action_move_panel(self, panel_key: str, direction: str) -> None:
         """Move a specific panel to a new layout position."""
+        from src.tui.widgets.toast import notify
         if panel_key not in ["files", "code", "chat"] or direction not in ["left", "right", "center", "top", "bottom"]:
             return
-  # noqa: W293
-        positions = getattr(self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}).copy()  # noqa: E501
-  # noqa: W293
+        # noqa: W293
+        positions = getattr(
+            self.config.user, "panel_positions", {"files": "left", "code": "center", "chat": "right"}
+        ).copy()  # noqa: E501
+        # noqa: W293
         # Validate: at least 1 panel must stay in horizontal area (left/center/right)
         test_positions = dict(positions)
         test_positions[panel_key] = direction
         horiz_count = sum(1 for v in test_positions.values() if v in ("left", "center", "right"))
         if horiz_count == 0:
-            from src.tui.widgets.toast import notify
             notify(self, "Layout", "At least one panel must stay in the horizontal area.", "warning")
             return
 
@@ -1001,18 +1128,19 @@ class GptcgtApp(App[None]):
                 if v == direction and k != panel_key:
                     existing_key = k
                     break
-  # noqa: W293
+            # noqa: W293
             if existing_key:
                 # Swap their positions
                 positions[existing_key] = positions[panel_key]
-  # noqa: W293
+        # noqa: W293
         positions[panel_key] = direction
         self.config.user.panel_positions = positions
         self.config._save_global()
-  # noqa: W293
-        from src.tui.widgets.toast import notify
+        # noqa: W293
         notify(self, "Layout", f"Moved {panel_key.title()} to {direction.title()}", "info")
-        self.run_worker(self._rebuild_layout())
+        if hasattr(self, "_layout_worker"):
+            self._layout_worker.cancel()
+        self._layout_worker = self.run_worker(self._rebuild_layout())
 
     def action_toggle_theme(self) -> None:
         """Cycle through themes (midnight -> polar -> slate -> ember -> neon -> midnight)."""
@@ -1029,66 +1157,76 @@ class GptcgtApp(App[None]):
         """Register native Textual Themes to replace dynamic CSS injection."""
         from textual.theme import Theme
 
-        self.register_theme(Theme(
-            name="midnight",
-            background="#0D1117",
-            panel="#161B22",
-            surface="#1C2333",
-            secondary="#30363D",
-            primary="#58A6FF",
-            success="#3FB950",
-            warning="#D29922",
-            error="#F85149",
-            dark=True
-        ))
-        self.register_theme(Theme(
-            name="polar",
-            background="#FFFFFF",
-            panel="#F6F8FA",
-            surface="#EAEEF2",
-            secondary="#D0D7DE",
-            primary="#0969DA",
-            success="#1A7F37",
-            warning="#9A6700",
-            error="#CF222E",
-            dark=False
-        ))
-        self.register_theme(Theme(
-            name="slate",
-            background="#1A1C29",
-            panel="#222536",
-            surface="#2B2E42",
-            secondary="#44415C",
-            primary="#7E56C2",
-            success="#3BA772",
-            warning="#E5A93B",
-            error="#DE4F55",
-            dark=True
-        ))
-        self.register_theme(Theme(
-            name="ember",
-            background="#211A1A",
-            panel="#2C2222",
-            surface="#3A2D2B",
-            secondary="#3E2723",
-            primary="#FF5722",
-            success="#388E3C",
-            warning="#FFC107",
-            error="#D32F2F",
-            dark=True
-        ))
-        self.register_theme(Theme(
-            name="neon",
-            background="#0A0A0A",
-            panel="#141414",
-            surface="#1F1F1F",
-            secondary="#330033",
-            primary="#FF00FF",
-            success="#00FF00",
-            warning="#FFFF00",
-            error="#FF0000",
-            dark=True
-        ))
+        self.register_theme(
+            Theme(
+                name="midnight",
+                background="#0D1117",
+                panel="#161B22",
+                surface="#1C2333",
+                secondary="#30363D",
+                primary="#58A6FF",
+                success="#3FB950",
+                warning="#D29922",
+                error="#F85149",
+                dark=True,
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="polar",
+                background="#FFFFFF",
+                panel="#F6F8FA",
+                surface="#EAEEF2",
+                secondary="#D0D7DE",
+                primary="#0969DA",
+                success="#1A7F37",
+                warning="#9A6700",
+                error="#CF222E",
+                dark=False,
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="slate",
+                background="#1A1C29",
+                panel="#222536",
+                surface="#2B2E42",
+                secondary="#44415C",
+                primary="#7E56C2",
+                success="#3BA772",
+                warning="#E5A93B",
+                error="#DE4F55",
+                dark=True,
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="ember",
+                background="#211A1A",
+                panel="#2C2222",
+                surface="#3A2D2B",
+                secondary="#3E2723",
+                primary="#FF5722",
+                success="#388E3C",
+                warning="#FFC107",
+                error="#D32F2F",
+                dark=True,
+            )
+        )
+        self.register_theme(
+            Theme(
+                name="neon",
+                background="#0A0A0A",
+                panel="#141414",
+                surface="#1F1F1F",
+                secondary="#330033",
+                primary="#FF00FF",
+                success="#00FF00",
+                warning="#FFFF00",
+                error="#FF0000",
+                dark=True,
+            )
+        )
 
     def _apply_theme(self, theme_name: str) -> None:
         """Apply a registered textual theme by name."""
@@ -1115,6 +1253,7 @@ class GptcgtApp(App[None]):
     def action_fuzzy_search(self) -> None:
         """Fuzzy file search — coming soon."""
         from src.tui.widgets.toast import notify
+
         notify(self, "Fuzzy Search", "Coming soon! Use the file tree for now.", "info")
 
     def action_session_history(self) -> None:
@@ -1214,9 +1353,7 @@ class GptcgtApp(App[None]):
                 notify(self, "Signed In", f"Welcome, {email}!", "success")
                 self._update_status_bar()
             else:
-                notify(
-                    self, "Sign In Failed", "Authorization timed out. Try /login again.", "error"
-                )
+                notify(self, "Sign In Failed", "Authorization timed out. Try /login again.", "error")
         except Exception as e:
             notify(self, "Sign In Error", str(e)[:100], "error")
 
@@ -1235,11 +1372,7 @@ class GptcgtApp(App[None]):
     def action_show_credits(self) -> None:
         from src.tui.widgets.toast import notify
 
-        if (
-            hasattr(self, "auth_manager")
-            and self.auth_manager
-            and self.auth_manager.is_authenticated
-        ):
+        if hasattr(self, "auth_manager") and self.auth_manager and self.auth_manager.is_authenticated:
             remaining = self.auth_manager.credits_remaining
             monthly = self.auth_manager.credits_monthly
             plan = self.auth_manager.user_plan
@@ -1250,9 +1383,7 @@ class GptcgtApp(App[None]):
                 "info",
             )
         else:
-            notify(
-                self, "Credits", "BYOK mode — no managed credits. Use /login to sign in.", "info"
-            )
+            notify(self, "Credits", "BYOK mode — no managed credits. Use /login to sign in.", "info")
 
     def action_show_billing(self) -> None:
         from src.tui.widgets.toast import notify
@@ -1268,7 +1399,6 @@ class GptcgtApp(App[None]):
         """Toggle visibility of the quick actions bar."""
         if hasattr(self, "quick_actions"):
             self.quick_actions.toggle_visibility()
-
 
     @on(CodeSelectionMade)
     def on_code_selection_for_actions(self, event: CodeSelectionMade) -> None:
@@ -1345,9 +1475,7 @@ class GptcgtApp(App[None]):
             elif action == "refactor_selection":
                 prompt = f"Refactor the code selection in {file_name} (lines {start}-{end}) to improve it."  # noqa: E501
             elif action == "write_tests_selection":
-                prompt = (
-                    f"Write unit tests for the code selection in {file_name} (lines {start}-{end})."
-                )
+                prompt = f"Write unit tests for the code selection in {file_name} (lines {start}-{end})."
 
         elif context.get("target") == "file":
             file_name = Path(context["file_path"]).name
@@ -1397,7 +1525,6 @@ class GptcgtApp(App[None]):
             files = [Path(file_path)] if file_path else []
             self.post_message(TaskReceived(task_str=prompt, attached_files=files))
 
-
     @on(CreditsUpdated)
     def on_credits_updated(self, event: CreditsUpdated) -> None:
         """Update status bar when credits change after task completion."""
@@ -1413,31 +1540,37 @@ class GptcgtApp(App[None]):
     @on(SpendingCapWarning)
     def on_spending_cap_warning(self, event: SpendingCapWarning) -> None:
         from src.tui.widgets.toast import notify
+
         notify(
             self,
             f"Spending Cap Alert: {event.warning_level.upper()}",
             f"You have used {event.percent_used:.1f}% (${event.spent_dollars:.2f} / ${event.cap_dollars:.2f}) of your daily spending cap.",  # noqa: E501
-            "warning"
+            "warning",
         )
 
     @on(CreditInsufficient)
     def on_credit_insufficient(self, event: CreditInsufficient) -> None:
         from src.tui.widgets.toast import notify
+
         msg = f"You need {event.credits_needed} credits, but only have {event.credits_remaining}."
         if event.suggested_mode:
             msg += f" Try switching to {event.suggested_mode} mode."
-        notify(
-            self,
-            "Insufficient Credits",
-            msg,
-            "error"
-        )
+        notify(self, "Insufficient Credits", msg, "error")
+
 
 def main() -> None:
     """Entry point for the application."""
-    import sys
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("project_path", nargs="?")
+    parser.add_argument("--workspace")
+    parser.add_argument("--task")
+    parser.add_argument("--autonomous-goal")
+    parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--version", "-V", action="store_true")
+    args, remaining = parser.parse_known_args()
 
-    if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-V"):
+    if args.version:
         from importlib.metadata import version
 
         try:
@@ -1447,11 +1580,18 @@ def main() -> None:
         print(f"gptcgt {v}")
         sys.exit(0)
 
-    debug_mode = "--debug" in sys.argv
+    debug_mode = args.debug
+    workspace_path = args.workspace or args.project_path
+    sys.argv = [sys.argv[0], *remaining]
 
-    app = GptcgtApp()
+    app = GptcgtApp(
+        project_path=workspace_path,
+        startup_task=args.task,
+        autonomous_goal=args.autonomous_goal,
+        headless_mode=args.headless,
+    )
     app.debug_mode = debug_mode
-    app.run()
+    app.run(headless=args.headless)
 
 
 if __name__ == "__main__":

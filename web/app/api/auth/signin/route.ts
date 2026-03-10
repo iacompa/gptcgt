@@ -98,12 +98,22 @@ export async function GET(request: Request) {
         );
     }
 
-    // Redirect to WorkOS SSO authorization
-    const authUrl = new URL('https://api.workos.com/sso/authorize');
+    const providerMap: Record<string, string> = {
+        authkit: 'authkit',
+        github: 'GitHubOAuth',
+        google: 'GoogleOAuth',
+        microsoft: 'MicrosoftOAuth',
+        apple: 'AppleOAuth',
+        salesforce: 'SalesforceOAuth',
+    };
+    const workosProvider = providerMap[provider.toLowerCase()] || 'authkit';
+
+    // Redirect to WorkOS User Management authorization
+    const authUrl = new URL('https://api.workos.com/user_management/authorize');
     authUrl.searchParams.set('client_id', workosClientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('provider', provider === 'github' ? 'authkit' : 'GoogleOAuth');
+    authUrl.searchParams.set('provider', workosProvider);
 
     // P1-01: CSRF state verification
     const state = crypto.randomUUID();

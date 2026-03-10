@@ -17,6 +17,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if services.redis.is_configured:
             try:
                 import redis.asyncio as redis
+
                 self.redis_client = redis.from_url(services.redis.url, decode_responses=True)
             except ImportError:
                 self.redis_client = None
@@ -46,9 +47,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Cleanup old entries (primitive background cleanup)
         if len(self.cache) > 10000:
-            self.cache = {
-                k: v for k, v in self.cache.items() if now - v["start_time"] < self.window_seconds
-            }
+            self.cache = {k: v for k, v in self.cache.items() if now - v["start_time"] < self.window_seconds}
+            # Extreme fallback: if STILL over 10000 active users in the window, clear it to prevent OOM
+            if len(self.cache) > 10000:
+                self.cache.clear()
 
         record = self.cache.get(client_id)
         if not record or now - record["start_time"] > self.window_seconds:

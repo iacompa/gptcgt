@@ -132,6 +132,7 @@ class ParallelDispatcher:
         auth_manager = None
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "auth_manager"):
                 auth_manager = current_app.auth_manager
@@ -158,6 +159,7 @@ class ParallelDispatcher:
         current_mode = "standard"
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "orchestrator"):
                 current_mode = current_app.orchestrator.mode_manager.active_mode.value
@@ -181,9 +183,7 @@ class ParallelDispatcher:
                     logger.warning(f"No API key for {model.provider.value}, skipping {model.name}")
                     continue
 
-            agent = AgentFactory.create_agent(
-                model, api_key=api_key, base_url=base_url, extra_headers=extra_headers
-            )
+            agent = AgentFactory.create_agent(model, api_key=api_key, base_url=base_url, extra_headers=extra_headers)
             slots.append(AgentSlot(agent_id=agent_id, model=model, agent=agent))
 
         if len(slots) < 2:
@@ -226,6 +226,7 @@ class ParallelDispatcher:
             # IMPORTANT: Each agent gets its OWN COPY of context messages
             # Phase 19: Build a custom system prompt injecting this specific model's memory
             from src.core.system_prompt import SystemPromptBuilder
+
             custom_sys = SystemPromptBuilder.build(model_name=slot.model.name)
 
             messages_copy = []
@@ -264,8 +265,11 @@ class ParallelDispatcher:
     AGENT_TIMEOUT_SECONDS = 120  # Per-agent wall-clock ceiling
 
     async def _run_single_agent_with_timeout(
-        self, slot: AgentSlot, messages: list[dict],
-        tools: list[dict] | None, queue: asyncio.Queue,
+        self,
+        slot: AgentSlot,
+        messages: list[dict],
+        tools: list[dict] | None,
+        queue: asyncio.Queue,
     ) -> None:
         """Wrap _run_single_agent with a per-agent timeout ceiling."""
         try:
@@ -278,12 +282,14 @@ class ParallelDispatcher:
             slot.error = f"Agent timed out after {self.AGENT_TIMEOUT_SECONDS}s"
             slot.end_time = time.time()
             logger.warning(f"Agent {slot.agent_id} ({slot.model.name}) timed out")
-            await queue.put({
-                "type": "agent_error",
-                "agent_id": slot.agent_id,
-                "model_name": slot.model.name,
-                "error": slot.error,
-            })
+            await queue.put(
+                {
+                    "type": "agent_error",
+                    "agent_id": slot.agent_id,
+                    "model_name": slot.model.name,
+                    "error": slot.error,
+                }
+            )
 
     async def _run_single_agent(
         self,
@@ -310,6 +316,7 @@ class ParallelDispatcher:
                 final_chunk: AgentResponse | None = None
 
                 import asyncio
+
                 agen = slot.agent.chat_stream(messages)
                 while True:
                     try:
@@ -322,12 +329,14 @@ class ParallelDispatcher:
                         slot.status = "failed"
                         slot.error = error_msg
                         slot.end_time = time.time()
-                        await queue.put({
-                            "type": "agent_error",
-                            "agent_id": slot.agent_id,
-                            "model_name": slot.model.name,
-                            "error": error_msg,
-                        })
+                        await queue.put(
+                            {
+                                "type": "agent_error",
+                                "agent_id": slot.agent_id,
+                                "model_name": slot.model.name,
+                                "error": error_msg,
+                            }
+                        )
                         return
 
                     if chunk.error:
@@ -431,14 +440,10 @@ class ParallelDispatcher:
 
             # Calculate cost
             registry = ModelRegistry()
-            slot.cost_usd = registry.calculate_cost(
-                slot.model.id, slot.input_tokens, slot.output_tokens
-            )
+            slot.cost_usd = registry.calculate_cost(slot.model.id, slot.input_tokens, slot.output_tokens)
 
             # Extract patches from response
-            slot.patch_set = self._diff_extractor.extract(
-                full_response, slot.agent_id, slot.model.name
-            )
+            slot.patch_set = self._diff_extractor.extract(full_response, slot.agent_id, slot.model.name)
             # Populate PatchSet metadata for downstream ELO + cost tracking
             slot.patch_set.cost_usd = slot.cost_usd
             slot.patch_set.generation_time = slot.duration_ms / 1000.0

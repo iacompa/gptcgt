@@ -136,9 +136,7 @@ class AnnotationPanel(Vertical):
                 btn._annotation_action_name = action
                 yield btn
 
-            close_btn = Button(
-                "Close", id="btn-close-annotation", classes="annotation-action-btn", variant="error"
-            )
+            close_btn = Button("Close", id="btn-close-annotation", classes="annotation-action-btn", variant="error")
             yield close_btn
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

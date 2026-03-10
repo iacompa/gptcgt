@@ -91,7 +91,7 @@ class PanelResizer(Widget):
         total = self._start_left_width + self._start_right_width
         if total < 10:
             return
-  # noqa: W293
+        # noqa: W293
         lw = max(5, min(total - 5, lw))
         rw = total - lw
 
@@ -112,17 +112,21 @@ class PanelResizer(Widget):
                 if self._left_panel and self._right_panel and self.parent:
                     # Normalize against visible panel widths only (exclude resizers)
                     # so saved proportions stay stable across layouts/theme changes.
-                    siblings = [child for child in self.parent.children if not isinstance(child, PanelResizer) and child.display]  # noqa: E501
+                    siblings = [
+                        child for child in self.parent.children if not isinstance(child, PanelResizer) and child.display
+                    ]  # noqa: E501
                     total_panel_w = sum(child.outer_size.width for child in siblings)
                     if total_panel_w > 0:
                         lw_pct = self._left_panel.outer_size.width / total_panel_w
                         rw_pct = self._right_panel.outer_size.width / total_panel_w
-                        self.post_message(self.ResizeComplete(
-                            left_id=self.left_panel_id,
-                            left_pct=lw_pct,
-                            right_id=self.right_panel_id,
-                            right_pct=rw_pct
-                        ))
+                        self.post_message(
+                            self.ResizeComplete(
+                                left_id=self.left_panel_id,
+                                left_pct=lw_pct,
+                                right_id=self.right_panel_id,
+                                right_pct=rw_pct,
+                            )
+                        )
 
             self._click_count = 0
             self._left_panel = None

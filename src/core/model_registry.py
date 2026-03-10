@@ -107,9 +107,7 @@ class ModelRegistry:
             cls._instance._loaded = False
         return cls._instance
 
-    def load(
-        self, bundled_path: Path | None = None, custom_models: list[dict] | None = None
-    ) -> None:
+    def load(self, bundled_path: Path | None = None, custom_models: list[dict] | None = None) -> None:
         """Load models from bundled JSON, then overlay custom models."""
         if bundled_path is None:
             bundled_path = Path(__file__).parent.parent / "data" / "models.json"
@@ -127,9 +125,7 @@ class ModelRegistry:
                     dynamic_prices = json.loads(response.read().decode())
                     logger.info("Successfully fetched dynamic model pricing from LiteLLM.")
         except Exception as e:
-            logger.warning(
-                f"Could not fetch dynamic model pricing, falling back to static rates: {e}"
-            )
+            logger.warning(f"Could not fetch dynamic model pricing, falling back to static rates: {e}")
 
         if bundled_path.exists():
             with open(bundled_path) as f:
@@ -143,12 +139,8 @@ class ModelRegistry:
                     out_cost = entry["output_cost_per_mtok"]
                     if entry["id"] in dynamic_prices:
                         dyn_data = dynamic_prices[entry["id"]]
-                        in_cost = (
-                            dyn_data.get("input_cost_per_token", in_cost / 1_000_000) * 1_000_000
-                        )
-                        out_cost = (
-                            dyn_data.get("output_cost_per_token", out_cost / 1_000_000) * 1_000_000
-                        )
+                        in_cost = dyn_data.get("input_cost_per_token", in_cost / 1_000_000) * 1_000_000
+                        out_cost = dyn_data.get("output_cost_per_token", out_cost / 1_000_000) * 1_000_000
 
                     model = ModelDefinition(
                         id=entry["id"],
@@ -189,7 +181,7 @@ class ModelRegistry:
                         display_color=entry.get("display_color", "#FF8800"),
                         display_emoji="🔧",
                         base_url=entry.get("base_url"),
-                        api_key_required=entry.get("api_key_required", False)  # noqa: W291
+                        api_key_required=entry.get("api_key_required", False),  # noqa: W291
                     )
                     self._models[model.id] = model
                     logger.info(f"Registered custom model: {model.id}")
@@ -204,11 +196,7 @@ class ModelRegistry:
 
     def get_models_for_tier(self, tier: QualityTier) -> list[ModelDefinition]:
         return sorted(
-            [
-                m
-                for m in self._models.values()
-                if tier.value in m.quality_tiers and not m.deprecated
-            ],
+            [m for m in self._models.values() if tier.value in m.quality_tiers and not m.deprecated],
             key=lambda m: m.input_cost_per_mtok,
         )
 
@@ -258,7 +246,8 @@ class ModelRegistry:
 
         def _candidates(t: QualityTier, provider: str | None = None) -> list[ModelDefinition]:
             return [
-                m for m in available
+                m
+                for m in available
                 if t.value in m.quality_tiers
                 and m.id not in excluded
                 and (provider is None or m.provider.value == provider)
@@ -322,6 +311,7 @@ class ModelRegistry:
     async def fetch_openrouter_models(self) -> list[dict]:
         """Fetch real-time model list and pricing from OpenRouter."""
         import httpx
+
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get("https://openrouter.ai/api/v1/models")
@@ -332,7 +322,9 @@ class ModelRegistry:
             logger.warning(f"Failed to fetch OpenRouter models: {e}")
             return []
 
-    def register_custom_openrouter_model(self, model_id: str, name: str, tier: QualityTier, openrouter_data: list[dict] | None = None) -> None:
+    def register_custom_openrouter_model(
+        self, model_id: str, name: str, tier: QualityTier, openrouter_data: list[dict] | None = None
+    ) -> None:
         """Register a dynamic OpenRouter model from API data."""
         # Enforce openrouter/ prefix for litellm
         if not model_id.startswith("openrouter/"):
@@ -370,7 +362,7 @@ class ModelRegistry:
             max_output_tokens=8192,
             quality_tiers=[tier.value],
             display_color="#3B82F6",
-            display_emoji="🐋"
+            display_emoji="🐋",
         )
         self._models[model_id] = model
         logger.info(f"Registered dynamic OpenRouter model: {model_id} (${in_cost:.2f} / ${out_cost:.2f})")

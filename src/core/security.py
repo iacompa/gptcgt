@@ -21,7 +21,9 @@ Auto-fix flow for BLOCKED patches:
 from __future__ import annotations
 
 import asyncio
+import fnmatch
 import json
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -309,13 +311,14 @@ class SecurityScanner:
         try:
             from src.tui.widgets.toast import notify  # noqa: I001
             import textual.app as _tapp
+
             app = _tapp.active_app.get()
             app.call_from_thread(
                 notify,
                 title="Security Alert",
                 message=f"Running in reduced scan mode: '{name}' not installed.",
                 severity="warning",
-                timeout=8.0
+                timeout=8.0,
             )
         except Exception as e:
             logger.debug(f"Could not push missing scanner toast: {e}")
@@ -328,11 +331,7 @@ class SecurityScanner:
             for hunk in fp.hunks:
                 for i, line in enumerate(hunk.modified_lines):
                     line_stripped = line.strip()
-                    if (
-                        not line_stripped
-                        or line_stripped.startswith("#")
-                        or line_stripped.startswith("//")
-                    ):
+                    if not line_stripped or line_stripped.startswith("#") or line_stripped.startswith("//"):
                         continue  # Skip comments and blank lines
 
                     for pattern, message, severity, category, cwe_id in SECURITY_PATTERNS:
@@ -373,6 +372,82 @@ class SecurityScanner:
                                 )
                             )
 
+        return findings
+
+    def scan_directory(self, directory: Path | None = None) -> list[SecurityFinding]:
+        """
+        Scan a directory tree using the built-in synchronous patterns.
+
+        This is used by proof generation where we need a deterministic, always-available
+        security gate even when patch-level context is not available.
+        """
+        root = (directory or self._project_root or Path.cwd()).resolve()
+        findings: list[SecurityFinding] = []
+        allowed_suffixes = {".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".toml", ".yaml", ".yml", ".sh"}
+        ignored_patterns = {
+            "node_modules",
+            ".git",
+            "__pycache__",
+            "venv",
+            ".venv",
+            "dist",
+            "build",
+            ".eggs",
+            "*.egg-info",
+            ".tox",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".pytest_cache",
+        }
+
+        for current_root, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not any(fnmatch.fnmatch(d, pattern) for pattern in ignored_patterns)]
+            current_root_path = Path(current_root)
+            for filename in filenames:
+                file_path = current_root_path / filename
+                if file_path.suffix.lower() not in allowed_suffixes:
+                    continue
+                try:
+                    rel_path = str(file_path.relative_to(root))
+                    for line_number, line in enumerate(file_path.read_text(encoding="utf-8").splitlines(), start=1):
+                        line_stripped = line.strip()
+                        if not line_stripped or line_stripped.startswith("#") or line_stripped.startswith("//"):
+                            continue
+
+                        for pattern, message, severity, category, cwe_id in SECURITY_PATTERNS:
+                            if re.search(pattern, line_stripped, re.IGNORECASE):
+                                findings.append(
+                                    SecurityFinding(
+                                        file_path=rel_path,
+                                        line_number=line_number,
+                                        rule_id=f"custom.{category}",
+                                        severity=severity,
+                                        message=message,
+                                        category=category,
+                                        cwe_id=cwe_id,
+                                        source="custom",
+                                    )
+                                )
+
+                        for pattern in self._custom_block_patterns:
+                            if pattern in line:
+                                findings.append(
+                                    SecurityFinding(
+                                        file_path=rel_path,
+                                        line_number=line_number,
+                                        rule_id="project.block-pattern",
+                                        severity="high",
+                                        message=f"Blocked by project rule: '{pattern}'",
+                                        category="project-policy",
+                                        source="project-rules",
+                                    )
+                                )
+                except Exception as e:
+                    logger.warning(f"Failed to scan {file_path}: {e}")
+
+        findings = self._filter_allowed(findings)
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        findings.sort(key=lambda f: severity_order.get(f.severity, 5))
         return findings
 
     async def _run_semgrep(self, patch_set: PatchSet, language: str) -> list[SecurityFinding]:
@@ -483,9 +558,7 @@ class SecurityScanner:
                         severity=severity_map.get(r.get("issue_severity", ""), "medium"),
                         message=r.get("issue_text", "Bandit finding"),
                         category=r.get("issue_cwe", {}).get("link", "general"),
-                        cwe_id=f"CWE-{r.get('issue_cwe', {}).get('id', '')}"
-                        if r.get("issue_cwe")
-                        else None,
+                        cwe_id=f"CWE-{r.get('issue_cwe', {}).get('id', '')}" if r.get("issue_cwe") else None,
                         source="bandit",
                     )
                 )
@@ -498,11 +571,7 @@ class SecurityScanner:
         """Remove findings that match project allow patterns."""
         if not self._custom_allow_patterns:
             return findings
-        return [
-            f
-            for f in findings
-            if not any(pattern in f.message for pattern in self._custom_allow_patterns)
-        ]
+        return [f for f in findings if not any(pattern in f.message for pattern in self._custom_allow_patterns)]
 
     def _categorize_semgrep_rule(self, rule_id: str) -> str:
         """Map semgrep rule IDs to categories."""
@@ -540,12 +609,8 @@ class SecurityScanner:
             lines.append("🟡 Security warnings:")
 
         for f in findings[:5]:  # Show max 5
-            emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "⚪"}.get(
-                f.severity, "⚪"
-            )
-            lines.append(
-                f"  {emoji} [{f.severity.upper()}] {f.file_path}:{f.line_number} — {f.message}"
-            )
+            emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "⚪"}.get(f.severity, "⚪")
+            lines.append(f"  {emoji} [{f.severity.upper()}] {f.file_path}:{f.line_number} — {f.message}")
             if f.cwe_id:
                 lines.append(f"    ({f.cwe_id})")
 

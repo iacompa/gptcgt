@@ -190,6 +190,23 @@ class SettingsScreen(ModalScreen):
         self._update_select_options(openrouter_opts)
 
     def _update_select_options(self, extra_opts: list[tuple[str, str]]) -> None:
+        import re
+        def natural_sort_key(text: str) -> list:
+            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
+
+        def key_fn(opt):
+            lbl, val = opt
+            if not val:
+                return ("000_default", [])
+            if val.startswith("openrouter/"):
+                parts = val.replace("openrouter/", "").split("/")
+                provider = parts[0].lower() if len(parts) >= 2 else "openrouter"
+            elif "/" in val:
+                provider = val.split("/")[0].lower()
+            else:
+                provider = "zzz_other"
+            return (provider, natural_sort_key(lbl))
+
         for select_id in ["#settings-orchestrator", "#settings-coder", "#settings-arbiter", "#settings-architect", "#settings-scout", "#settings-tester"]:  # noqa: E501
             try:
                 sel = self.query_one(select_id, Select)
@@ -198,7 +215,7 @@ class SettingsScreen(ModalScreen):
                 for lbl, val in extra_opts:
                     if val not in existing_vals:
                         new_options.append((lbl, val))
-                sel.set_options(new_options)
+                sel.set_options(sorted(new_options, key=key_fn))
             except Exception:
                 pass
 
@@ -216,7 +233,25 @@ class SettingsScreen(ModalScreen):
         if current_val and current_val not in seen:
             opts.append((f"⚙️ Custom ({current_val})", current_val))
   # noqa: W293
-        return opts
+
+        import re
+        def natural_sort_key(text: str) -> list:
+            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
+
+        def key_fn(opt):
+            lbl, val = opt
+            if not val:
+                return ("000_default", [])
+            if val.startswith("openrouter/"):
+                parts = val.replace("openrouter/", "").split("/")
+                provider = parts[0].lower() if len(parts) >= 2 else "openrouter"
+            elif "/" in val:
+                provider = val.split("/")[0].lower()
+            else:
+                provider = "zzz_other"
+            return (provider, natural_sort_key(lbl))
+
+        return sorted(opts, key=key_fn)
 
     def _compose_api_tab(self):
         yield Label(
@@ -413,12 +448,7 @@ class SettingsScreen(ModalScreen):
             placeholder="e.g. 2.00",
             id="settings-task-spend-limit",
         )
-        yield Label("Max tokens per task:")
-        yield Input(
-            str(c.max_tokens_per_task),
-            placeholder="e.g. 500000",
-            id="settings-task-token-limit",
-        )
+
 
         # Phase 9: Autonomous controls
         yield Label("\nAutonomous Mode:", classes="section-label")
@@ -563,7 +593,7 @@ class SettingsScreen(ModalScreen):
             notify(self.app, "MCP Error", f"Invalid JSON: {e}", "error")
 
     def _test_mcp_servers(self) -> None:
-        from src.tools.mcp_client import MCPManager
+        from src.core.mcp_client import MCPManager
         from src.tui.widgets.toast import notify
         c = self.app.config.user
         mcp_servers = getattr(c, "mcp_servers", [])
@@ -738,12 +768,7 @@ class SettingsScreen(ModalScreen):
                 self.app.config.set_user("max_spend_per_task", float(tsl))
         except Exception:
             pass
-        try:
-            ttl = self.query_one("#settings-task-token-limit", Input).value.strip()
-            if ttl:
-                self.app.config.set_user("max_tokens_per_task", int(ttl))
-        except Exception:
-            pass
+
 
         # Phase 9: Autonomous controls
         try:

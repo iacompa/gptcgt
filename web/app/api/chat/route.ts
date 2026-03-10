@@ -47,34 +47,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Stream the SSE response through to the client
-        const stream = new ReadableStream({
-            async start(controller) {
-                const reader = proxyRes.body?.getReader();
-                if (!reader) {
-                    controller.close();
-                    return;
-                }
+        if (!proxyRes.body) {
+            return Response.json({ error: 'Proxy response body missing' }, { status: 502 });
+        }
 
-                try {
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        controller.enqueue(value);
-                    }
-                } catch (err) {
-                    console.error('Stream error:', err);
-                } finally {
-                    controller.close();
-                }
-            },
-        });
-
-        return new Response(stream, {
+        return new Response(proxyRes.body, {
             headers: {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
             },
         });
     } catch (err: any) {

@@ -37,6 +37,9 @@ class TestResult:
         return (self.passed / total * 100) if total > 0 else 0.0
 
 
+TestResult.__test__ = False
+
+
 class TesterAgent:
     """
     Independent agent that:
@@ -46,10 +49,12 @@ class TesterAgent:
     4. Reports results and updates its own memory file
     """
 
+    __test__ = False
     MAX_TEST_GEN_TOKENS = 2000
 
     def __init__(self) -> None:
         from src.core.model_registry import ModelRegistry
+
         self.registry = ModelRegistry()
 
     async def generate_and_run_tests(
@@ -71,6 +76,7 @@ class TesterAgent:
             return result
 
         from src.core.system_prompt import SystemPromptBuilder
+
         system_prompt = SystemPromptBuilder.build(
             role_type="engineer",
             custom_instructions=(
@@ -81,7 +87,7 @@ class TesterAgent:
                 "If test execution output is returned, read the failure or coverage report "
                 "and rewrite the test code to fix the issues."
             ),
-            model_name="tester"
+            model_name="tester",
         )
         messages = [
             {"role": "system", "content": system_prompt},
@@ -119,13 +125,15 @@ class TesterAgent:
                 test_patch = FilePatch(
                     file_path=f"tests/test_generated_{hash(test_code) % 10000}.py",
                     is_new_file=True,
-                    hunks=[Hunk(
-                        start_line=1,
-                        end_line=1,
-                        original_lines=[],
-                        modified_lines=test_code.splitlines(),
-                        status="approved"
-                    )],
+                    hunks=[
+                        Hunk(
+                            start_line=1,
+                            end_line=1,
+                            original_lines=[],
+                            modified_lines=test_code.splitlines(),
+                            status="approved",
+                        )
+                    ],
                 )
                 test_patch_set = PatchSet(
                     patches=[test_patch],
@@ -152,21 +160,22 @@ class TesterAgent:
                         result.failure_details.append(tr.raw_output[:2000])
                     else:
                         result.failure_details = [
-                            f.get("message", str(f)) if isinstance(f, dict) else str(f)
-                            for f in (tr.failures or [])
+                            f.get("message", str(f)) if isinstance(f, dict) else str(f) for f in (tr.failures or [])
                         ]
 
                     # Adaptive Loop decision
                     if result.failed > 0 or result.errors > 0:
                         logger.info(f"TesterAgent Loop {iteration}: {result.failed}F {result.errors}E. Self-healing...")
                         messages.append({"role": "assistant", "content": test_code})
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                f"The test run failed. Here is the output:\n{tr.raw_output[:2000]}\n"
-                                "Please FIX the code to pass and improve coverage. RETURN ONLY THE RAW CODE."
-                            )
-                        })
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"The test run failed. Here is the output:\n{tr.raw_output[:2000]}\n"
+                                    "Please FIX the code to pass and improve coverage. RETURN ONLY THE RAW CODE."
+                                ),
+                            }
+                        )
                         continue
                     else:
                         logger.info(f"TesterAgent Loop {iteration}: All tests passed!")
@@ -192,6 +201,7 @@ class TesterAgent:
                 return ""
 
             from src.core.config import ConfigManager
+
             config = ConfigManager.get_instance()
             tester_model_id = config.user.tester_model
 
@@ -216,10 +226,12 @@ class TesterAgent:
 
             key_name = PROVIDER_KEY_MAP.get(selected_model.provider.value)
             api_key = KeyChainManager.get_key(key_name) if key_name else None
-  # noqa: W293
+            # noqa: W293
             # Support Custom models without keys
             if not api_key:
-                if selected_model.provider == Provider.CUSTOM and not getattr(selected_model, "api_key_required", False):  # noqa: E501
+                if selected_model.provider == Provider.CUSTOM and not getattr(
+                    selected_model, "api_key_required", False
+                ):  # noqa: E501
                     pass  # Keep going
                 else:
                     logger.warning(f"TesterAgent: Missing key for {selected_model.id}")
@@ -228,7 +240,7 @@ class TesterAgent:
             agent = AgentFactory.create_agent(
                 selected_model,  # noqa: W291
                 api_key=api_key,  # noqa: W291
-                base_url=getattr(selected_model, "base_url", None)
+                base_url=getattr(selected_model, "base_url", None),
             )
             agent.config.max_tokens = self.MAX_TEST_GEN_TOKENS
 
@@ -247,6 +259,7 @@ class TesterAgent:
         """Append learning to .gptcgt/agents/tester.md."""
         try:
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             memory_path = ".gptcgt/agents/tester.md"
 

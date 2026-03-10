@@ -4,9 +4,11 @@ import { Check, Shield, Database, Users, KeyRound, Loader2 } from "lucide-react"
 import Link from "next/link";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { useToast } from "@/components/toaster";
 
 export default function PricingPage() {
     const [loadingPack, setLoadingPack] = useState<number | null>(null);
+    const { pushToast } = useToast();
 
     const handleBuyPack = async (amount: number) => {
         try {
@@ -18,13 +20,21 @@ export default function PricingPage() {
             if (data?.url) {
                 window.location.href = data.url;
             } else {
-                alert("Checkout failed: Unknown error");
+                pushToast({
+                    tone: "error",
+                    title: "Could not open checkout",
+                    description: "The billing service did not return a checkout URL.",
+                });
             }
         } catch (e: any) {
             if (e.message && e.message.includes("Authorization")) {
                 window.location.href = "/auth?redirect_url=/pricing";
             } else {
-                alert("Error initiating checkout: " + e.message);
+                pushToast({
+                    tone: "error",
+                    title: "Credit pack checkout failed",
+                    description: e.message,
+                });
             }
         } finally {
             setLoadingPack(null);
@@ -32,144 +42,148 @@ export default function PricingPage() {
     };
 
     return (
-        <div className="py-24 sm:py-32 max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl text-center">
-                <h2 className="text-base font-semibold leading-7 text-indigo-400">Pricing</h2>
-                <p className="mt-2 text-4xl font-bold tracking-tight text-white sm:text-5xl">
-                    Scale capabilities, not headcount
+        <div className="page-shell page-stack">
+            <div className="hero-panel px-6 py-10 text-center sm:px-10">
+                <p className="eyebrow">Pricing</p>
+                <p className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-slate-950 sm:text-5xl">
+                    Scale capability, not dashboard chaos.
                 </p>
-                <p className="mt-4 text-lg text-gray-400">Use your own API keys for free in the CLI/Terminal, or subscribe for managed credits to unlock the Web UI and zero-config access to every provider.</p>
+                <p className="mx-auto mt-4 max-w-3xl copy-lg">
+                    Use your own keys for the CLI, or subscribe for managed credits that unlock the web workspace, shared billing controls, and faster onboarding for teams.
+                </p>
             </div>
 
-            <div className="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-6 lg:max-w-7xl lg:grid-cols-4">
+            <div className="grid gap-6 lg:grid-cols-4">
                 {/* BYOK Free Tier */}
-                <div className="rounded-3xl p-8 xl:p-10 ring-1 ring-emerald-500/30 bg-emerald-950/10 hover:bg-emerald-950/20 transition-colors flex flex-col justify-between">
+                <div className="panel flex flex-col justify-between p-8">
                     <div>
                         <div className="flex items-center gap-2">
-                            <KeyRound className="h-5 w-5 text-emerald-400" />
-                            <h3 className="text-2xl font-bold text-white">BYOK (CLI)</h3>
+                            <KeyRound className="h-5 w-5 text-[var(--accent)]" />
+                            <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">BYOK (CLI)</h3>
                         </div>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">Bring Your Own Keys. Use your own API keys locally in the CLI/Terminal — pay providers directly.</p>
+                        <p className="mt-4 copy-sm">Bring your own keys. Use your own API accounts locally in the CLI and pay providers directly.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
-                            <span className="text-4xl font-bold tracking-tight text-emerald-400">Free</span>
-                            <span className="text-sm font-semibold leading-6 text-gray-400">forever</span>
+                            <span className="text-4xl font-semibold tracking-[-0.03em] text-[var(--accent)]">Free</span>
+                            <span className="text-sm font-semibold leading-6 text-[var(--text-soft)]">forever</span>
                         </p>
-                        <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> All 6 Operation Modes</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Unlimited Usage</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> 10+ Provider Support</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Local Model Support (Ollama)</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> Secure OS Keychain Storage</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-emerald-400" /> ELO Rankings &amp; Routing</li>
+                        <ul className="mt-8 space-y-3 text-sm leading-6 text-[var(--text-muted)]">
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> All 6 operation modes</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Unlimited usage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> 10+ provider integrations</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Local model support</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> OS keychain storage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> ELO routing and comparisons</li>
                         </ul>
                     </div>
-                    <Link href="/docs/keys" className="mt-8 block rounded-md bg-emerald-500/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-emerald-400 hover:bg-emerald-500/20 ring-1 ring-inset ring-emerald-500/20">
+                    <Link href="/docs/keys" className="btn-secondary mt-8">
                         Get started — it&apos;s free
                     </Link>
                 </div>
 
                 {/* Pro Plan */}
-                <div className="rounded-3xl p-8 xl:p-10 ring-1 ring-gray-800 bg-gray-900/40 hover:bg-gray-900 transition-colors flex flex-col justify-between">
+                <div className="panel flex flex-col justify-between p-8">
                     <div>
-                        <h3 className="text-2xl font-bold text-white">Pro</h3>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">Managed credits — zero config, one subscription for all providers.</p>
+                        <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Pro</h3>
+                        <p className="mt-4 copy-sm">Managed credits and zero-config access across providers for a single developer.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
-                            <span className="text-4xl font-bold tracking-tight text-white">$29</span>
-                            <span className="text-sm font-semibold leading-6 text-gray-400">/month</span>
+                            <span className="text-4xl font-semibold tracking-[-0.03em] text-slate-950">$29</span>
+                            <span className="text-sm font-semibold leading-6 text-[var(--text-soft)]">/month</span>
                         </p>
-                        <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> 1,000 Credits Monthly</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Optional PAYG Overage</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> No API Keys Needed</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Standard Support</li>
+                        <ul className="mt-8 space-y-3 text-sm leading-6 text-[var(--text-muted)]">
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> 1,000 credits monthly</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Optional pay-as-you-go overage</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> No provider keys required</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Standard support</li>
                         </ul>
                     </div>
-                    <Link href="/dashboard/billing" className="mt-8 block rounded-md bg-indigo-500/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-indigo-400 hover:bg-indigo-500/20 ring-1 ring-inset ring-indigo-500/20">
+                    <Link href="/dashboard/billing" className="btn-secondary mt-8">
                         Get started
                     </Link>
                 </div>
 
                 {/* Team Plan */}
-                <div className="rounded-3xl p-8 xl:p-10 bg-gradient-to-b from-indigo-900/40 to-gray-900 ring-2 ring-indigo-500 shadow-2xl relative flex flex-col justify-between">
-                    <div className="absolute top-0 right-6 transform -translate-y-1/2 rounded-full bg-indigo-500 px-3 py-1 text-xs font-semibold text-white">Most popular</div>
+                <div className="hero-panel relative flex flex-col justify-between p-8">
+                    <div className="badge badge-accent absolute right-6 top-0 -translate-y-1/2">Most popular</div>
                     <div>
-                        <h3 className="text-2xl font-bold text-white">Team</h3>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">For engineering teams shipping production features.</p>
+                        <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Team</h3>
+                        <p className="mt-4 copy-sm">For engineering groups that need shared wallet controls, safer automation, and one billing surface.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
-                            <span className="text-4xl font-bold tracking-tight text-white">$49</span>
-                            <span className="text-sm font-semibold leading-6 text-gray-400">/seat/month</span>
+                            <span className="text-4xl font-semibold tracking-[-0.03em] text-slate-950">$49</span>
+                            <span className="text-sm font-semibold leading-6 text-[var(--text-soft)]">/seat/month</span>
                         </p>
-                        <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> 2,000 Credits Monthly</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Hard Spending Caps</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Shared Organization Keys</li>
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Priority Support</li>
+                        <ul className="mt-8 space-y-3 text-sm leading-6 text-[var(--text-muted)]">
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> 2,000 credits monthly per seat</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Hard spending caps</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Shared organization keys</li>
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Priority support</li>
                         </ul>
                     </div>
-                    <Link href="/dashboard/billing" className="mt-8 block rounded-md bg-indigo-500 px-3 py-2 text-center text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+                    <Link href="/dashboard/billing" className="btn-primary mt-8">
                         Start Team Trial
                     </Link>
                 </div>
 
                 {/* Enterprise Plan */}
-                <div className="rounded-3xl p-8 xl:p-10 ring-1 ring-gray-800 bg-gray-900/40 hover:bg-gray-900 transition-colors flex flex-col justify-between">
+                <div className="panel flex flex-col justify-between p-8">
                     <div>
-                        <h3 className="text-2xl font-bold text-white">Enterprise</h3>
-                        <p className="mt-4 text-sm leading-6 text-gray-400">Advanced security and compliance for large orgs.</p>
+                        <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Enterprise</h3>
+                        <p className="mt-4 copy-sm">Advanced security, governance, and organizational workflow support for larger teams.</p>
                         <p className="mt-6 flex items-baseline gap-x-1">
-                            <span className="text-4xl font-bold tracking-tight text-white">$149</span>
-                            <span className="text-sm font-semibold leading-6 text-gray-400">/seat/month</span>
+                            <span className="text-4xl font-semibold tracking-[-0.03em] text-slate-950">$149</span>
+                            <span className="text-sm font-semibold leading-6 text-[var(--text-soft)]">/seat/month</span>
                         </p>
-                        <ul className="mt-8 space-y-3 text-sm leading-6 text-gray-300">
-                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-indigo-400" /> Custom Credit Volumes</li>
-                            <li className="flex gap-x-3"><Shield className="h-6 w-5 flex-none text-indigo-400" /> SOC2 Compliance & Audit Logs</li>
-                            <li className="flex gap-x-3"><Users className="h-6 w-5 flex-none text-indigo-400" /> SAML SSO via WorkOS</li>
-                            <li className="flex gap-x-3"><Database className="h-6 w-5 flex-none text-indigo-400" /> Data Residency Guarantees</li>
+                        <ul className="mt-8 space-y-3 text-sm leading-6 text-[var(--text-muted)]">
+                            <li className="flex gap-x-3"><Check className="h-6 w-5 flex-none text-[var(--accent)]" /> Custom credit volumes</li>
+                            <li className="flex gap-x-3"><Shield className="h-6 w-5 flex-none text-[var(--accent)]" /> Compliance and audit support</li>
+                            <li className="flex gap-x-3"><Users className="h-6 w-5 flex-none text-[var(--accent)]" /> SAML SSO via WorkOS</li>
+                            <li className="flex gap-x-3"><Database className="h-6 w-5 flex-none text-[var(--accent)]" /> Data residency guarantees</li>
                         </ul>
                     </div>
-                    <Link href="mailto:sales@ia-compa.com" className="mt-8 block rounded-md bg-white/10 px-3 py-2 text-center text-sm font-semibold leading-6 text-white hover:bg-white/20">
+                    <Link href="mailto:sales@ia-compa.com" className="btn-secondary mt-8">
                         Contact Sales
                     </Link>
                 </div>
             </div>
 
-            <div className="mt-24 pt-16 border-t border-gray-800 text-center max-w-4xl mx-auto">
-                <h3 className="text-2xl font-bold mb-6">Pay-As-You-Go Credit Packs</h3>
-                <p className="text-gray-400 mb-8">Need extra capacity this month? Purchase non-expiring proxy credits. 1 credit ≈ 1 Scout completion.</p>
+            <div className="panel px-6 py-8 text-center sm:px-8">
+                <h3 className="text-2xl font-semibold tracking-[-0.03em] text-slate-950">Pay-as-you-go credit packs</h3>
+                <p className="mx-auto mt-3 max-w-3xl copy-sm">
+                    Need extra capacity this month? Purchase non-expiring proxy credits for burst work, demos, or one-off migrations.
+                </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
-                        <div className="text-xl font-bold text-white mb-1">100 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$1.00</div>
+                <div className="mt-8 grid gap-6 md:grid-cols-3">
+                    <div className="panel-muted p-6">
+                        <div className="text-xl font-semibold text-slate-950">100 Credits</div>
+                        <div className="mt-2 inline-block rounded-full bg-white/80 px-3 py-1 text-sm text-[var(--text-muted)]">$1.00</div>
                         <button
                             onClick={() => handleBuyPack(100)}
                             disabled={loadingPack !== null}
-                            className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                            className="btn-secondary mt-5 w-full"
                         >
                             {loadingPack === 100 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Buy Pack
                         </button>
                     </div>
-                    <div className="bg-gray-900 border border-indigo-500/50 rounded-xl p-6 relative">
-                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">Value</div>
-                        <div className="text-xl font-bold text-white mb-1">500 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$5.00</div>
+                    <div className="hero-panel relative p-6">
+                        <div className="badge badge-accent absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2">Value</div>
+                        <div className="text-xl font-semibold text-slate-950">500 Credits</div>
+                        <div className="mt-2 inline-block rounded-full bg-white/80 px-3 py-1 text-sm text-[var(--text-muted)]">$5.00</div>
                         <button
                             onClick={() => handleBuyPack(500)}
                             disabled={loadingPack !== null}
-                            className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                            className="btn-primary mt-5 w-full"
                         >
                             {loadingPack === 500 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Buy Pack
                         </button>
                     </div>
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl p-6">
-                        <div className="text-xl font-bold text-white mb-1">1,000 Credits</div>
-                        <div className="text-gray-400 bg-gray-800 rounded px-2 py-0.5 inline-block text-sm mb-4">$10.00</div>
+                    <div className="panel-muted p-6">
+                        <div className="text-xl font-semibold text-slate-950">1,000 Credits</div>
+                        <div className="mt-2 inline-block rounded-full bg-white/80 px-3 py-1 text-sm text-[var(--text-muted)]">$10.00</div>
                         <button
                             onClick={() => handleBuyPack(1000)}
                             disabled={loadingPack !== null}
-                            className="w-full bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded py-2 text-sm font-medium transition flex items-center justify-center gap-2"
+                            className="btn-secondary mt-5 w-full"
                         >
                             {loadingPack === 1000 ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Buy Pack

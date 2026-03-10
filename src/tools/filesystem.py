@@ -63,9 +63,7 @@ def glob_files(pattern: str, max_results: int = 50) -> list[dict]:
     return results
 
 
-def grep_search(
-    query: str, path: str = "", max_results: int = 30, case_sensitive: bool = False
-) -> list[dict]:
+def grep_search(query: str, path: str = "", max_results: int = 30, case_sensitive: bool = False) -> list[dict]:
     """Search file contents for a text pattern within workspace."""
     ws = Workspace.get_instance()
     search_dir = ws.get_project_root() / path if path else ws.get_project_root()
@@ -103,9 +101,7 @@ def grep_search(
             ]:
                 args.append(f"--include=*.{e}")
             args.extend(["--", query, str(search_dir)])
-            proc = subprocess.run(
-                args, capture_output=True, text=True, timeout=10, cwd=str(ws.get_project_root())
-            )
+            proc = subprocess.run(args, capture_output=True, text=True, timeout=10, cwd=str(ws.get_project_root()))
             for line in proc.stdout.splitlines()[:max_results]:
                 parts = line.split(":", 2)
                 if len(parts) >= 3:
@@ -114,9 +110,7 @@ def grep_search(
                     except ValueError:
                         rel = parts[0]
                     if not _should_skip(Path(parts[0]), ws.get_project_root()):
-                        results.append(
-                            {"file": rel, "line": int(parts[1]), "content": parts[2].strip()[:200]}
-                        )
+                        results.append({"file": rel, "line": int(parts[1]), "content": parts[2].strip()[:200]})
             return results[:max_results]
         except Exception:
             pass
@@ -124,11 +118,7 @@ def grep_search(
     # Python fallback
     q = query.lower() if not case_sensitive else query
     for fp in search_dir.rglob("*"):
-        if (
-            not fp.is_file()
-            or _should_skip(fp, ws.get_project_root())
-            or fp.stat().st_size > 500_000
-        ):
+        if not fp.is_file() or _should_skip(fp, ws.get_project_root()) or fp.stat().st_size > 500_000:
             continue
         try:
             content = fp.read_text(encoding="utf-8", errors="replace")

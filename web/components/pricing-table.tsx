@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 
 export function PricingTable({
     onSelectPlan,
-    currentPlan
+    currentPlan,
 }: {
     onSelectPlan?: (plan: string) => void;
     currentPlan?: string;
@@ -14,48 +14,53 @@ export function PricingTable({
             name: "free",
             label: "Free (BYOK)",
             price: "$0",
-            features: ["Bring your own keys", "Basic orchestration", "Community support"]
+            features: ["Bring your own keys", "Local orchestration", "CLI-first usage"],
         },
         {
             name: "pro",
             label: "Pro",
             price: "$29/mo",
-            features: ["1,000 requests/mo", "Proxy hard caps", "Standard support"]
+            features: ["1,000 managed credits", "Optional overage", "Single-user workspace"],
         },
         {
             name: "team",
             label: "Team",
             price: "$49/user/mo",
-            features: ["2,000 requests/mo/user", "Shared API keys", "Priority support"]
-        }
+            features: ["2,000 credits per seat", "Shared wallet", "Stronger controls"],
+        },
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map(p => (
-                <div key={p.name} className={`bg-gray-900 border ${currentPlan === p.name ? 'border-indigo-500' : 'border-gray-800'} rounded-xl p-6 relative`}>
-                    {currentPlan === p.name && (
-                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                            Current Plan
+        <div className="grid gap-4 md:grid-cols-3">
+            {plans.map((plan) => {
+                const isCurrent = currentPlan === plan.name;
+                return (
+                    <div key={plan.name} className={isCurrent ? "hero-panel p-5" : "panel-muted p-5"}>
+                        <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-lg font-semibold tracking-[-0.03em] text-slate-950">{plan.label}</h3>
+                            {isCurrent && <span className="badge badge-accent">Current</span>}
                         </div>
-                    )}
-                    <h3 className="font-bold text-lg">{p.label}</h3>
-                    <div className="text-2xl font-bold my-4">{p.price}</div>
-                    <ul className="space-y-2 mb-6 text-sm text-gray-400">
-                        {p.features.map(f => (
-                            <li key={f} className="flex gap-2"><Check size={16} className="text-indigo-400 shrink-0" /> {f}</li>
-                        ))}
-                    </ul>
-                    {onSelectPlan && currentPlan !== p.name && (
-                        <button
-                            onClick={() => onSelectPlan(p.name)}
-                            className="w-full bg-gray-800 hover:bg-gray-700 text-white rounded py-2 text-sm transition"
-                        >
-                            Select {p.label}
-                        </button>
-                    )}
-                </div>
-            ))}
+                        <p className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{plan.price}</p>
+                        <ul className="mt-5 space-y-3 text-sm text-[var(--text-muted)]">
+                            {plan.features.map((feature) => (
+                                <li key={feature} className="flex gap-2">
+                                    <Check className="mt-0.5 h-4 w-4 flex-none text-[var(--accent)]" />
+                                    {feature}
+                                </li>
+                            ))}
+                        </ul>
+                        {onSelectPlan && !isCurrent && (
+                            <button
+                                type="button"
+                                onClick={() => onSelectPlan(plan.name)}
+                                className="btn-secondary mt-6 w-full"
+                            >
+                                Select {plan.label}
+                            </button>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 }

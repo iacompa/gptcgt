@@ -9,8 +9,10 @@ from src.core.model_registry import QualityTier
 
 logger = get_logger("core.dag_nodes")
 
+
 class InitAnalyzeNode(DAGNode):
     name = "init_analyze"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         ctx.mode_manager.initialize_task(state.global_tier)
@@ -35,8 +37,10 @@ class InitAnalyzeNode(DAGNode):
         )
         return "gather_context"
 
+
 class GatherContextNode(DAGNode):
     name = "gather_context"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         relevant_files = []
@@ -47,21 +51,22 @@ class GatherContextNode(DAGNode):
                 mentioned_symbols=state.analysis_results.get("mentioned_symbols", []),
             )
             if relevant_files:
-                await state.narration_callback(
-                    f"Found {len(relevant_files)} relevant files.", "result"
-                )
+                await state.narration_callback(f"Found {len(relevant_files)} relevant files.", "result")
                 try:
                     import textual.app as _tapp
 
                     from src.core.events import FileRelevanceUpdated
+
                     _tapp.active_app.get().post_message(FileRelevanceUpdated(files=relevant_files))
                 except Exception as e:
                     logger.debug(f"Could not post FileRelevanceUpdated to UI: {e}")
         state.relevant_files = relevant_files
         return "route_task"
 
+
 class RouteTaskNode(DAGNode):
     name = "route_task"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         provider_family = None
@@ -73,26 +78,29 @@ class RouteTaskNode(DAGNode):
         )
         if state.model_selected_callback:
             await state.model_selected_callback("Orchestrator", selected_model.name)
-        await state.narration_callback(
-            f"Routed to {selected_model.name} based on complexity and tier.", "routing"
-        )
+        await state.narration_callback(f"Routed to {selected_model.name} based on complexity and tier.", "routing")
         state.selected_model = selected_model
         return "prepare_blackboard"
 
+
 class PrepareBlackboardNode(DAGNode):
     name = "prepare_blackboard"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         from src.core.workspace import Workspace
+
         ws = Workspace.get_instance()
         gptcgt_dir = ws.get_project_root() / ".gptcgt"
         if not (gptcgt_dir / "project.md").exists():
             from src.core.project_context import ProjectContextGenerator
+
             pcg = ProjectContextGenerator()
             pcg.generate_and_save()
 
         from src.core.blackboard import AgentBlackboard
         from src.core.task_brief import TaskBrief
+
         task_brief = TaskBrief(
             intent=state.intent,
             complexity=state.complexity,
@@ -115,7 +123,7 @@ class PrepareBlackboardNode(DAGNode):
         if existing_plan:
             bb.write("architect_plan", existing_plan, author="architect")
 
-        is_explicit_architect = (ctx.mode_manager.active_mode == OperationMode.ARCHITECT)
+        is_explicit_architect = ctx.mode_manager.active_mode == OperationMode.ARCHITECT
         state.is_architect_task = is_explicit_architect or (state.intent == "architect" and state.complexity >= 7)
         if state.is_architect_task:
             state.intent = "architect"
@@ -124,29 +132,32 @@ class PrepareBlackboardNode(DAGNode):
         if state.intent == "architect_execute":
             return "architect_execute"
 
-        is_standard = (
-            not state.is_architect_task
-            and (
-                ctx.mode_manager.active_mode in (
-                    OperationMode.STANDARD,
-                    OperationMode.SCOUT,
-                ) or ctx.mode_manager.active_mode.name.startswith("SINGLE_MODEL_")
+        is_standard = not state.is_architect_task and (
+            ctx.mode_manager.active_mode
+            in (
+                OperationMode.STANDARD,
+                OperationMode.SCOUT,
             )
+            or ctx.mode_manager.active_mode.name.startswith("SINGLE_MODEL_")
         )
         if is_standard:
             return "standard_execution"
         else:
             return "parallel_execution"
 
+
 class ArchitectPlanNode(DAGNode):
     name = "architect_plan"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         await state.narration_callback("🏗️ Architect Mode: Phase 1 — Generating plan...", "info")
         from src.core.chat_pipeline import ChatPipeline
+
         plan_pipeline = ChatPipeline(ctx.chat_store, state.global_tier)
 
         plan_text = ""
+
         async def capture_plan(chunk: str):
             nonlocal plan_text
             plan_text += chunk
@@ -177,12 +188,14 @@ class ArchitectPlanNode(DAGNode):
             complexity=state.complexity,
         )
         from src.core.blackboard import AgentBlackboard
+
         bb = AgentBlackboard.get_instance()
         bb.write("architect_plan", plan_text, author="architect")
 
         # Fire ArbiterVerdictReady to mount the UX gate
         from src.core.arbiter import ArbiterScore, ArbiterVerdict
         from src.core.events import ArbiterVerdictReady
+
         try:
             import textual.app as _tapp
 
@@ -203,6 +216,7 @@ class ArchitectPlanNode(DAGNode):
             _tapp.active_app.get().post_message(ArbiterVerdictReady(verdict=mock_verdict))
         except Exception as e:
             from src.core.logger import get_logger
+
             get_logger("core.dag").error(f"Failed to post architect verdict: {e}")
 
         # VERY IMPORTANT: Halt execution here. The UX Appoval Panel will create a new task
@@ -210,16 +224,20 @@ class ArchitectPlanNode(DAGNode):
         state.halt_execution = True
         return None
 
+
 class ArchitectExecuteNode(DAGNode):
     name = "architect_execute"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         await state.narration_callback("🏗️ Architect Mode: Phase 2 — Executing plan...", "info")
         from src.core.blackboard import AgentBlackboard
+
         bb = AgentBlackboard.get_instance()
         plan_text = bb.read("architect_plan") or ""
 
         from src.core.chat_pipeline import ChatPipeline
+
         exec_pipeline = ChatPipeline(ctx.chat_store, state.global_tier)
         provider_family = None
         if ctx.mode_manager.active_mode.name.startswith("SINGLE_MODEL_"):
@@ -247,25 +265,32 @@ class ArchitectExecuteNode(DAGNode):
         )
         return "finalize"
 
+
 class StandardExecutionNode(DAGNode):
     name = "standard_execution"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
-        await state.narration_callback(
-            f"Executing task in {ctx.mode_manager.active_mode.name} mode...", "info"
-        )
+        await state.narration_callback(f"Executing task in {ctx.mode_manager.active_mode.name} mode...", "info")
         from src.core.events import AgentStatusUpdate
+
         try:
             import textual.app as _tapp
+
             _tui_app = _tapp.active_app.get()
-            _tui_app.post_message(AgentStatusUpdate(
-                agent_id="orch", model_name=state.selected_model.name if state.selected_model else "AI",
-                status="thinking", detail="Cross-referencing memory...",
-            ))
+            _tui_app.post_message(
+                AgentStatusUpdate(
+                    agent_id="orch",
+                    model_name=state.selected_model.name if state.selected_model else "AI",
+                    status="thinking",
+                    detail="Cross-referencing memory...",
+                )
+            )
         except Exception:
             pass
 
         from src.core.chat_pipeline import ChatPipeline
+
         pipeline = ChatPipeline(ctx.chat_store, state.global_tier)
 
         reflection_hint: str | None = None
@@ -273,6 +298,7 @@ class StandardExecutionNode(DAGNode):
             import textual.app as _tapp
 
             from src.tui.panels.chat import ChatPanel
+
             _chat = _tapp.active_app.get().query_one(ChatPanel)
             if _chat._pending_reflection_hint:
                 reflection_hint = _chat._pending_reflection_hint
@@ -281,6 +307,7 @@ class StandardExecutionNode(DAGNode):
             pass
 
         response_text = ""
+
         async def intercept_yield(chunk: str):
             nonlocal response_text
             response_text += chunk
@@ -289,6 +316,7 @@ class StandardExecutionNode(DAGNode):
         merged_files = list(state.attached_files) if state.attached_files else []
         if state.relevant_files:
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             for rf in state.relevant_files[:10]:
                 rf_path = str(rf)
@@ -336,21 +364,24 @@ class StandardExecutionNode(DAGNode):
         state.agent_texts["orch"] = response_text
 
         confusion_signals = [
-            "I'm not sure", "I don't know", "I cannot determine",
-            "I'm unable to", "beyond my capabilities",
+            "I'm not sure",
+            "I don't know",
+            "I cannot determine",
+            "I'm unable to",
+            "beyond my capabilities",
         ]
         has_confusion_signal = any(sig.lower() in response_text.lower() for sig in confusion_signals)
         is_short = len(response_text.strip()) < 200
         # Require BOTH short AND confusion keyword; skip entirely for question intents
-        is_confused = (
-            is_short and has_confusion_signal
-            and state.intent != "question"
-        )
+        is_confused = is_short and has_confusion_signal and state.intent != "question"
         if is_confused and state.global_tier != QualityTier.MAX:
             try:
                 max_model = ctx.router.route_task(
-                    state.intent, 10, QualityTier.MAX, role="coder",
-                    provider_family=state.selected_model.provider.value if state.selected_model else None
+                    state.intent,
+                    10,
+                    QualityTier.MAX,
+                    role="coder",
+                    provider_family=state.selected_model.provider.value if state.selected_model else None,
                 )
                 if max_model.id != state.selected_model.id:
                     await state.narration_callback(f"⚡ Escalating to {max_model.name} (confusion detected)", "routing")
@@ -372,8 +403,10 @@ class StandardExecutionNode(DAGNode):
 
         return "finalize"
 
+
 class ParallelExecutionNode(DAGNode):
     name = "parallel_execution"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         await state.narration_callback(f"Executing task in {ctx.mode_manager.active_mode.name} mode...", "info")
@@ -408,6 +441,7 @@ class ParallelExecutionNode(DAGNode):
         models = ctx.router.get_parallel_models(count)
 
         from src.core.system_prompt import SystemPromptBuilder
+
         sys_prompt = SystemPromptBuilder.build(model_name="orchestrator")
         context_messages = [{"role": "system", "content": sys_prompt}]
         for f in state.attached_files:
@@ -415,10 +449,12 @@ class ParallelExecutionNode(DAGNode):
         context_messages.append({"role": "user", "content": state.user_input})
 
         from src.tools.tool_registry import get_tool_definitions
+
         tools = get_tool_definitions()
 
         if ctx.mode_manager.active_mode == OperationMode.ARCHITECT:
             from src.core.architect import ArchitectPipeline
+
             arch_pipeline = ArchitectPipeline(dispatcher, arbiter)
             event_stream = arch_pipeline.run_planning_phase(state.user_input, context_messages, models, tools)
         else:
@@ -432,15 +468,32 @@ class ParallelExecutionNode(DAGNode):
 
             if event["type"] == "dispatch_started":
                 current_dispatch_id = event["dispatch_id"]
-                _tui_app.post_message(ParallelDispatchStarted(current_dispatch_id, ctx.mode_manager.active_mode.name, event["agents"]))  # noqa: E501
+                _tui_app.post_message(
+                    ParallelDispatchStarted(current_dispatch_id, ctx.mode_manager.active_mode.name, event["agents"])
+                )  # noqa: E501
             elif event["type"] == "agent_chunk":
                 agent_id = event["agent_id"]
                 agent_texts[agent_id] = agent_texts.get(agent_id, "") + event["text"]
-                _tui_app.post_message(MultiAgentChunk(dispatch_id=current_dispatch_id, agent_id=agent_id, text=event["text"]))  # noqa: E501
+                _tui_app.post_message(
+                    MultiAgentChunk(dispatch_id=current_dispatch_id, agent_id=agent_id, text=event["text"])
+                )  # noqa: E501
             elif event["type"] == "agent_tool_call":
-                _tui_app.post_message(MultiAgentToolCall(dispatch_id=current_dispatch_id, agent_id=event["agent_id"], tool_name=event["tool_name"], args=event["args"]))  # noqa: E501
+                _tui_app.post_message(
+                    MultiAgentToolCall(
+                        dispatch_id=current_dispatch_id,
+                        agent_id=event["agent_id"],
+                        tool_name=event["tool_name"],
+                        args=event["args"],
+                    )
+                )  # noqa: E501
             elif event["type"] == "agent_complete":
-                _tui_app.post_message(ParallelAgentComplete(dispatch_id=current_dispatch_id, agent_id=event["agent_id"], result={"duration_ms": event.get("duration_ms", 0), "cost_usd": event.get("cost_usd", 0.0)}))  # noqa: E501
+                _tui_app.post_message(
+                    ParallelAgentComplete(
+                        dispatch_id=current_dispatch_id,
+                        agent_id=event["agent_id"],
+                        result={"duration_ms": event.get("duration_ms", 0), "cost_usd": event.get("cost_usd", 0.0)},
+                    )
+                )  # noqa: E501
             elif event["type"] == "error":
                 if state.error_callback:
                     await state.error_callback(event.get("error", "Unknown error"))
@@ -449,17 +502,20 @@ class ParallelExecutionNode(DAGNode):
                 _tui_app.post_message(ParallelDispatchComplete(dispatch))
                 if ctx.mode_manager.active_mode != OperationMode.ARCHITECT:
                     await state.narration_callback("Running 6-stage Arbiter evaluation on patches...", "info")
+
                     async def on_progress(stage, agent_id, detail):
                         await state.narration_callback(f"Arbiter [{stage}]: {detail}", "decision")
 
+                    lang = "python"
+                    if hasattr(ws, "config") and hasattr(ws.config, "project"):
+                        lang = ws.config.project.primary_language or "python"
                     verdict = await arbiter.evaluate(
-                        dispatch, project_root,
-                        ctx.workspace.config.project.primary_language or "python",
-                        on_progress=on_progress, intent=state.intent
+                        dispatch, project_root, lang, on_progress=on_progress, intent=state.intent
                     )
                     _tui_app.post_message(ArbiterVerdictReady(verdict))
 
                     from src.core.diff_engine import MultiAgentPatchSet
+
                     valid_patches = [s.patch_set for s in verdict.scores if s.patch_set and not s.eliminated]
                     if valid_patches:
                         multi_ps = MultiAgentPatchSet(patch_sets=valid_patches)
@@ -474,6 +530,7 @@ class ParallelExecutionNode(DAGNode):
 
 class FinalizeNode(DAGNode):
     name = "finalize"
+
     async def execute(self, state: TaskState, ctx: Any) -> str | None:
         await self._check_cancel(state)
         for text in state.agent_texts.values():

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -8,18 +9,27 @@ from api.config import settings
 from api.database import close_db_pool, init_db_pool
 from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
-from api.routes import api_keys, auth, billing, github, proxy, team, team_invites, usage, users
+from api.routes import api_keys, auth, billing, github, hub, models, proxy, team, team_invites, usage, users
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
+
+
+from api.workers.deduction_worker import process_deductions_loop  # noqa: E402
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup actions
     await init_db_pool()
+    worker_task = asyncio.create_task(process_deductions_loop())
     yield
     # Shutdown actions
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
     await close_db_pool()
 
 
@@ -60,7 +70,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(usage.router, prefix="/usage")
+app.include_router(models.router, prefix="/models")
 app.include_router(proxy.router, prefix="/proxy")
+app.include_router(hub.router, prefix="/hub")
 
 
 @app.get("/health")

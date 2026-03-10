@@ -119,6 +119,7 @@ class Orchestrator:
             import textual.app as _tapp
 
             from src.core.events import AnnotationsReady
+
             current_app = _tapp.active_app.get()
             for fp, anns in file_annotations.items():
                 current_app.post_message(AnnotationsReady(file_path=fp, annotations=anns))
@@ -129,22 +130,23 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"Failed to post AnnotationsReady event: {e}")
 
-    async def _analyze_intent_and_scope(
-        self, text: str, files: list[dict], tier: QualityTier
-    ) -> dict[str, Any]:
+    async def _analyze_intent_and_scope(self, text: str, files: list[dict], tier: QualityTier) -> dict[str, Any]:
         """Uses a lightning-fast QualityTier.LIGHT LLM model to mathematically analyze complexity."""
         from src.core.events import AgentStatusUpdate
         from src.core.intent_analyzer import IntentAnalyzer
 
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
-            current_app.post_message(AgentStatusUpdate(
-                agent_id="orch",
-                model_name="Orchestrator",
-                status="thinking",
-                detail="Analyzing complexity...",
-            ))
+            current_app.post_message(
+                AgentStatusUpdate(
+                    agent_id="orch",
+                    model_name="Orchestrator",
+                    status="thinking",
+                    detail="Analyzing complexity...",
+                )
+            )
         except Exception:
             pass
 
@@ -156,13 +158,16 @@ class Orchestrator:
 
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
-            current_app.post_message(AgentStatusUpdate(
-                agent_id="orch",
-                model_name="Orchestrator",
-                status="completed",
-                detail="",
-            ))
+            current_app.post_message(
+                AgentStatusUpdate(
+                    agent_id="orch",
+                    model_name="Orchestrator",
+                    status="completed",
+                    detail="",
+                )
+            )
         except Exception:
             pass
 

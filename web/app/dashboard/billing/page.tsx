@@ -1,212 +1,272 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CreditCard, ShieldAlert, Wallet } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { CreditCard, ShieldAlert } from "lucide-react";
+import { useToast } from "@/components/toaster";
 
 export default function BillingPage() {
     const [status, setStatus] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [teamSeats, setTeamSeats] = useState(5);
     const [creditAmount, setCreditAmount] = useState(500);
+    const [capInput, setCapInput] = useState("");
+    const { pushToast } = useToast();
 
-    useEffect(() => {
-        loadStatus();
-    }, []);
-
-    const loadStatus = async () => {
+    const loadStatus = useCallback(async () => {
         try {
             const { data, error } = await apiClient.GET("/billing/status");
             if (error) throw error;
-            setStatus(data as any);
-        } catch (e) {
-            console.error(e);
+            const nextStatus = data as any;
+            setStatus(nextStatus);
+            setCapInput(nextStatus?.spending_cap ? String(nextStatus.spending_cap) : "");
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Could not load billing status",
+                description: error.message,
+            });
         } finally {
             setLoading(false);
+        }
+    }, [pushToast]);
+
+    useEffect(() => {
+        void loadStatus();
+    }, [loadStatus]);
+
+    const redirectToBillingUrl = async (task: () => Promise<any>, failureTitle: string) => {
+        try {
+            const { data, error } = await task();
+            if (error) throw error;
+            if (data?.url) {
+                window.location.href = data.url;
+                return;
+            }
+            throw new Error("The billing service did not return a redirect URL.");
+        } catch (error: any) {
+            pushToast({
+                tone: "error",
+                title: failureTitle,
+                description: error.message || "Please try again.",
+            });
         }
     };
 
     const handleCheckout = async (plan: string, quantity: number = 1) => {
-        try {
-            const { data, error } = await apiClient.POST("/billing/checkout", {
-                body: { plan, annual: false, quantity } as any
-            });
-            if (error) throw error;
-            if (data?.url) window.location.href = data.url;
-        } catch (e) {
-            alert("Checkout failed");
-        }
+        await redirectToBillingUrl(
+            () =>
+                apiClient.POST("/billing/checkout", {
+                    body: { plan, annual: false, quantity } as any,
+                }),
+            "Checkout failed"
+        );
     };
 
     const handlePortal = async () => {
-        try {
-            const { data, error } = await apiClient.POST("/billing/portal");
-            if (error) throw error;
-            if (data?.url) window.location.href = data.url;
-        } catch (e) {
-            alert("Portal access failed");
-        }
+        await redirectToBillingUrl(() => apiClient.POST("/billing/portal"), "Portal access failed");
     };
 
     const handlePurchaseCredits = async () => {
+        await redirectToBillingUrl(
+            () =>
+                apiClient.POST("/billing/credits", {
+                    body: { credit_amount: creditAmount } as any,
+                }),
+            "Credit purchase failed"
+        );
+    };
+
+    const handleUpdateCap = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const value = capInput.trim() === "" ? null : parseInt(capInput, 10);
         try {
-            const { data, error } = await apiClient.POST("/billing/credits", {
-                body: { credit_amount: creditAmount } as any
+            const { error } = await apiClient.PATCH("/user/me/spending_cap", {
+                body: { spending_cap: value },
             });
             if (error) throw error;
-            if (data?.url) window.location.href = data.url;
-        } catch (e) {
-            alert("Failed to initiate credit purchase");
+            await loadStatus();
+            pushToast({
+                tone: "success",
+                title: "Spending cap updated",
+                description: value === null ? "Monthly overage cap removed." : `Cap set to $${value}.`,
+            });
+        } catch (error: any) {
+            pushToast({
+                tone: "error",
+                title: "Could not update spending cap",
+                description: error.message,
+            });
         }
     };
 
-    const handleUpdateCap = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const fd = new FormData(e.target as HTMLFormElement);
-        const cap = fd.get("cap") ? parseInt(fd.get("cap") as string) : null;
-
-        try {
-            const { error } = await apiClient.PATCH("/user/me/spending_cap", {
-                body: { spending_cap: cap }
-            });
-            if (error) throw error;
-            loadStatus();
-            alert("Spending cap updated");
-        } catch (e) {
-            alert("Failed to update cap");
-        }
+    if (loading) {
+        return <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">Loading billing data...</div>;
     }
 
-    if (loading) return <div>Loading billing data...</div>;
-
     return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-2xl font-bold">Billing & Usage</h1>
-                <p className="text-gray-400 mt-1">Manage your active plans, credits, and spend limits.</p>
-            </div>
+        <div className="page-stack">
+            <section className="hero-panel p-6 sm:p-8">
+                <p className="eyebrow">Billing</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                    Manage plans, caps, and credit top-ups without leaving the workspace.
+                </h1>
+                <p className="mt-3 max-w-3xl copy-lg">
+                    Subscription state, wallet balance, renewal timing, and overage controls should feel operational, not hidden.
+                </p>
+            </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {status?.billing_access ? (
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <h3 className="font-bold mb-4 flex items-center gap-2"><CreditCard /> Subscription Details</h3>
-                        <div className="space-y-4">
-                            <div className="flex justify-between border-b border-gray-800 pb-2">
-                                <span className="text-gray-400">Company Plan</span>
-                                <span className="font-medium capitalize">{status?.plan || "Free"} ({status?.subscription_status})</span>
-                            </div>
-                            <div className="flex justify-between border-b border-gray-800 pb-2">
-                                <span className="text-gray-400">Team Wallet Remaining</span>
-                                <span className="font-bold text-indigo-400">{status?.credits_remaining} <span className="text-sm font-normal text-gray-500">/ {status?.credits_monthly}</span></span>
-                            </div>
-                            {status?.current_period_end && (
-                                <div className="flex justify-between border-b border-gray-800 pb-2">
-                                    <span className="text-gray-400">Renews On</span>
-                                    <span>{new Date(status.current_period_end).toLocaleDateString()}</span>
-                                </div>
-                            )}
+            <section className="grid gap-4 md:grid-cols-3">
+                <div className="metric-card">
+                    <p className="metric-label">Plan</p>
+                    <p className="mt-3 text-3xl font-semibold capitalize tracking-[-0.04em] text-slate-950">
+                        {status?.plan || "Free"}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">{status?.subscription_status || "inactive"}</p>
+                </div>
+                <div className="metric-card">
+                    <p className="metric-label">Wallet balance</p>
+                    <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                        {status?.credits_remaining?.toLocaleString?.() ?? status?.credits_remaining ?? "—"}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
+                        of {status?.credits_monthly?.toLocaleString?.() ?? status?.credits_monthly ?? "—"} monthly credits
+                    </p>
+                </div>
+                <div className="metric-card">
+                    <p className="metric-label">Renewal</p>
+                    <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                        {status?.current_period_end ? new Date(status.current_period_end).toLocaleDateString() : "N/A"}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">Current billing cycle end</p>
+                </div>
+            </section>
+
+            {status?.billing_access ? (
+                <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                    <div className="panel p-6">
+                        <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-[var(--accent)]" />
+                            <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Subscription controls</h2>
                         </div>
-                        <div className="mt-6 flex gap-4">
-                            {status?.subscription_status === "active" ? (
-                                <button onClick={handlePortal} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm font-medium w-full text-center">
-                                    Manage Subscription
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                            <div className="panel-muted p-5">
+                                <p className="metric-label">Pro</p>
+                                <p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">$29/mo</p>
+                                <p className="mt-2 text-sm text-[var(--text-muted)]">Single-user managed credits with optional overage.</p>
+                                <button type="button" onClick={() => handleCheckout("pro", 1)} className="btn-secondary mt-5 w-full">
+                                    Choose Pro
                                 </button>
-                            ) : (
-                                <div className="space-y-4 w-full">
-                                    <button onClick={() => handleCheckout("pro", 1)} className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-sm font-medium w-full text-center">
-                                        Upgrade to Pro ($29/mo)
-                                    </button>
-
-                                    <div className="p-4 border border-gray-800 rounded-lg bg-gray-900 shadow-inner">
-                                        <h4 className="font-bold text-sm mb-3">Team Workspace</h4>
-                                        <div className="flex items-center justify-between mb-4">
-                                            <span className="text-sm text-gray-400">Seats ($49/user/mo)</span>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="100"
-                                                value={teamSeats}
-                                                onChange={(e) => setTeamSeats(Math.max(1, parseInt(e.target.value) || 1))}
-                                                className="w-20 bg-gray-950 border border-gray-700 rounded px-3 py-1 text-sm text-center focus:outline-none focus:border-indigo-500"
-                                            />
-                                        </div>
-                                        <button onClick={() => handleCheckout("team", teamSeats)} className="bg-gray-800 border border-gray-700 hover:bg-gray-700 px-4 py-2 rounded text-sm font-medium w-full text-center">
-                                            Upgrade to Team (${49 * teamSeats}/mo)
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <h3 className="font-bold mb-4 flex items-center gap-2"><CreditCard /> My Engineering Quota</h3>
-                        <p className="text-sm text-gray-400 mb-6">You are a Member of an Enterprise Workspace. Your Team Manager assigns your credit limits.</p>
-                        <div className="space-y-4">
-                            <div className="flex justify-between border-b border-gray-800 pb-2">
-                                <span className="text-gray-400">My Monthly Quota</span>
-                                <span className="font-medium">{status?.allocated_quota ? status.allocated_quota.toLocaleString() : "Unlimited (Using Team Wallet)"}</span>
+                            </div>
+                            <div className="hero-panel p-5">
+                                <p className="metric-label">Team</p>
+                                <p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">$49/seat/mo</p>
+                                <p className="mt-2 text-sm text-[var(--text-muted)]">Shared wallet, org keys, and stronger control surfaces.</p>
+                                <label className="mt-4 block text-sm font-medium text-slate-900">Seats</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={teamSeats}
+                                    onChange={(event) => setTeamSeats(Math.max(1, parseInt(event.target.value || "1", 10)))}
+                                    className="field mt-2"
+                                />
+                                <button type="button" onClick={() => handleCheckout("team", teamSeats)} className="btn-primary mt-4 w-full">
+                                    Start Team
+                                </button>
                             </div>
                         </div>
+                        <div className="soft-divider my-6" />
+                        <button type="button" onClick={handlePortal} className="btn-secondary">
+                            Manage subscription in Stripe
+                        </button>
                     </div>
-                )}
 
-                {status?.billing_access && (
-                    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                        <h3 className="font-bold mb-4 flex items-center gap-2 text-amber-500"><ShieldAlert /> Spending Caps</h3>
-                        <p className="text-sm text-gray-400 mb-6">Set a hard limit on monthly metered overage. The proxy will block all API requests once reached.</p>
-
-                        <form onSubmit={handleUpdateCap} className="space-y-4 mb-8">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Monthly Limit ($)</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <div className="space-y-6">
+                        <div className="panel p-6">
+                            <div className="flex items-center gap-2">
+                                <ShieldAlert className="h-5 w-5 text-[var(--amber)]" />
+                                <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Monthly overage guardrail</h2>
+                            </div>
+                            <form onSubmit={handleUpdateCap} className="mt-5 space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-900">Hard cap ($)</label>
                                     <input
                                         type="number"
-                                        name="cap"
-                                        defaultValue={status?.spending_cap || ""}
+                                        value={capInput}
+                                        onChange={(event) => setCapInput(event.target.value)}
                                         placeholder="No limit"
-                                        className="w-full bg-gray-950 border border-gray-700 rounded-md py-2 pl-8 pr-4 text-white focus:outline-none focus:border-amber-500"
+                                        className="field"
                                     />
                                 </div>
+                                <p className="text-sm text-[var(--text-muted)]">
+                                    Requests are blocked once metered overage reaches this number.
+                                </p>
+                                <button type="submit" className="btn-secondary">
+                                    Save cap
+                                </button>
+                            </form>
+                        </div>
+
+                        <div className="panel p-6">
+                            <div className="flex items-center gap-2">
+                                <Wallet className="h-5 w-5 text-[var(--accent)]" />
+                                <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Top up wallet</h2>
                             </div>
-                            <button type="submit" className="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white px-4 py-2 rounded text-sm font-medium w-full">
-                                Save Limit
-                            </button>
-                        </form>
-
-                        <div className="pt-6 border-t border-gray-800">
-                            <h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-400"><CreditCard /> Top-Up Team Wallet</h3>
-                            <p className="text-sm text-gray-400 mb-4">Pay-as-you-go credits for immediate use by your entire Team Workspace. Credits never expire.</p>
-
-                            <div className="bg-gray-950 border border-gray-800 rounded-lg p-4 mb-4">
-                                <div className="flex justify-between items-center mb-6">
-                                    <span className="text-2xl font-bold text-white">{creditAmount.toLocaleString()} <span className="text-sm text-gray-500 font-normal">Credits</span></span>
-                                    <span className="text-xl text-emerald-400 font-medium">${(creditAmount * 0.01).toFixed(2)}</span>
+                            <p className="mt-3 text-sm text-[var(--text-muted)]">
+                                Non-expiring credits for burst demand, shared immediately across the team workspace.
+                            </p>
+                            <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-white/70 p-5">
+                                <div className="flex items-end justify-between gap-4">
+                                    <div>
+                                        <p className="metric-label">Purchase size</p>
+                                        <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                                            {creditAmount.toLocaleString()} credits
+                                        </p>
+                                    </div>
+                                    <p className="text-2xl font-semibold tracking-[-0.03em] text-[var(--accent)]">
+                                        ${(creditAmount * 0.01).toFixed(2)}
+                                    </p>
                                 </div>
-
                                 <input
                                     type="range"
                                     min="100"
                                     max="50000"
                                     step="100"
                                     value={creditAmount}
-                                    onChange={(e) => setCreditAmount(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    onChange={(event) => setCreditAmount(parseInt(event.target.value, 10))}
+                                    className="mt-6 w-full accent-[var(--accent)]"
                                 />
-                                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                                <div className="mt-2 flex justify-between text-xs text-[var(--text-soft)]">
                                     <span>100</span>
                                     <span>50,000</span>
                                 </div>
                             </div>
-
-                            <button onClick={handlePurchaseCredits} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-lg text-sm font-bold w-full shadow-lg shadow-emerald-900/20 transition-all">
-                                Purchase {creditAmount.toLocaleString()} Credits for Team
+                            <button type="button" onClick={handlePurchaseCredits} className="btn-primary mt-5 w-full">
+                                Purchase credits
                             </button>
                         </div>
                     </div>
-                )}
-            </div>
+                </section>
+            ) : (
+                <section className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-[var(--accent)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Team-assigned quota</h2>
+                    </div>
+                    <p className="mt-3 max-w-2xl text-sm text-[var(--text-muted)]">
+                        You are using a shared enterprise workspace. Your team admin controls the wallet and your quota allocation.
+                    </p>
+                    <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-white/70 p-5">
+                        <p className="metric-label">Allocated quota</p>
+                        <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+                            {status?.allocated_quota ? status.allocated_quota.toLocaleString() : "Unlimited"}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--text-muted)]">Using the shared team wallet</p>
+                    </div>
+                </section>
+            )}
         </div>
     );
 }

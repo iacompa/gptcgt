@@ -22,6 +22,15 @@ async def run_migration():
         "002_billing_moderation.sql",
         "003_tos_tracking.sql",
         "004_api_key_hashes.sql",
+        "005_deduction_queue.sql",
+        "006_webhook_events.sql",
+        "007_github_columns.sql",
+        "008_team_invites.sql",
+        "009_partitions.sql",
+        "010_hub_runs.sql",
+        "011_runtime_parity.sql",
+        "012_hub_run_workspace.sql",
+        "013_device_auth_sessions.sql",
     ]
 
     print("Connecting to database...")
@@ -36,12 +45,15 @@ async def run_migration():
 
             sql = schema_path.read_text()
             print(f"Applying schema {migration}...")
-            await conn.execute(sql)
+            # Run in a transaction so failures roll back safely
+            async with conn.transaction():
+                await conn.execute(sql)
 
         print("All schemas applied successfully!")
 
     except Exception as e:
-        print(f"Migration failed at {migration}: {e}")
+        print(f"Migration failed unexpectedly: {e}")
+        raise
     finally:
         if "conn" in locals():
             await conn.close()

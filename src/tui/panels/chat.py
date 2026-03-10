@@ -57,10 +57,16 @@ def apply_brand_colors(text: str) -> str:
 
     # Skip if text already contains Rich markup tags (e.g. [bold], [#color], [/foo])
     # but allow plain brackets like JSON arrays or markdown links
-    if re.search(r'\[/?[a-z#]', text):
+    if re.search(r"\[/?[a-z#]", text):
         return text
 
-    return re.sub(r'\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b', replacer, text, flags=re.IGNORECASE)  # noqa: E501
+    return re.sub(
+        r"\b(chatgpt|gpt|chat|openai|claude|sonnet|opus|haiku|anthropic|grok|xai|gemini|deepseek|google|teamtalk|team|talk|openrouter)\b",
+        replacer,
+        text,
+        flags=re.IGNORECASE,
+    )  # noqa: E501
+
 
 class AnimatedWelcome(Static):
     DEFAULT_CSS = """
@@ -71,16 +77,77 @@ class AnimatedWelcome(Static):
         width: 100%;
     }
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.step = 0
         self.frames = [
-            [("ChatGPT", "#34D399"), (" ", ""), ("Claude", "#FB923C"), (" ", ""), ("Grok", "#9CA3AF"), (" ", ""), ("Gemini", "#60A5FA"), (" ", ""), ("TeamTalk", "#A78BFA")],  # noqa: E501
-            [("hatGPT", "#34D399"), (" ", ""), ("Claud", "#FB923C"), (" ", ""), ("rok", "#9CA3AF"), (" ", ""), ("Gemin", "#60A5FA"), (" ", ""), ("eamTal", "#A78BFA")],  # noqa: E501
-            [("atGPT", "#34D399"), (" ", ""), ("Clau", "#FB923C"), (" ", ""), ("ok", "#9CA3AF"), (" ", ""), ("Gemi", "#60A5FA"), (" ", ""), ("amTa", "#A78BFA")],  # noqa: E501
-            [("tGPT", "#34D399"), (" ", ""), ("Cla", "#FB923C"), (" ", ""), ("k", "#9CA3AF"), (" ", ""), ("Gem", "#60A5FA"), (" ", ""), ("mT", "#A78BFA")],  # noqa: E501
-            [("GPT", "#34D399"), (" ", ""), ("Cl", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("Ge", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],  # noqa: E501
-            [("GPT", "#34D399"), (" ", ""), ("C", "#FB923C"), (" ", ""), ("", "#9CA3AF"), ("", ""), ("G", "#60A5FA"), (" ", ""), ("T", "#A78BFA")],  # noqa: E501
+            [
+                ("ChatGPT", "#34D399"),
+                (" ", ""),
+                ("Claude", "#FB923C"),
+                (" ", ""),
+                ("Grok", "#9CA3AF"),
+                (" ", ""),
+                ("Gemini", "#60A5FA"),
+                (" ", ""),
+                ("TeamTalk", "#A78BFA"),
+            ],  # noqa: E501
+            [
+                ("hatGPT", "#34D399"),
+                (" ", ""),
+                ("Claud", "#FB923C"),
+                (" ", ""),
+                ("rok", "#9CA3AF"),
+                (" ", ""),
+                ("Gemin", "#60A5FA"),
+                (" ", ""),
+                ("eamTal", "#A78BFA"),
+            ],  # noqa: E501
+            [
+                ("atGPT", "#34D399"),
+                (" ", ""),
+                ("Clau", "#FB923C"),
+                (" ", ""),
+                ("ok", "#9CA3AF"),
+                (" ", ""),
+                ("Gemi", "#60A5FA"),
+                (" ", ""),
+                ("amTa", "#A78BFA"),
+            ],  # noqa: E501
+            [
+                ("tGPT", "#34D399"),
+                (" ", ""),
+                ("Cla", "#FB923C"),
+                (" ", ""),
+                ("k", "#9CA3AF"),
+                (" ", ""),
+                ("Gem", "#60A5FA"),
+                (" ", ""),
+                ("mT", "#A78BFA"),
+            ],  # noqa: E501
+            [
+                ("GPT", "#34D399"),
+                (" ", ""),
+                ("Cl", "#FB923C"),
+                (" ", ""),
+                ("", "#9CA3AF"),
+                ("", ""),
+                ("Ge", "#60A5FA"),
+                (" ", ""),
+                ("T", "#A78BFA"),
+            ],  # noqa: E501
+            [
+                ("GPT", "#34D399"),
+                (" ", ""),
+                ("C", "#FB923C"),
+                (" ", ""),
+                ("", "#9CA3AF"),
+                ("", ""),
+                ("G", "#60A5FA"),
+                (" ", ""),
+                ("T", "#A78BFA"),
+            ],  # noqa: E501
             [("GPT", "#34D399"), ("C", "#FB923C"), ("G", "#60A5FA"), ("T", "#A78BFA")],
             [("gpt", "#34D399"), ("c", "#FB923C"), ("g", "#60A5FA"), ("t", "#A78BFA")],
         ]
@@ -105,6 +172,7 @@ class AnimatedWelcome(Static):
 
         t.append(" 👋\n\nTry asking:", style="bold")
         return t
+
 
 logger = get_logger("tui.chat")
 
@@ -219,6 +287,8 @@ class ChatMessage(Static):
     _current_streaming_label: Label | None = None
     _streaming_labels: list[Label] = []
     _current_streaming_text: str = ""
+    _chunk_flush_timer = None
+    _pending_chunks: list[str] = []
 
     def __init__(self, role: str, content: str, name: str = "", time_str: str = "", **kwargs):
         super().__init__(**kwargs)
@@ -230,12 +300,15 @@ class ChatMessage(Static):
         from src.tui.widgets.collapsible_code import StreamingCodeParser
 
         self.parser = StreamingCodeParser()
-        # The following were moved to class attributes with default values:
-        # self._streaming_labels: list[Label] = []
-        # self._current_streaming_label: Label | None = None
+        self._streaming_labels = []
+        self._current_streaming_label = None
+        self._current_streaming_text = ""
+        self._pending_chunks = []
+        self._chunk_flush_timer = None
 
     def compose(self) -> ComposeResult:
         from textual.containers import Vertical as _V
+
         if self.role == "system":
             self.add_class("msg-system")
             yield Label(f"── {self.content} ── {self.time_str} ──")
@@ -257,6 +330,7 @@ class ChatMessage(Static):
                         CollapsibleCodeBlock,
                         parse_agent_response,
                     )
+
                     blocks = parse_agent_response(self.content)
                     for block in blocks:
                         if block.is_code:
@@ -264,7 +338,6 @@ class ChatMessage(Static):
                         else:
                             label = Label(apply_brand_colors(block.content), classes="msg-content")
                             yield label
-
 
     def update_speaker(self, name: str) -> None:
         """Dynamically update the speaker's name in the UI header."""
@@ -284,17 +357,32 @@ class ChatMessage(Static):
             return
 
         self.content += chunk
+        self._pending_chunks.append(chunk)
+
+        if self._chunk_flush_timer is None:
+            self._chunk_flush_timer = self.set_timer(0.05, self._flush_pending_chunks)
+
+    def _flush_pending_chunks(self) -> None:
+        if not self.is_mounted:
+            self._pending_chunks.clear()
+            self._chunk_flush_timer = None
+            return
+
+        self._chunk_flush_timer = None
+        if not self._pending_chunks:
+            return
 
         from src.tui.widgets.collapsible_code import CollapsibleCodeBlock
 
-        events = self.parser.feed(chunk)
+        events = self.parser.feed("".join(self._pending_chunks))
+        self._pending_chunks.clear()
 
         for event_type, data in events:
             if event_type == "text":
                 if self._current_streaming_label is None:
                     self._current_streaming_label = Label("", classes="msg-content")
                     self._streaming_labels.append(self._current_streaming_label)
-                    inner = getattr(self, '_inner', self)
+                    inner = getattr(self, "_inner", self)
                     inner.mount(self._current_streaming_label)
 
                 self._current_streaming_text += data
@@ -307,7 +395,7 @@ class ChatMessage(Static):
             elif event_type == "code_end":
                 lang = data["language"]
                 code_text = data["full_code"]
-                inner = getattr(self, '_inner', self)
+                inner = getattr(self, "_inner", self)
                 inner.mount(CollapsibleCodeBlock(language=lang, code=code_text))
                 self._current_streaming_text = ""
 
@@ -315,6 +403,11 @@ class ChatMessage(Static):
         """Call this when agent is done sending chunks."""
         if not self.is_mounted:
             return
+
+        if self._chunk_flush_timer is not None:
+            self._chunk_flush_timer.stop()
+            self._chunk_flush_timer = None
+        self._flush_pending_chunks()
 
         from src.tui.widgets.collapsible_code import CollapsibleCodeBlock
 
@@ -325,7 +418,7 @@ class ChatMessage(Static):
                 if self._current_streaming_label is None:
                     self._current_streaming_label = Label("", classes="msg-content")
                     self._streaming_labels.append(self._current_streaming_label)
-                    inner = getattr(self, '_inner', self)
+                    inner = getattr(self, "_inner", self)
                     inner.mount(self._current_streaming_label)
 
                 self._current_streaming_text += data
@@ -334,7 +427,7 @@ class ChatMessage(Static):
             elif event_type == "code_end":
                 lang = data["language"]
                 code_text = data["full_code"]
-                inner = getattr(self, '_inner', self)
+                inner = getattr(self, "_inner", self)
                 inner.mount(CollapsibleCodeBlock(language=lang, code=code_text))
                 self._current_streaming_text = ""
 
@@ -343,7 +436,13 @@ class ChatMessage(Static):
         if not self.is_mounted:
             return
 
+        if self._chunk_flush_timer is not None:
+            self._chunk_flush_timer.stop()
+            self._chunk_flush_timer = None
+        self._flush_pending_chunks()
+
         from src.tui.widgets.thought_block import AgentThoughtBlock
+
         block = AgentThoughtBlock(title=title, content=content)
 
         # Break current label stream to mount block linearly
@@ -402,6 +501,8 @@ class AgentStreamBox(Static):
         self.content_label: Label | None = None
         self.footer_label: Label | None = None
         self.tool_logs: list["CollapsibleCodeBlock"] = []  # noqa: F821
+        self._pending_chunks: list[str] = []
+        self._chunk_flush_timer = None
 
     def compose(self) -> ComposeResult:
         from textual.containers import Vertical
@@ -419,9 +520,14 @@ class AgentStreamBox(Static):
 
     def append_chunk(self, chunk: str) -> None:
         self.content_text += chunk
-        display_text = (
-            self.content_text[-500:] if len(self.content_text) > 500 else self.content_text
-        )
+        self._pending_chunks.append(chunk)
+
+        if self._chunk_flush_timer is None:
+            self._chunk_flush_timer = self.set_timer(0.05, self._flush_pending_chunks)
+
+    def _flush_pending_chunks(self) -> None:
+        self._chunk_flush_timer = None
+        display_text = self.content_text[-500:] if len(self.content_text) > 500 else self.content_text
         if len(self.content_text) > 500:
             display_text = "..." + display_text
 
@@ -430,6 +536,7 @@ class AgentStreamBox(Static):
                 self.content_label.update(apply_brand_colors(display_text))
             except Exception as e:
                 logger.debug(f"ContentLabel update failed: {e}")
+        self._pending_chunks.clear()
 
     def add_tool_call(self, tool_name: str, args: dict) -> None:
         import json
@@ -450,10 +557,16 @@ class AgentStreamBox(Static):
         self.tool_logs.append(block)
 
     def mark_complete(self, duration_ms: int, cost_usd: float) -> None:
+        if self._chunk_flush_timer is not None:
+            self._chunk_flush_timer.stop()
+            self._flush_pending_chunks()
         if self.footer_label:
             self.footer_label.update(f"✓ {duration_ms / 1000:.1f}s │ ${cost_usd:.4f}")
 
     def mark_error(self, error: str) -> None:
+        if self._chunk_flush_timer is not None:
+            self._chunk_flush_timer.stop()
+            self._flush_pending_chunks()
         if self.footer_label:
             self.footer_label.update("❌ Error")
         if self.content_label:
@@ -569,12 +682,12 @@ class ChatPanel(Vertical):
         super().__init__(*args, **kwargs)
         self._user_scrolled_up = False
         self._parallel_containers: dict[str, Horizontal] = {}  # dispatch_id -> container
-        self._agent_boxes: dict[
-            str, dict[str, AgentStreamBox]
-        ] = {}  # dispatch_id -> {agent_id -> box}
+        self._agent_boxes: dict[str, dict[str, AgentStreamBox]] = {}  # dispatch_id -> {agent_id -> box}
         self._pending_reflection_hint: str | None = None  # stores latest lesson for next dispatch
         self._stream_start_time: float | None = None
         self._streaming_timer = None
+        self._estimate_timer = None
+        self._pending_estimate_value = ""
 
     def compose(self) -> ComposeResult:
         yield Label("💬 Chat", id="chat-header")
@@ -598,8 +711,6 @@ class ChatPanel(Vertical):
             self._load_session_history()
         # Populate header with model/mode info so it's never blank
         self._populate_header_on_boot()
-
-
 
     def _populate_header_on_boot(self) -> None:
         """Hide the header on startup to save space."""
@@ -630,6 +741,7 @@ class ChatPanel(Vertical):
         """Show live elapsed timer during generation."""
         self._header().display = True
         import time
+
         self._stream_start_time = time.monotonic()
         self._stream_model_name = model_name
         self._header().update(f"⏳ {model_name} thinking..." if model_name else "⏳ Thinking...")
@@ -641,6 +753,7 @@ class ChatPanel(Vertical):
     def _tick_streaming_header(self) -> None:
         """Timer callback to update elapsed time."""
         import time
+
         if self._stream_start_time is None:
             return
         elapsed = time.monotonic() - self._stream_start_time
@@ -681,18 +794,10 @@ class ChatPanel(Vertical):
         if not messages:
             # Re-mount empty state if no messages
             self.scroll_container.mount(AnimatedWelcome())
-            self.scroll_container.mount(
-                Label('• "Explain this codebase"', classes="empty-prompt", id="ep-1")
-            )
-            self.scroll_container.mount(
-                Label('• "Fix the bug in auth.py"', classes="empty-prompt", id="ep-2")
-            )
-            self.scroll_container.mount(
-                Label('• "Ask Gemini to write tests"', classes="empty-prompt", id="ep-3")
-            )
-            self.scroll_container.mount(
-                Label('• "Refactor this function"', classes="empty-prompt", id="ep-4")
-            )
+            self.scroll_container.mount(Label('• "Explain this codebase"', classes="empty-prompt", id="ep-1"))
+            self.scroll_container.mount(Label('• "Fix the bug in auth.py"', classes="empty-prompt", id="ep-2"))
+            self.scroll_container.mount(Label('• "Ask Gemini to write tests"', classes="empty-prompt", id="ep-3"))
+            self.scroll_container.mount(Label('• "Refactor this function"', classes="empty-prompt", id="ep-4"))
             self.scroll_container.mount(
                 Label(
                     "\nReference files with @filename\nChange tier with Ctrl+Q\nAll shortcuts: Ctrl+?",  # noqa: E501
@@ -714,15 +819,35 @@ class ChatPanel(Vertical):
 
     @on(ChatInput.Changed)
     def on_input_changed(self, event: ChatInput.Changed) -> None:
-        # Dynamic Token Estimation while typing
+        self._pending_estimate_value = event.value
+        if self._estimate_timer:
+            self._estimate_timer.stop()
+        self._estimate_timer = self.set_timer(0.12, self._flush_token_estimate)
+
+    def _flush_token_estimate(self) -> None:
+        self._estimate_timer = None
+        value = self._pending_estimate_value
+        if not value.strip():
+            try:
+                import textual.app as _tapp
+
+                current_app = _tapp.active_app.get()
+                if hasattr(current_app, "status_bar"):
+                    current_app.status_bar.est_cost = 0.0
+            except Exception:
+                pass
+            return
+
+        # Dynamic token estimation while typing, but only after a short pause.
         try:
             import textual.app as _tapp
 
             from src.core.model_registry import ModelRegistry
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "status_bar"):
                 # Rough token estimate: length / 4
-                tokens = len(event.value) // 4
+                tokens = len(value) // 4
 
                 # Fetch currently assigned active mode limits
                 tier = current_app.status_bar.tier_name.lower()
@@ -762,6 +887,7 @@ class ChatPanel(Vertical):
         is_managed = False
         try:
             import textual.app as _tapp
+
             if getattr(_tapp.active_app.get(), "auth_manager", None):
                 is_managed = _tapp.active_app.get().auth_manager.use_managed_credits
         except Exception:
@@ -770,11 +896,9 @@ class ChatPanel(Vertical):
         if not is_managed and not KeyChainManager.has_any_keys() and not self.app.config.user.setup_completed:
             user_config = getattr(self.app.config, "user", None)
             has_custom = bool(getattr(user_config, "custom_models", [])) if user_config else False
-  # noqa: W293
+            # noqa: W293
             if not has_custom:
-                self._append_message(
-                    "system", "⚠️ No API keys configured. Add a key in Settings (Ctrl+,) or run /setup"
-                )
+                self._append_message("system", "⚠️ No API keys configured. Add a key in Settings (Ctrl+,) or run /setup")
                 return
 
         # Render user message
@@ -791,6 +915,7 @@ class ChatPanel(Vertical):
         file_paths = []
         try:
             from src.core.workspace import Workspace, WorkspaceEscapeError
+
             ws = Workspace.get_instance()
             for f in files:
                 try:
@@ -799,8 +924,10 @@ class ChatPanel(Vertical):
                 except WorkspaceEscapeError:
                     logger.warning(f"@file path rejected (outside workspace): {f}")
                     from src.tui.widgets.toast import notify
+
                     try:
                         import textual.app as _tapp
+
                         notify(_tapp.active_app.get(), "Security", f"Path '{f}' is outside project", "warning")
                     except Exception:
                         pass
@@ -818,9 +945,7 @@ class ChatPanel(Vertical):
                 rng = ctx.get("line_range")
                 if rng:
                     # Append selection info to task text
-                    clean_text += (
-                        f"\n\n[Context: {Path(ctx['file_path']).name} lines {rng[0]}-{rng[1]}]"
-                    )
+                    clean_text += f"\n\n[Context: {Path(ctx['file_path']).name} lines {rng[0]}-{rng[1]}]"
 
         # Emit properly structured task received event
         self.post_message(TaskReceived(task_str=clean_text, attached_files=file_paths))
@@ -839,9 +964,7 @@ class ChatPanel(Vertical):
         self._spinner_frame = 0
         self.scroll_container.mount(self._spinner_label)
         self.scroll_container.scroll_end(animate=False)
-        self._spinner_timer = self.set_interval(
-            0.1, self._tick_spinner
-        )
+        self._spinner_timer = self.set_interval(0.1, self._tick_spinner)
 
     def _tick_spinner(self) -> None:
         """Advance the spinner animation frame."""
@@ -879,6 +1002,7 @@ class ChatPanel(Vertical):
             parts = cmd.split()
             base = parts[0].lower() if parts else cmd
             import difflib
+
             matches = difflib.get_close_matches(base, all_slashes, n=3, cutoff=0.4)
             suggestion = f" Did you mean: {', '.join(matches)}?" if matches else ""
             self._append_message(
@@ -908,10 +1032,12 @@ class ChatPanel(Vertical):
         """Export current session as timestamped markdown to project root."""
         try:
             from src.core.workspace import Workspace
+
             ws = Workspace.get_instance()
             session_id = self.app.chat_store.current_session_id
             md_content = self.app.chat_store.export_session(session_id, format="markdown")
             from datetime import datetime
+
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             out_path = ws.get_project_root() / f"chat_export_{ts}.md"
             out_path.write_text(md_content)
@@ -927,7 +1053,7 @@ class ChatPanel(Vertical):
                 "🚀 **Autonomous Mode**\n"
                 "Usage: `/auto <goal>`\n"
                 "Example: `/auto Build a todo app with authentication`\n\n"
-                "The AI agents will collaborate to plan, code, test, and review your project."
+                "The AI agents will collaborate to plan, code, test, and review your project.",
             )
             return
 
@@ -938,7 +1064,7 @@ class ChatPanel(Vertical):
             f"Goal: {goal}\n\n"
             f"Agents will plan → code → test → review in a loop.\n"
             f"Watch the Activity Feed for inter-agent conversation.\n"
-            f"Type `/auto stop` to cancel."
+            f"Type `/auto stop` to cancel.",
         )
 
         # Check for stop/pause/resume commands
@@ -994,11 +1120,7 @@ class ChatPanel(Vertical):
                 session = getattr(sb, "session_cost", 0.0)
                 daily = getattr(sb, "daily_total", 0.0)
                 budget = getattr(sb, "budget", 0.0)
-                cost_str = (
-                    f"💰 Session: ${session:.4f} │ "
-                    f"Today: ${daily:.4f} │ "
-                    f"Budget: ${budget:.2f}"
-                )
+                cost_str = f"💰 Session: ${session:.4f} │ Today: ${daily:.4f} │ Budget: ${budget:.2f}"
             else:
                 cost_str = "💰 Cost tracking not available."
             self._append_message("system", cost_str)
@@ -1009,6 +1131,7 @@ class ChatPanel(Vertical):
         """Show context window budget stats for active model."""
         try:
             from src.core.model_registry import ModelRegistry, QualityTier
+
             registry = ModelRegistry()
             tier = QualityTier.STANDARD
             if hasattr(self.app, "tier_manager"):
@@ -1029,11 +1152,18 @@ class ChatPanel(Vertical):
 
     def _slash_mode(self, args: list[str]) -> None:
         """Switch operation mode: /mode scout|standard|ensemble|battle|architect."""
-        from src.core.mode_manager import ModeManager, OperationMode
+        from src.core.mode_manager import OperationMode
 
         valid_modes = {m.value: m for m in OperationMode}
+
+        # Use the shared mode manager from the orchestrator
+        mode_mgr = self.app.orchestrator.mode_manager if hasattr(self.app, "orchestrator") else None
+        if not mode_mgr:
+            self._append_message("system", "⚠️ Orchestrator not available. Cannot change mode.")
+            return
+
         if not args:
-            current = ModeManager().active_mode.value
+            current = mode_mgr.active_mode.value
             modes_list = ", ".join(valid_modes.keys())
             self._append_message(
                 "system",
@@ -1047,7 +1177,7 @@ class ChatPanel(Vertical):
             self._append_message("system", f"Unknown mode '{name}'. Available: {modes_list}")
             return
 
-        ModeManager().set_mode(valid_modes[name])
+        mode_mgr.set_mode(valid_modes[name])
         self._append_message("system", f"🎯 Mode switched to: {name}")
         # Update status bar if available
         if hasattr(self.app, "_update_status_bar"):
@@ -1056,7 +1186,7 @@ class ChatPanel(Vertical):
     def _slash_compact(self, args: list[str]) -> None:
         """Compact context into a single summary to save tokens."""
         self._append_message("system", "📦 Context compaction running...")
-  # noqa: W293
+        # noqa: W293
         try:
             messages = self.app.chat_store.get_session_messages() or []
             if len(messages) < 10:
@@ -1079,7 +1209,7 @@ class ChatPanel(Vertical):
                     id=str(uuid.uuid4()),
                     role=MessageRole.SYSTEM,
                     content=f"[Context Summary] {summary}",
-                    timestamp=datetime.now()
+                    timestamp=datetime.now(),
                 )
 
                 # Hard reset memory: keep last 20 messages and prepend summary
@@ -1087,8 +1217,7 @@ class ChatPanel(Vertical):
 
                 self._append_message(
                     "system",
-                    f"📦 Compacted {len(old_msgs) - 20} older messages into a summary. "
-                    f"Context truncated in memory."
+                    f"📦 Compacted {len(old_msgs) - 20} older messages into a summary. Context truncated in memory.",
                 )
                 self._load_session_history()
             else:
@@ -1096,9 +1225,7 @@ class ChatPanel(Vertical):
         except Exception as e:
             self._append_message("system", f"Compaction failed: {e}")
 
-    def _append_message(
-        self, role: str, content: str, name: str = "", time_str: str = ""
-    ) -> ChatMessage:
+    def _append_message(self, role: str, content: str, name: str = "", time_str: str = "") -> ChatMessage:
         try:
             existing = self.query_one("#transient-status")
             existing.remove()
@@ -1141,9 +1268,7 @@ class ChatPanel(Vertical):
         from datetime import datetime
 
         time_str = datetime.now().strftime("%I:%M %p")
-        self._append_message(
-            "system", f"[{color}]⚙️ {event.text}[/{color}]", "Orchestrator", time_str
-        )
+        self._append_message("system", f"[{color}]⚙️ {event.text}[/{color}]", "Orchestrator", time_str)
         self.scroll_container.scroll_end(animate=False)
 
     @on(AgentStatusUpdate)
@@ -1153,6 +1278,7 @@ class ChatPanel(Vertical):
             # Stop the thinking spinner now that we have a real agent status
             self._stop_thinking_spinner()
             from textual.widgets import Label
+
             # Remove any existing transient
             try:
                 existing = self.query_one("#transient-status")
@@ -1161,7 +1287,11 @@ class ChatPanel(Vertical):
                 logger.debug(f"Transient status remove failed: {e}")
 
             model_display = f"({event.model_name})" if event.model_name else ""
-            status_pill = Label(f"🧠 [bold #58A6FF]{event.agent_id.capitalize()} {model_display} {event.status}...[/] [dim]{event.detail}[/]", id="transient-status", classes="transient-pill")  # noqa: E501
+            status_pill = Label(
+                f"🧠 [bold #58A6FF]{event.agent_id.capitalize()} {model_display} {event.status}...[/] [dim]{event.detail}[/]",
+                id="transient-status",
+                classes="transient-pill",
+            )  # noqa: E501
             status_pill.styles.margin = (0, 0, 1, 0)
             self.scroll_container.mount(status_pill)
             self.scroll_container.scroll_end(animate=False)
@@ -1206,7 +1336,7 @@ class ChatPanel(Vertical):
             f"{indent}[bold #d2a8ff]{depth_indicator} Swarm Handoff[/bold #d2a8ff] "
             f"[dim]Delegating to [bold]{event.child_model_name}[/bold][/dim]\n"
             f"{indent}  [italic dim]'{instruction_preview}'[/italic dim]",
-            classes="delegation-pill"
+            classes="delegation-pill",
         )
         delegation_msg.styles.margin = (0, 0, 1, 0)
         self.scroll_container.mount(delegation_msg)
@@ -1277,9 +1407,7 @@ class ChatPanel(Vertical):
 
     @on(ParallelDispatchComplete)
     def on_parallel_dispatch_complete(self, event: ParallelDispatchComplete) -> None:
-        self._append_message(
-            "system", "🏁 Parallel generation complete. Evaluating patches...", "Orchestrator"
-        )
+        self._append_message("system", "🏁 Parallel generation complete. Evaluating patches...", "Orchestrator")
 
     @on(ArbiterVerdictReady)
     def on_arbiter_verdict_ready(self, event: ArbiterVerdictReady) -> None:
@@ -1290,9 +1418,7 @@ class ChatPanel(Vertical):
 
             is_architect = False
             if hasattr(self.app, "orchestrator") and self.app.orchestrator:
-                is_architect = (
-                    self.app.orchestrator.mode_manager.active_mode == OperationMode.ARCHITECT
-                )
+                is_architect = self.app.orchestrator.mode_manager.active_mode == OperationMode.ARCHITECT
 
             if is_architect:
                 from src.tui.widgets.architect_approval_panel import ArchitectApprovalPanel
@@ -1315,6 +1441,7 @@ class ChatPanel(Vertical):
     def on_context_truncated(self, event: ContextTruncated) -> None:
         """Surface a visible warning when the context manager drops messages or truncates files."""
         from datetime import datetime
+
         time_str = datetime.now().strftime("%I:%M %p")
 
         detail_parts = [f"[bold #F59E0B]⚠ Context Limit:[/] {event.reason}"]
@@ -1333,6 +1460,7 @@ class ChatPanel(Vertical):
         from datetime import datetime
 
         from textual.widgets import Collapsible
+
         time_str = datetime.now().strftime("%I:%M %p")
 
         # Store the lesson so the next task dispatch can inject it as a system hint

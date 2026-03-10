@@ -188,9 +188,7 @@ class ContextChipBar(Horizontal):
         self.mount(chip)
         self._update_visibility()
 
-    def remove_chip_by_path(
-        self, file_path: str, line_range: tuple[int, int] | None = None
-    ) -> None:
+    def remove_chip_by_path(self, file_path: str, line_range: tuple[int, int] | None = None) -> None:
         """Remove a chip by file path and optional line range."""
         if line_range:
             key = f"{file_path}:{line_range[0]}-{line_range[1]}"
@@ -211,9 +209,7 @@ class ContextChipBar(Horizontal):
         result = []
         for key, info in self._context_files.items():
             entry = {
-                "file_path": key.split(":")[0]
-                if ":" in key and info["chip_type"] == "selection"
-                else key,
+                "file_path": key.split(":")[0] if ":" in key and info["chip_type"] == "selection" else key,
                 "chip_type": info["chip_type"],
             }
             if info.get("line_range"):
