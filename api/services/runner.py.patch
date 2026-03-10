@@ -1,0 +1,186 @@
+--- api/services/runner.py
++++ api/services/runner.py
+@@ -19,17 +19,10 @@
+     def __init__(self):
+         # run_id -> Process
+         self._processes: dict[str, asyncio.subprocess.Process] = {}
+-        # run_id -> deque of recent log lines (up to 1000)
+-        self._logs: dict[str, deque[str]] = {}
+         # run_id -> asyncio.Event (fired when process completes)
+         self._completion_events: dict[str, asyncio.Event] = {}
+ 
+     async def start_run(self, run_id: UUID, user_id: UUID, repo_url: str, prompt: str) -> None:
+         """Spawn the background agent execution and pipe logs into memory."""
+         str_run_id = str(run_id)
+         
+-        self._logs[str_run_id] = deque(maxlen=1000)
+         self._completion_events[str_run_id] = asyncio.Event()
+ 
+         # Update DB to 'running'
+         pool = get_pool()
+         await pool.execute(
+-            "UPDATE hub_runs SET status = 'running', updated_at = now() WHERE id = $1", 
++            "UPDATE hub_runs SET status = 'running', logs = '', updated_at = now() WHERE id = $1", 
+             run_id
+         )
+ 
+         # In production this would clone the repo to a scratch dir.
+@@ -40,7 +33,7 @@
+-        self._append_log(str_run_id, f"Initializing run {run_id} for {repo_url}...\n")
++        await self._append_log(pool, run_id, f"Initializing run {run_id} for {repo_url}...\n")
+         
+         cmd = [
+             "gptcgt",
+@@ -63,12 +56,12 @@
+             
+         except Exception as e:
+             logger.error(f"Failed to spawn runner for {run_id}: {e}")
+-            self._append_log(str_run_id, f"CRITICAL RUNNER ERROR: {e}\n")
++            await self._append_log(pool, run_id, f"CRITICAL RUNNER ERROR: {e}\n")
+             await pool.execute(
+                 "UPDATE hub_runs SET status = 'failed', updated_at = now() WHERE id = $1", 
+                 run_id
+             )
+             self._completion_events[str_run_id].set()
+ 
+     async def _consume_output(self, str_run_id: str, proc: asyncio.subprocess.Process, run_id: UUID):
+         """Consume stdout from the subprocess continuously until it exits."""
++        pool = get_pool()
+         try:
+             if proc.stdout:
+                 while True:
+                     line = await proc.stdout.readline()
+                     if not line:
+                         break
+                     decoded_line = line.decode('utf-8', errors='replace')
+-                    self._append_log(str_run_id, decoded_line)
++                    await self._append_log(pool, run_id, decoded_line)
+                     
+             await proc.wait()
+             
+             # Subprocess finished
+             final_status = "completed" if proc.returncode == 0 else "failed"
+-            self._append_log(str_run_id, f"\nRun finished with exit code {proc.returncode} ({final_status}).\n")
++            await self._append_log(pool, run_id, f"\nRun finished with exit code {proc.returncode} ({final_status}).\n")
+             
+         except Exception as e:
+             logger.error(f"Error reading stdout from run {str_run_id}: {e}")
+             final_status = "failed"
+-            self._append_log(str_run_id, f"\nFatal error reading logs: {e}\n")
++            await self._append_log(pool, run_id, f"\nFatal error reading logs: {e}\n")
+             
+         finally:
+             self._completion_events[str_run_id].set()
+             
+             # Cleanup process tracking and finalize DB
+             self._processes.pop(str_run_id, None)
+             try:
+                 await pool.execute(
+                     "UPDATE hub_runs SET status = $1, updated_at = now() WHERE id = $2", 
+                     final_status, run_id
+                 )
+             except Exception as e:
+                 logger.error(f"Failed to update hub_runs status to {final_status} for {run_id}: {e}")
+ 
+-    def _append_log(self, str_run_id: str, line: str):
+-        if str_run_id in self._logs:
+-            self._logs[str_run_id].append(line)
++    async def _append_log(self, pool, run_id: UUID, line: str):
++        try:
++            await pool.execute("UPDATE hub_runs SET logs = COALESCE(logs, '') || $1 WHERE id = $2", line, run_id)
++        except Exception as e:
++            logger.error(f"Failed to append log for run {run_id}: {e}")
+ 
+     async def cancel_run(self, run_id: UUID) -> bool:
+         """Terminate an active run."""
+         str_run_id = str(run_id)
+         proc = self._processes.get(str_run_id)
++        pool = get_pool()
+         
+         if not proc:
+             return False
+             
+         # Terminate gently then aggressively if necessary
+         try:
+             proc.terminate()
+-            self._append_log(str_run_id, "\n[RUN CANCELLED BY USER]\n")
++            await self._append_log(pool, run_id, "\n[RUN CANCELLED BY USER]\n")
+             
+             # Update DB eagerly
+             await pool.execute(
+                 "UPDATE hub_runs SET status = 'cancelled', updated_at = now() WHERE id = $1", 
+                 run_id
+             )
+             return True
+         except ProcessLookupError:
+             return False
+         except Exception as e:
+             logger.error(f"Failed to cancel process {str_run_id}: {e}")
+             return False
+ 
+     async def get_log_iterator(self, run_id: str):
+         """
+         Yields accumulated logs immediately, then waits for new lines. 
+         Compatible with FastAPI StreamingResponse for EventSource (SSE).
+         """
+-        if run_id not in self._logs:
+-            yield "data: {\"error\": \"Run not active or not found in memory\"}\n\n"
+-            return
++        pool = get_pool()
++        uid_run_id = UUID(run_id)
+             
+         # 1. Flush the current buffer
+-        curr_buffer = list(self._logs[run_id])
+-        for line in curr_buffer:
+-            yield f"data: {line}\n\n"
++        current_logs = await pool.fetchval("SELECT logs FROM hub_runs WHERE id = $1", uid_run_id)
++        if current_logs:
++            for line in current_logs.split('\n'):
++                if line:
++                    yield f"data: {line}\n\n"
+             
+         # 2. Wait for process completion or new lines
+         # In a robust implementation, this would use asyncio.Queue or Condition
+         # instead of polling, but for P1-09 this lightweight async spin works.
+-        last_index = len(self._logs[run_id])
++        last_len = len(current_logs) if current_logs else 0
+         event = self._completion_events.get(run_id)
+         
+         while event and not event.is_set():
+-            current_len = len(self._logs[run_id])
+-            if current_len > last_index:
+-                # Calculate how many new lines to yield (handling deque eviction nicely)
+-                # Since maxlen is 1000, if we fall behind by 1000, we skip.
+-                items_to_yield = min(current_len - last_index, 1000)
+-                new_items = list(self._logs[run_id])[-items_to_yield:]
+-                
+-                for line in new_items:
+-                    yield f"data: {line}\n\n"
+-                last_index = current_len
++            current_logs = await pool.fetchval("SELECT logs FROM hub_runs WHERE id = $1", uid_run_id)
++            current_len = len(current_logs) if current_logs else 0
++            if current_len > last_len:
++                new_logs = current_logs[last_len:]
++                for line in new_logs.split('\n'):
++                    if line:
++                        yield f"data: {line}\n\n"
++                last_len = current_len
+                 
+             await asyncio.sleep(0.5)
+             
+         # Yield any final lines that arrived between loop evaluation and process exit
+-        current_len = len(self._logs[run_id])
+-        if current_len > last_index:
+-            items_to_yield = min(current_len - last_index, 1000)
+-            new_items = list(self._logs[run_id])[-items_to_yield:]
+-            for line in new_items:
+-                yield f"data: {line}\n\n"
++        current_logs = await pool.fetchval("SELECT logs FROM hub_runs WHERE id = $1", uid_run_id)
++        current_len = len(current_logs) if current_logs else 0
++        if current_len > last_len:
++            new_logs = current_logs[last_len:]
++            for line in new_logs.split('\n'):
++                if line:
++                    yield f"data: {line}\n\n"
+         
+         yield "data: [DONE]\n\n"

@@ -32,9 +32,7 @@ class ProjectSetupScreen(ModalScreen[bool]):
     }
     """
 
-    def __init__(
-        self, initializer: "ProjectInitializer", workspace: "Workspace", *args, **kwargs
-    ) -> None:
+    def __init__(self, initializer: "ProjectInitializer", workspace: "Workspace", *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.initializer = initializer
         self.workspace = workspace

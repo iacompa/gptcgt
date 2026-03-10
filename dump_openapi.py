@@ -6,10 +6,11 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent
 sys.path.insert(0, str(project_root))
 
-from api.main import app
 
 def main():
     try:
+        from api.main import app
+
         schema = app.openapi()
         with open("openapi.json", "w") as f:
             json.dump(schema, f, indent=2)

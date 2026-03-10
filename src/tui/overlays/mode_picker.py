@@ -173,11 +173,20 @@ class ModePickerOverlay(ModalScreen):
         super().__init__(*args, **kwargs)
         self.current_mode = current_mode
 
-    def action_pick_1(self) -> None: self.dismiss(OperationMode.STANDARD)
-    def action_pick_2(self) -> None: self.dismiss(OperationMode.ENSEMBLE)
-    def action_pick_3(self) -> None: self.dismiss(OperationMode.BATTLE)
-    def action_pick_4(self) -> None: self.dismiss(OperationMode.ARCHITECT)
-    def action_pick_5(self) -> None: self.dismiss(OperationMode.SCOUT)
+    def action_pick_1(self) -> None:
+        self.dismiss(OperationMode.STANDARD)
+
+    def action_pick_2(self) -> None:
+        self.dismiss(OperationMode.ENSEMBLE)
+
+    def action_pick_3(self) -> None:
+        self.dismiss(OperationMode.BATTLE)
+
+    def action_pick_4(self) -> None:
+        self.dismiss(OperationMode.ARCHITECT)
+
+    def action_pick_5(self) -> None:
+        self.dismiss(OperationMode.SCOUT)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="mode-dialog"):
@@ -188,7 +197,7 @@ class ModePickerOverlay(ModalScreen):
             )
 
             for i, (mode, icon, name, tagline, desc, cost_range) in enumerate(_MODES, 1):
-                is_active = (mode == self.current_mode)
+                is_active = mode == self.current_mode
                 cr = CREDIT_COSTS.get(mode, 5)
                 with Vertical(
                     classes=f"mode-box{' -active' if is_active else ''}",

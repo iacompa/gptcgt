@@ -149,6 +149,7 @@ class OnboardingScreen(ModalScreen):
         )
         container.mount(Label("\nView documents (opens browser):", classes="text-secondary"))
         from textual.widgets import Button as _Btn
+
         container.mount(_Btn("Terms of Service", id="btn-tos", variant="default"))
         container.mount(_Btn("Privacy Policy", id="btn-privacy", variant="default"))
         container.mount(_Btn("Acceptable Use", id="btn-aup", variant="default"))
@@ -210,6 +211,7 @@ class OnboardingScreen(ModalScreen):
             from src.auth.key_validator import (
                 KeyValidator,  # Lazy: only loaded when user validates a key
             )
+
             is_valid, msg = await KeyValidator.validate(var_name, key_val)
 
             if is_valid:
@@ -225,7 +227,7 @@ class OnboardingScreen(ModalScreen):
                 from src.core.model_registry import ModelRegistry, Provider
 
                 registry = ModelRegistry()
-  # noqa: W293
+                # noqa: W293
                 # Fetch provider models directly (bypass get_available_models since key isn't saved yet)
                 try:
                     provider_enum = Provider(provider_name)
@@ -248,9 +250,7 @@ class OnboardingScreen(ModalScreen):
                             var_name,
                         )
                     else:
-                        self._update_key_status(
-                            stat_label, False, f"❌ Failed: {health.get('error', 'error')}", "", ""
-                        )
+                        self._update_key_status(stat_label, False, f"❌ Failed: {health.get('error', 'error')}", "", "")
                 else:
                     self._update_key_status(stat_label, True, "✅ Valid", key_val, var_name)
             else:
@@ -259,9 +259,7 @@ class OnboardingScreen(ModalScreen):
             logger.error(f"Failed to validate {var_name}: {e}")
             self._update_key_status(stat_label, False, "❌ Error", "", "")
 
-    def _update_key_status(
-        self, stat_label: Label, is_valid: bool, text: str, key_val: str, var_name: str
-    ) -> None:
+    def _update_key_status(self, stat_label: Label, is_valid: bool, text: str, key_val: str, var_name: str) -> None:
         stat_label.update(text)
         stat_label.remove_class("status-checking", "status-valid", "status-invalid")
         stat_label.add_class("status-valid" if is_valid else "status-invalid")
@@ -327,13 +325,9 @@ class OnboardingScreen(ModalScreen):
     def _render_step_5_prefs(self, container):
         container.mount(Label("Choose Your Defaults", classes="step-title"))
         container.mount(Label("Theme:"))
-        container.mount(
-            OptionList("🌙 Midnight", "☀️ Polar", "🌊 Slate", "🔥 Ember", "⚡ Neon", id="opt-theme")
-        )
+        container.mount(OptionList("🌙 Midnight", "☀️ Polar", "🌊 Slate", "🔥 Ember", "⚡ Neon", id="opt-theme"))
         container.mount(Label("\nQuality Tier:"))
-        container.mount(
-            OptionList("💡 Light", "⚡ Standard (recommended)", "🔥 Max", id="opt-tier")
-        )
+        container.mount(OptionList("💡 Light", "⚡ Standard (recommended)", "🔥 Max", id="opt-tier"))
 
     def _render_step_6_done(self, container):
         container.mount(Label("You're all set! 🎉", classes="step-title"))
@@ -358,12 +352,15 @@ class OnboardingScreen(ModalScreen):
             self.action_next_step()
         elif event.button.id == "btn-tos":
             import webbrowser
+
             webbrowser.open("https://gptcgt.ai/legal/terms")
         elif event.button.id == "btn-privacy":
             import webbrowser
+
             webbrowser.open("https://gptcgt.ai/legal/privacy")
         elif event.button.id == "btn-aup":
             import webbrowser
+
             webbrowser.open("https://gptcgt.ai/legal/aup")
 
     def action_next_step(self) -> None:
@@ -372,9 +369,7 @@ class OnboardingScreen(ModalScreen):
             self.app.config.set_user("tos_accepted", True)
             import datetime
 
-            self.app.config.set_user(
-                "tos_accepted_at", datetime.datetime.now(datetime.timezone.utc).isoformat()
-            )
+            self.app.config.set_user("tos_accepted_at", datetime.datetime.now(datetime.timezone.utc).isoformat())
             self.app.config.set_user("tos_version", "1.0")
 
             # Send to backend if authenticated

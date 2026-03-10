@@ -115,10 +115,7 @@ class HunkEditor(Vertical):
         """Apply the user's edits and close the editor."""
         if self._editor:
             edited_text = self._editor.text
-            logger.info(
-                f"Hunk edit applied for {self.file_path} hunk {self.hunk_index} "
-                f"({len(edited_text)} chars)"
-            )
+            logger.info(f"Hunk edit applied for {self.file_path} hunk {self.hunk_index} ({len(edited_text)} chars)")
             self.post_message(self.EditApplied(self.file_path, self.hunk_index, edited_text))
 
     def action_cancel_edit(self) -> None:

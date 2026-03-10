@@ -45,9 +45,7 @@ class CostSummaryWidget(Static):
         for m in self.breakdown.model_usages:
             if m.was_refusal:
                 continue
-            models_summary.append(
-                f"{m.model_display_name} ${m.total_cost:.3f} ({m.duration_seconds:.1f}s)"
-            )
+            models_summary.append(f"{m.model_display_name} ${m.total_cost:.3f} ({m.duration_seconds:.1f}s)")
 
         line2 = " • ".join(models_summary)
         return f"{line1}\n    {line2}"

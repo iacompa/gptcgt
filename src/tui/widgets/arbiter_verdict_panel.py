@@ -115,21 +115,15 @@ class ArbiterVerdictPanel(Vertical):
                         )
 
                     if score.eliminated and score.elimination_reason:
-                        yield Label(
-                            f"[red]Reason: {score.elimination_reason}[/red]", classes="av-stat"
-                        )
+                        yield Label(f"[red]Reason: {score.elimination_reason}[/red]", classes="av-stat")
 
                     if score.patch_set and not score.eliminated:
-                        btn = Button(
-                            "View Patch", id=f"btn-patch-{score.agent_id}", variant="primary"
-                        )
+                        btn = Button("View Patch", id=f"btn-patch-{score.agent_id}", variant="primary")
                         btn._patch_set = score.patch_set
                         yield btn
                     elif score.patch_set and score.eliminated:
                         # Allow viewing even eliminated patches for comparison
-                        btn = Button(
-                            "View Rejected Patch", id=f"btn-patch-{score.agent_id}", variant="default"
-                        )
+                        btn = Button("View Rejected Patch", id=f"btn-patch-{score.agent_id}", variant="default")
                         btn._patch_set = score.patch_set
                         yield btn
 

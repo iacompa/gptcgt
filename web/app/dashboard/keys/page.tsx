@@ -1,9 +1,10 @@
-// Client component for interacting with the backend
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Trash2, Copy, Check } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Check, Copy, KeyRound, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { useToast } from "@/components/toaster";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export default function KeysPage() {
     const [keys, setKeys] = useState<any[]>([]);
@@ -12,154 +13,246 @@ export default function KeysPage() {
     const [generating, setGenerating] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState("anthropic");
     const [apiKeyInput, setApiKeyInput] = useState("");
+    const [copied, setCopied] = useState(false);
+    const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const { pushToast } = useToast();
 
-    useEffect(() => {
-        loadKeys();
-    }, []);
-
-    const loadKeys = async () => {
+    const loadKeys = useCallback(async () => {
         try {
             const { data, error } = await apiClient.GET("/api_keys/");
             if (error) throw error;
             setKeys((data as any[]) || []);
-        } catch (e) {
-            console.error(e);
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Could not load API keys",
+                description: error.message,
+            });
         } finally {
             setLoading(false);
         }
-    };
+    }, [pushToast]);
 
-    const createKey = async (e: React.FormEvent) => {
-        e.preventDefault();
+    useEffect(() => {
+        void loadKeys();
+    }, [loadKeys]);
+
+    const createKey = async (event: React.FormEvent) => {
+        event.preventDefault();
         if (!selectedProvider || !apiKeyInput) return;
 
         setGenerating(true);
         try {
             const { data, error } = await apiClient.POST("/api_keys/", {
-                body: { provider: selectedProvider, key: apiKeyInput } as any
+                body: { provider: selectedProvider, key: apiKeyInput } as any,
             });
             if (error) throw error;
             setNewKey({ ...(data as any), raw: apiKeyInput });
             setApiKeyInput("");
             setSelectedProvider("anthropic");
-            loadKeys();
-        } catch (e: any) {
-            console.error(e);
-            alert(e.message || "Failed to store key");
+            await loadKeys();
+            pushToast({
+                tone: "success",
+                title: "Key stored securely",
+                description: `Encrypted ${selectedProvider} credentials were added to the vault.`,
+            });
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Failed to store key",
+                description: error.message || "Please verify the provider and key format.",
+            });
         } finally {
             setGenerating(false);
         }
     };
 
-    const deleteKey = async (id: string) => {
-        if (!confirm("Are you sure you want to revoke this key?")) return;
+    const deleteKey = async () => {
+        if (!keyToDelete) return;
+        setIsDeleting(true);
         try {
             const { error } = await apiClient.DELETE("/api_keys/{key_id}", {
-                params: { path: { key_id: id } }
+                params: { path: { key_id: keyToDelete } },
             });
             if (error) throw error;
-            loadKeys();
-        } catch (e) {
-            console.error(e);
+            await loadKeys();
+            setKeyToDelete(null);
+            pushToast({
+                tone: "success",
+                title: "Key revoked",
+                description: "The provider key was removed from the vault.",
+            });
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Failed to revoke key",
+                description: error.message,
+            });
+        } finally {
+            setIsDeleting(false);
         }
     };
 
-    const [copied, setCopied] = useState(false);
     const copyKey = () => {
-        if (newKey) {
-            navigator.clipboard.writeText(newKey.raw);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        }
+        if (!newKey) return;
+        navigator.clipboard.writeText(newKey.raw);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
     };
 
     return (
-        <div>
-            <div className="flex justify-between items-end mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold">API Key Vault</h1>
-                    <p className="text-gray-400 mt-1">Store your provider API keys securely. They are encrypted with AES-256-GCM and used to proxy requests through GPTCGT.</p>
-                </div>
-            </div>
+        <div className="page-stack">
+            <section className="hero-panel p-6 sm:p-8">
+                <p className="eyebrow">API key vault</p>
+                <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950 sm:text-4xl">
+                    Store provider credentials without turning the browser into a secret manager.
+                </h1>
+                <p className="mt-3 max-w-3xl copy-lg">
+                    Keys are encrypted before storage and used only for proxy execution. The goal is to keep setup friction low without hiding the security model.
+                </p>
+            </section>
 
             {newKey && (
-                <div className="mb-8 p-6 bg-emerald-900/20 border border-emerald-500/50 rounded-xl">
-                    <h3 className="text-emerald-400 font-bold mb-2">Key stored successfully!</h3>
-                    <p className="text-sm text-gray-300 mb-4">Your <span className="capitalize font-medium">{newKey.provider}</span> key has been encrypted and stored. Prefix: <code className="text-emerald-300">{newKey.key_prefix}</code></p>
-                    <button
-                        onClick={() => setNewKey(null)}
-                        className="mt-2 text-sm text-gray-400 hover:text-white underline"
-                    >
-                        Dismiss
-                    </button>
-                </div>
+                <section className="panel p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="eyebrow">Latest vault update</p>
+                            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                                {newKey.provider} key stored successfully
+                            </h2>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                Prefix <span className="mono font-medium text-slate-950">{newKey.key_prefix}</span>
+                            </p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button type="button" onClick={copyKey} className="btn-secondary">
+                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                {copied ? "Copied" : "Copy raw key once"}
+                            </button>
+                            <button type="button" onClick={() => setNewKey(null)} className="btn-ghost">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </section>
             )}
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-                <h3 className="font-bold mb-2">Add Provider API Key</h3>
-                <p className="text-sm text-gray-400 mb-4">Paste your API key from Anthropic, OpenAI, Google, or xAI. It will be encrypted before storage — we never see your raw key.</p>
-                <form onSubmit={createKey} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                    <select
-                        value={selectedProvider}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
-                        className="bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
-                        required
-                    >
-                        <option value="anthropic">Anthropic</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="google">Google AI</option>
-                        <option value="xai">xAI</option>
-                        <option value="deepseek">DeepSeek</option>
-                    </select>
-                    <input
-                        type="password"
-                        value={apiKeyInput}
-                        onChange={(e) => setApiKeyInput(e.target.value)}
-                        placeholder="sk-ant-... or sk-... or AIza..."
-                        required
-                        minLength={10}
-                        className="flex-1 bg-gray-950 border border-gray-700 rounded-md px-4 py-2 text-white placeholder:text-gray-600 focus:outline-none focus:border-indigo-500 font-mono text-sm"
-                    />
-                    <button
-                        type="submit"
-                        disabled={generating || !apiKeyInput}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
-                    >
-                        <Plus size={18} /> {generating ? "Encrypting..." : "Store Key"}
-                    </button>
-                </form>
-            </div>
+            <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+                <div className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <Plus className="h-5 w-5 text-[var(--accent)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Add provider key</h2>
+                    </div>
+                    <p className="mt-3 text-sm text-[var(--text-muted)]">
+                        Paste a provider key from Anthropic, OpenAI, Google, xAI, or DeepSeek. The raw value is encrypted before it is stored.
+                    </p>
+                    <form onSubmit={createKey} className="mt-5 space-y-4">
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-slate-900">Provider</label>
+                            <select
+                                value={selectedProvider}
+                                onChange={(event) => setSelectedProvider(event.target.value)}
+                                className="select-field"
+                                required
+                            >
+                                <option value="anthropic">Anthropic</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="google">Google AI</option>
+                                <option value="xai">xAI</option>
+                                <option value="deepseek">DeepSeek</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-slate-900">API key</label>
+                            <input
+                                type="password"
+                                value={apiKeyInput}
+                                onChange={(event) => setApiKeyInput(event.target.value)}
+                                placeholder="sk-ant-... or sk-... or AIza..."
+                                required
+                                minLength={10}
+                                className="field mono"
+                            />
+                        </div>
+                        <button type="submit" disabled={generating || !apiKeyInput} className="btn-primary">
+                            {generating ? "Encrypting..." : "Store key"}
+                            {!generating && <KeyRound className="h-4 w-4" />}
+                        </button>
+                    </form>
+                </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-800 text-gray-400">
+                <div className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-5 w-5 text-[var(--amber)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Vault posture</h2>
+                    </div>
+                    <div className="mt-5 space-y-4 text-sm text-[var(--text-muted)]">
+                        <div className="panel-muted p-4">Keys are encrypted with AES-256-GCM before they hit storage.</div>
+                        <div className="panel-muted p-4">The UI only displays provider and key prefix, not the full secret.</div>
+                        <div className="panel-muted p-4">Revoking a key removes it from the browser-visible list and backend lookup path.</div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="table-shell">
+                <table>
+                    <thead>
                         <tr>
-                            <th className="px-6 py-3 font-medium">PROVIDER</th>
-                            <th className="px-6 py-3 font-medium">KEY PREFIX</th>
-                            <th className="px-6 py-3 font-medium">CREATED</th>
-                            <th className="px-6 py-3 font-medium text-right">ACTIONS</th>
+                            <th>Provider</th>
+                            <th>Key prefix</th>
+                            <th>Created</th>
+                            <th className="text-right">Action</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-800">
+                    <tbody>
                         {loading ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">Loading keys...</td></tr>
-                        ) : keys.length === 0 ? (
-                            <tr><td colSpan={4} className="px-6 py-8 text-center text-gray-500">No API keys stored. Add your first provider key above.</td></tr>
-                        ) : keys.map((key) => (
-                            <tr key={key.id} className="hover:bg-gray-800/50">
-                                <td className="px-6 py-4 font-medium capitalize">{key.provider}</td>
-                                <td className="px-6 py-4 font-mono text-xs text-gray-400">{key.key_prefix}</td>
-                                <td className="px-6 py-4 text-gray-400">{new Date(key.created_at).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 text-right">
-                                    <button onClick={() => deleteKey(key.id)} className="text-red-400 hover:text-red-300">
-                                        <Trash2 size={16} />
-                                    </button>
+                            <tr>
+                                <td colSpan={4} className="px-5 py-8 text-center text-[var(--text-muted)]">
+                                    Loading keys...
                                 </td>
                             </tr>
-                        ))}
+                        ) : keys.length === 0 ? (
+                            <tr>
+                                <td colSpan={4} className="px-5 py-8 text-center text-[var(--text-muted)]">
+                                    No API keys stored yet.
+                                </td>
+                            </tr>
+                        ) : (
+                            keys.map((key) => (
+                                <tr key={key.id}>
+                                    <td className="font-medium capitalize text-slate-900">{key.provider}</td>
+                                    <td className="mono text-sm text-[var(--text-muted)]">{key.key_prefix}</td>
+                                    <td>{new Date(key.created_at).toLocaleDateString()}</td>
+                                    <td className="text-right">
+                                        <button
+                                            type="button"
+                                            onClick={() => setKeyToDelete(key.id)}
+                                            className="btn-ghost ml-auto text-red-700 hover:bg-red-50"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Revoke
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
-            </div>
+            </section>
+
+            <ConfirmDialog
+                open={!!keyToDelete}
+                title="Revoke provider key?"
+                description="This removes the key from the vault. Proxy requests that depend on it will fail until a replacement is stored."
+                confirmLabel="Revoke key"
+                busy={isDeleting}
+                onCancel={() => setKeyToDelete(null)}
+                onConfirm={deleteKey}
+            />
         </div>
     );
 }

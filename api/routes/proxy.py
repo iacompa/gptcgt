@@ -7,6 +7,7 @@ This endpoint mirrors the same credit mode logic used by the LiteLLM proxy:
 - Deduct credits atomically
 - Write immutable usage_events row
 """
+
 import logging
 from typing import Optional
 
@@ -14,8 +15,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from api.database import get_pool
-from api.services.cost_computation import determine_tier
-from src.billing.credits import CreditService
+from src.billing.credits import CreditService, resolve_billing_mode
 from src.billing.spending_caps import SpendingCapService
 
 logger = logging.getLogger(__name__)
@@ -44,20 +44,12 @@ async def record_usage(request: Request, body: RecordUsageRequest):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     pool = get_pool()
-    mode = determine_tier(body.model or "")
+    mode = resolve_billing_mode(body.model)
 
-    affordability = await credit_service.check_credits(pool, user_id, mode)
-    if not affordability["can_proceed"]:
-        raise HTTPException(
-            status_code=402,
-            detail=(
-                f"Insufficient credits. Requires {affordability['credits_cost']}. "
-                f"Remaining: {affordability['remaining']}"
-            ),
-        )
+    cost = credit_service.CREDIT_COSTS.get(mode, 5)
 
     # F08: Spending cap enforcement (was missing — bypass path vs main proxy)
-    cap_status = await spending_caps.check_before_task(pool, user_id, affordability["credits_cost"])
+    cap_status = await spending_caps.check_before_task(pool, user_id, cost)
     if not cap_status["allowed"]:
         raise HTTPException(
             status_code=403,
@@ -67,30 +59,37 @@ async def record_usage(request: Request, body: RecordUsageRequest):
             ),
         )
 
-    deduction = await credit_service.deduct(pool, user_id, mode)
-    if not deduction.get("success"):
-        raise HTTPException(status_code=402, detail="Insufficient credits")
+    deduction = await credit_service.check_and_deduct(pool, user_id, mode)
+    if not deduction["can_proceed"]:
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Insufficient credits. Requires {deduction.get('credits_cost', cost)}. "
+                f"Remaining: {deduction.get('remaining', 0)}"
+            ),
+        )
 
     async with pool.acquire() as conn:
-        internal_id = await conn.fetchval(
-            "SELECT id FROM users WHERE workos_user_id = $1",
+        user_row = await conn.fetchrow(
+            "SELECT id, team_id FROM users WHERE workos_user_id = $1",
             user_id,
         )
-        if not internal_id:
+        if not user_row:
             raise HTTPException(status_code=404, detail="User not found")
 
         await conn.execute(
             """
             INSERT INTO usage_events
             (
-                user_id, task_mode, credits_consumed, models_used,
+                user_id, team_id, task_mode, credits_consumed, models_used,
                 input_tokens, output_tokens, success, duration_ms, created_at
             )
-            VALUES ($1, $2, $3, $4, $5, 0, true, 0, now())
+            VALUES ($1, $2, $3, $4, $5, $6, 0, true, 0, now())
             """,
-            internal_id,
+            user_row["id"],
+            user_row["team_id"],
             mode,
-            affordability["credits_cost"],
+            cost,
             [body.model or "unknown"],
             max(body.tokens_used, 0),
         )

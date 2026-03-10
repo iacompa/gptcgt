@@ -43,9 +43,7 @@ class ContextCompactor:
         keep_full_count = 20
 
         # Only consider USER and AGENT messages for the LLM context
-        conversational_msgs = [
-            m for m in chat_history if m.role in (MessageRole.USER, MessageRole.AGENT)
-        ]
+        conversational_msgs = [m for m in chat_history if m.role in (MessageRole.USER, MessageRole.AGENT)]
 
         if len(conversational_msgs) > keep_full_count:
             to_summarize = conversational_msgs[:-keep_full_count]
@@ -56,9 +54,7 @@ class ContextCompactor:
                 self._summary_cache = await self._summarize_old_messages(to_summarize)
                 self._last_summarized_index = len(to_summarize)
 
-            messages.append(
-                {"role": "user", "content": f"[Earlier in session summary: {self._summary_cache}]"}
-            )
+            messages.append({"role": "user", "content": f"[Earlier in session summary: {self._summary_cache}]"})
         else:
             recent = conversational_msgs
 
@@ -105,10 +101,7 @@ class ContextCompactor:
         try:
             summary = await self._llm_summarize(messages)
             if summary:
-                logger.debug(
-                    f"LLM compaction succeeded: {len(messages)} msgs → "
-                    f"{len(summary)} chars"
-                )
+                logger.debug(f"LLM compaction succeeded: {len(messages)} msgs → {len(summary)} chars")
                 return summary
         except Exception as e:
             logger.debug(f"LLM summarization unavailable, using heuristic: {e}")

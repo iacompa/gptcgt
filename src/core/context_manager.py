@@ -32,6 +32,7 @@ def _try_post_truncation_event(
         import textual.app as _tapp
 
         from src.core.events import ContextTruncated
+
         _tapp.active_app.get().post_message(
             ContextTruncated(
                 reason=reason,
@@ -62,8 +63,9 @@ class ContextManager:
             # Honor config-level per-agent token cap if set
             try:
                 from src.core.config import ConfigManager
+
                 cfg = ConfigManager.get_instance()
-                cap = getattr(cfg, "max_context_tokens_per_agent", 0)
+                cap = cfg.get("max_context_tokens_per_agent")
                 if cap and cap > 0:
                     self.max_tokens = min(self.max_tokens, cap)
                     logger.debug(f"Applied per-agent token cap: {cap}")
@@ -176,9 +178,7 @@ class ContextManager:
             # Keep most recent messages that fit within budget (newest first priority)
             accumulated_tokens = 0
             for msg in reversed(history_messages):
-                msg_tokens = (
-                    self.count_tokens(str(msg.get("content", ""))) + 4
-                )  # overhead per message
+                msg_tokens = self.count_tokens(str(msg.get("content", ""))) + 4  # overhead per message
                 if accumulated_tokens + msg_tokens > remaining_budget:
                     messages_dropped += 1
                     continue

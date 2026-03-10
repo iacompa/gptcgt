@@ -252,6 +252,7 @@ class FileTreePanel(Vertical):
     def _handle_ai_tree_action(self, action: str) -> None:
         """Handle AI context-menu actions from file tree."""
         from src.core.events import TaskReceived
+
         if "|" in action:
             cmd, path_str = action.split("|", 1)
             file_path = Path(path_str)
@@ -263,17 +264,23 @@ class FileTreePanel(Vertical):
             }
             if cmd == "tree_add_context":
                 from src.core.events import ContextModified
+
                 self.app.post_message(ContextModified(action="add", file_path=str(file_path)))
                 from src.tui.widgets.toast import notify
+
                 notify(self.app, "Context", f"Added {file_path.name} to chat context.", "info")
             elif cmd in prompts and prompts[cmd]:
-                self.app.post_message(
-                    TaskReceived(task_str=prompts[cmd], attached_files=[file_path])
-                )
+                self.app.post_message(TaskReceived(task_str=prompts[cmd], attached_files=[file_path]))
         elif action == "ai_explain_project":
-            self.app.post_message(TaskReceived(task_str="Explain what this project does and its overall architecture.", attached_files=[]))  # noqa: E501
+            self.app.post_message(
+                TaskReceived(task_str="Explain what this project does and its overall architecture.", attached_files=[])
+            )  # noqa: E501
         elif action == "ai_bugs_project":
-            self.app.post_message(TaskReceived(task_str="Scan the codebase for bugs, security issues, and code smells.", attached_files=[]))  # noqa: E501
+            self.app.post_message(
+                TaskReceived(
+                    task_str="Scan the codebase for bugs, security issues, and code smells.", attached_files=[]
+                )
+            )  # noqa: E501
 
     @on(FileRelevanceUpdated)
     def highlight_relevant_files(self, event: FileRelevanceUpdated) -> None:

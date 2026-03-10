@@ -43,16 +43,16 @@ class ModeManager:
     def __init__(self):
         self.active_mode = OperationMode.STANDARD
         self.current_credits_used = 0
+        self._explicit_override = False
 
     def check_credits(self, mode: OperationMode) -> bool:
         """Check if we have enough simulated credits for the mode."""
         cost = CREDIT_COSTS.get(mode, 5)
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
-            if hasattr(current_app, "auth_manager") and getattr(
-                current_app.auth_manager, "use_managed_credits", False
-            ):
+            if hasattr(current_app, "auth_manager") and getattr(current_app.auth_manager, "use_managed_credits", False):
                 if getattr(current_app.auth_manager, "credits_remaining", 0) < cost:
                     return False
         except Exception:
@@ -62,6 +62,7 @@ class ModeManager:
     def set_mode(self, mode: OperationMode) -> None:
         """Explicitly override the operating mode."""
         self.active_mode = mode
+        self._explicit_override = True
         logger.info(f"Operation mode explicitly set to: {mode.name}")
 
     def initialize_task(self, _requested_tier: QualityTier) -> None:
@@ -75,6 +76,7 @@ class ModeManager:
         """
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "cost_tracker"):
                 today_spend = current_app.cost_tracker.get_today_spend()
@@ -93,6 +95,10 @@ class ModeManager:
 
         # Only fall back to STANDARD if the mode was not explicitly chosen by the user.
         # ARCHITECT, ENSEMBLE, BATTLE, and SINGLE_MODEL_* modes must be preserved.
+        if self._explicit_override:
+            # User firmly requested this mode via UI or /mode command, so don't revert it
+            return
+
         _preserved_modes = {
             OperationMode.ENSEMBLE,
             OperationMode.ARCHITECT,
@@ -132,10 +138,10 @@ class ModeManager:
         """Check if auto-tiering is allowed by user config."""
         try:
             import textual.app as _tapp
+
             current_app = _tapp.active_app.get()
             if hasattr(current_app, "config"):
                 return getattr(current_app.config.user, "allow_auto_tiering", True)
         except Exception:
             pass
         return True
-

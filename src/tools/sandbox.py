@@ -167,12 +167,11 @@ class E2BSandbox:
 
     def __init__(self) -> None:
         from src.auth.keychain import KeyChainManager
+
         self._api_key = KeyChainManager.get_key("E2B_API_KEY") or os.environ.get("E2B_API_KEY", "")
         self._available = bool(self._api_key)
         if not self._available:
-            logger.info(
-                "E2B API key not configured — sandbox verification disabled, using local fallback"
-            )
+            logger.info("E2B API key not configured — sandbox verification disabled, using local fallback")
 
     @property
     def available(self) -> bool:
@@ -200,13 +199,13 @@ class E2BSandbox:
 
         # Compute diff stats (always local, instant)
         result.lines_changed = sum(
-            sum(len(h.modified_lines) + len(h.original_lines) for h in fp.hunks)
-            for fp in patch_set.patches
+            sum(len(h.modified_lines) + len(h.original_lines) for h in fp.hunks) for fp in patch_set.patches
         )
         result.files_touched = patch_set.file_count
 
         if not self._available:
             from src.auth.keychain import KeyChainManager
+
             session_token = KeyChainManager.get_key("GPTCGT_SESSION_TOKEN")
             if session_token:
                 try:
@@ -311,16 +310,24 @@ class E2BSandbox:
                 patched = "\n".join(lines)
                 if files_to_upload[str(fp.file_path)].endswith("\n"):
                     patched += "\n"
+
+                # P2-08: Circuit breaker - check syntax in memory before transmission
+                if str(fp.file_path).endswith(".py"):
+                    import ast
+                    try:
+                        ast.parse(patched)
+                    except SyntaxError as e:
+                        logger.error(f"Syntax error in patched {fp.file_path}: {e}")
+                        result.syntax_valid = False
+                        result.syntax_errors.append(f"{fp.file_path}: SyntaxError: {e}")
+                        return result  # Abort immediately
+
                 files_to_upload[str(fp.file_path)] = patched
 
         tools = LANGUAGE_TOOLS.get(language, LANGUAGE_TOOLS.get("python"))
         test_cmd = test_command or tools.get("test_runner", "pytest")
 
-        payload = {
-            "files": files_to_upload,
-            "language": language,
-            "command": test_cmd
-        }
+        payload = {"files": files_to_upload, "language": language, "command": test_cmd}
 
         config = ConfigManager.get_instance()
         base_url = config.user.api_base_url or "https://gptcgt.ai/api"
@@ -332,11 +339,7 @@ class E2BSandbox:
 
         try:
             async with httpx.AsyncClient(timeout=65.0) as client:
-                resp = await client.post(
-                    url,
-                    json=payload,
-                    headers={"Authorization": f"Bearer {session_token}"}
-                )
+                resp = await client.post(url, json=payload, headers={"Authorization": f"Bearer {session_token}"})
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -347,10 +350,7 @@ class E2BSandbox:
 
             # Parse test results
             result.test_result = self._parse_test_output(
-                data.get("stdout", ""),
-                data.get("stderr", ""),
-                data.get("exit_code", 1),
-                language
+                data.get("stdout", ""), data.get("stderr", ""), data.get("exit_code", 1), language
             )
         except Exception as e:
             if on_stderr:
@@ -404,6 +404,18 @@ class E2BSandbox:
                     patched = "\n".join(lines)
                     if original.endswith("\n"):
                         patched += "\n"
+
+                    # P2-08: Circuit breaker - check syntax in memory before transmission
+                    if str(fp.file_path).endswith(".py"):
+                        import ast
+                        try:
+                            ast.parse(patched)
+                        except SyntaxError as e:
+                            logger.error(f"Syntax error in patched {fp.file_path}: {e}")
+                            result.syntax_valid = False
+                            result.syntax_errors.append(f"{fp.file_path}: SyntaxError: {e}")
+                            return result  # Abort immediately
+
                     sandbox.files.write(f"/home/user/project/{fp.file_path}", patched)
                 except Exception as e:
                     logger.warning(f"Failed to apply patch for {fp.file_path}: {e}")
@@ -515,9 +527,7 @@ class E2BSandbox:
             logger.warning(f"Failed to parse lint output: {e}")
         return result
 
-    def _parse_test_output(
-        self, stdout: str, stderr: str, exit_code: int, language: str
-    ) -> TestResult:
+    def _parse_test_output(self, stdout: str, stderr: str, exit_code: int, language: str) -> TestResult:
         """Parse test runner output into TestResult."""
         result = TestResult()
         combined = f"{stdout}\n{stderr}"

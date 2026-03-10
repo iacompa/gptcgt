@@ -42,9 +42,7 @@ def decrypt_key(encrypted_str: str) -> str:
         ciphertext = payload[12:-16]
 
         key = _get_key()
-        decryptor = Cipher(
-            algorithms.AES(key), modes.GCM(iv, tag), backend=default_backend()
-        ).decryptor()
+        decryptor = Cipher(algorithms.AES(key), modes.GCM(iv, tag), backend=default_backend()).decryptor()
 
         plain_text = decryptor.update(ciphertext) + decryptor.finalize()
         return plain_text.decode()

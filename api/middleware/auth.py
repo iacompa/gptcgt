@@ -11,21 +11,23 @@ moderation_service = ModerationService()
 
 # Paths that don't need authentication — EXACT match or explicit prefix
 # Using tuples of (path, match_type) where match_type is "exact" or "prefix"
-PUBLIC_PATHS_EXACT = frozenset({
-    "/health",
-    "/docs",
-    "/openapi.json",
-    "/auth/device",
-    "/auth/token",
-    "/auth/signin",
-    "/auth/sso/callback",
-    "/billing/webhook",
-})
+PUBLIC_PATHS_EXACT = frozenset(
+    {
+        "/health",
+        "/docs",
+        "/openapi.json",
+        "/auth/device",
+        "/auth/token",
+        "/auth/signin",
+        "/auth/sso/callback",
+        "/billing/webhook",
+    }
+)
 
 PUBLIC_PATH_PREFIXES = (
-    "/docs/",        # Only /docs/ subpaths, not /docs-secret
+    "/docs/",  # Only /docs/ subpaths, not /docs-secret
     "/auth/device/",  # Only /auth/device/ subpaths
-    "/auth/token/",   # Only /auth/token/ subpaths
+    "/auth/token/",  # Only /auth/token/ subpaths
     "/billing/webhook/",
 )
 
@@ -80,13 +82,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not user_row:
                 # Try matching by email (web login flow sets sub=email)
                 email = payload.get("email") or user_id
-                user_row = await pool.fetchrow(
+                user_rows = await pool.fetch(
                     "SELECT workos_user_id FROM users WHERE email = $1",
                     email,
                 )
 
-                if user_row:
-                    user_id = user_row["workos_user_id"]
+                if len(user_rows) > 1:
+                    return self._json_response(401, "Ambiguous account resolution (multiple emails). Please use SSO.")
+                elif len(user_rows) == 1:
+                    user_id = user_rows[0]["workos_user_id"]
                 else:
                     # SECURITY: Reject if user not found — no silent fallthrough
                     return self._json_response(
@@ -100,26 +104,24 @@ class AuthMiddleware(BaseHTTPMiddleware):
             async with pool.acquire() as conn:
                 status = await moderation_service.check_user_status(conn, user_id)
                 if status["status"] != "active":
-                    return self._json_response(
-                        403, f"Account {status['status']}: {status.get('reason')}"
-                    )
+                    return self._json_response(403, f"Account {status['status']}: {status.get('reason')}")
 
                 # Credit-Exhaustion Enforcement for AI proxy endpoints
                 if self._is_proxy_endpoint(path):
-                    credits = await conn.fetchval(
+                    row = await conn.fetchrow(
                         """
-                        SELECT COALESCE(
-                            t.shared_credits_remaining,
-                            u.credits_remaining,
-                            0
-                        )
+                        SELECT
+                            COALESCE(t.shared_credits_remaining, u.credits_remaining, 0) as credits,
+                            COALESCE(t.overage_enabled, u.overage_enabled) as overage_enabled
                         FROM users u
                         LEFT JOIN teams t ON u.team_id = t.id
                         WHERE u.workos_user_id = $1
                         """,
                         user_id,
                     )
-                    if credits is not None and credits <= 0:
+                    credits = row["credits"] if row else 0
+                    overage = row["overage_enabled"] if row else False
+                    if credits is not None and credits <= 0 and not overage:
                         msg = (
                             "⚠️ Credits exhausted. Visit your dashboard at "
                             "https://gptcgt.ai/dashboard/billing "
@@ -143,6 +145,4 @@ class AuthMiddleware(BaseHTTPMiddleware):
     def _json_response(self, status_code: int, message: str):
         from fastapi.responses import JSONResponse
 
-        return JSONResponse(
-            status_code=status_code, content={"detail": message}
-        )
+        return JSONResponse(status_code=status_code, content={"detail": message})

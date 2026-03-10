@@ -286,10 +286,7 @@ class DropdownMenu(Vertical):
             self.close_submenu()
             return
 
-        if (
-            self.active_submenu
-            and getattr(self.active_submenu, "_source_item", None) == item_widget.item
-        ):
+        if self.active_submenu and getattr(self.active_submenu, "_source_item", None) == item_widget.item:
             return
 
         self.close_submenu()
@@ -300,9 +297,7 @@ class DropdownMenu(Vertical):
         x = region.x + region.width - 1
         y = region.y - 1
 
-        submenu = DropdownMenu(
-            item_widget.item.submenu, x=x, y=y, parent_dropdown=self, source_widget=item_widget
-        )
+        submenu = DropdownMenu(item_widget.item.submenu, x=x, y=y, parent_dropdown=self, source_widget=item_widget)
         submenu._source_item = item_widget.item
         self.active_submenu = submenu
         self.screen.mount(submenu)
@@ -384,11 +379,7 @@ class DropdownMenu(Vertical):
             for i in range(len(self._item_widgets)):
                 idx = (start + i) % len(self._item_widgets)
                 w = self._item_widgets[idx]
-                if (
-                    w.item.label.lower().startswith(char)
-                    and not w.item.is_disabled
-                    and not w.item.is_separator
-                ):
+                if w.item.label.lower().startswith(char) and not w.item.is_disabled and not w.item.is_separator:
                     self.focus_item(w)
                     break
 
@@ -396,11 +387,7 @@ class DropdownMenu(Vertical):
         if not self._item_widgets:
             return
 
-        start = (
-            self.focused_index
-            if self.focused_index >= 0
-            else (0 if direction > 0 else len(self._item_widgets) - 1)
-        )
+        start = self.focused_index if self.focused_index >= 0 else (0 if direction > 0 else len(self._item_widgets) - 1)
         curr = start
 
         for _ in range(len(self._item_widgets)):

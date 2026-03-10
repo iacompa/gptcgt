@@ -117,25 +117,19 @@ class ActivityFeedPanel(Vertical):
         self.query_one("#active-agents-bar").on_agent_dispatched(event)
 
     def on_agent_completed(self, event: AgentCompleted) -> None:
-        self._add_entry(
-            f"🎯 Orchestrator: Agent {event.agent_id} completed response.", is_orchestrator=True
-        )
+        self._add_entry(f"🎯 Orchestrator: Agent {event.agent_id} completed response.", is_orchestrator=True)
         # Propagate to status bar
         self.query_one("#active-agents-bar").on_agent_completed(event)
 
     def on_cost_updated(self, event: CostUpdated) -> None:
-        self._add_entry(
-            f"   💰 Task cost: ${event.task_cost:.3f} | Today: ${event.daily_total:.2f}"
-        )
+        self._add_entry(f"   💰 Task cost: ${event.task_cost:.3f} | Today: ${event.daily_total:.2f}")
 
     def on_patch_proposed(self, event: PatchProposed) -> None:
         self._add_entry(f"   📝 Patch proposed for {event.filepath.name} by {event.agent_id}")
 
     def on_security_alert(self, event: SecurityAlert) -> None:
         icon = "🔴" if event.severity == "high" else "🟡"
-        self._add_entry(
-            f"   {icon} Security Alert ({event.severity}): {event.details} in {event.filepath.name}"
-        )
+        self._add_entry(f"   {icon} Security Alert ({event.severity}): {event.details} in {event.filepath.name}")
 
     def on_dag_trace_event(self, event: DAGTraceEvent) -> None:
         """Render DAG node transitions as concise activity entries."""
@@ -145,9 +139,7 @@ class ActivityFeedPanel(Vertical):
         elif event.status == "done":
             elapsed = f"{event.elapsed_ms}ms" if event.elapsed_ms else ""
             arrow = f" → {event.next_node.replace('_', ' ').title()}" if event.next_node else ""
-            self._add_entry(
-                f"   ✓ {name} ({elapsed}){arrow}", is_orchestrator=True
-            )
+            self._add_entry(f"   ✓ {name} ({elapsed}){arrow}", is_orchestrator=True)
         elif event.status == "error":
             self._add_entry(
                 f"   ✗ {name} — {event.error or 'unknown error'}",
@@ -157,8 +149,12 @@ class ActivityFeedPanel(Vertical):
     # Phase 9: Inter-agent conversation rendering
 
     _AGENT_ICONS = {
-        "coder": "💻", "tester": "🧪", "arbiter": "⚖️",
-        "scout": "🔍", "orchestrator": "🎯", "architect": "📐",
+        "coder": "💻",
+        "tester": "🧪",
+        "arbiter": "⚖️",
+        "scout": "🔍",
+        "orchestrator": "🎯",
+        "architect": "📐",
     }
 
     def on_agent_conversation(self, event: AgentConversation) -> None:

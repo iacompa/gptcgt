@@ -4,37 +4,43 @@ CREATE TABLE IF NOT EXISTS users (
     workos_user_id TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     display_name TEXT,
+    password_hash TEXT,
     plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'team', 'enterprise')),
     credits_remaining INTEGER DEFAULT 0,
     credits_monthly INTEGER DEFAULT 0,
+    allocated_quota INTEGER,
     spending_cap INTEGER,                  -- User-set monthly max in dollars
+    overage_enabled BOOLEAN DEFAULT false,
     stripe_customer_id TEXT,
+    team_id UUID,
+    team_role TEXT DEFAULT 'member',
+    billing_access BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now(),
     last_active_at TIMESTAMPTZ
 );
 
--- Organizations (Team and Enterprise plans)
-CREATE TABLE IF NOT EXISTS organizations (
+-- Teams (Team and Enterprise plans, as well as personal workspaces)
+CREATE TABLE IF NOT EXISTS teams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    workos_org_id TEXT UNIQUE NOT NULL,
+    workos_team_id TEXT UNIQUE,            -- Nullable for personal workspaces
     name TEXT NOT NULL,
-    plan TEXT NOT NULL CHECK (plan IN ('team', 'enterprise')),
-    seats_purchased INTEGER NOT NULL,
-    shared_credits INTEGER DEFAULT 0,
+    plan TEXT NOT NULL CHECK (plan IN ('free', 'team', 'enterprise')),
+    seats_purchased INTEGER DEFAULT 1,
+    shared_credits_remaining INTEGER DEFAULT 0,
     stripe_customer_id TEXT,
     sso_enabled BOOLEAN DEFAULT false,
     data_residency TEXT DEFAULT 'us' CHECK (data_residency IN ('us', 'eu')),
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Org memberships
-CREATE TABLE IF NOT EXISTS org_members (
+-- Team memberships
+CREATE TABLE IF NOT EXISTS team_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
     role TEXT DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
     joined_at TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(user_id, org_id)
+    UNIQUE(user_id, team_id)
 );
 
 -- API key vault (encrypted, for managed BYOK at org level)
@@ -52,7 +58,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE TABLE IF NOT EXISTS usage_events (
     id UUID DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
-    org_id UUID,
+    team_id UUID,
     task_mode TEXT NOT NULL,               -- scout/standard/ensemble/architect
     credits_consumed INTEGER NOT NULL,
     models_used TEXT[] NOT NULL,
@@ -90,7 +96,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 -- Audit log (Enterprise only, partitioned by month)
 CREATE TABLE IF NOT EXISTS audit_log (
     id BIGSERIAL,
-    org_id UUID,
+    team_id UUID,
     user_id UUID,
     action TEXT NOT NULL,
     details JSONB,
@@ -108,8 +114,8 @@ CREATE TABLE IF NOT EXISTS audit_log_2026_03 PARTITION OF audit_log
 CREATE INDEX IF NOT EXISTS idx_users_workos ON users(workos_user_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_stripe ON users(stripe_customer_id);
-CREATE INDEX IF NOT EXISTS idx_org_members_user ON org_members(user_id);
-CREATE INDEX IF NOT EXISTS idx_org_members_org ON org_members(org_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id);
 CREATE INDEX IF NOT EXISTS idx_usage_user_date ON usage_events(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_usage_org_date ON usage_events(org_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_team_date ON usage_events(team_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_api_keys_owner ON api_keys(owner_type, owner_id);

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { BASE_URL } from "@/lib/config";
 
 export const dynamic = 'force-dynamic';
 
@@ -9,5 +8,4 @@ export async function POST() {
     response.cookies.delete("gptcgt_session");
     return response;
 }
-
 

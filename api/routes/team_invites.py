@@ -103,13 +103,18 @@ async def accept_invite(request: Request, body: AcceptInviteRequest):
 
     pool = get_pool()
     async with pool.acquire() as conn:
+        try:
+            invite_uuid = uuid.UUID(body.invite_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid invite ID format")
+
         # Find the invite
         invite = await conn.fetchrow(
             """
             SELECT id, team_id, email, role, status
             FROM team_invites WHERE id = $1
             """,
-            uuid.UUID(body.invite_id),
+            invite_uuid,
         )
         if not invite:
             raise HTTPException(status_code=404, detail="Invite not found")
@@ -208,9 +213,14 @@ async def remove_member(request: Request, body: RemoveMemberRequest):
         if not req or req["team_role"] not in ("owner", "admin"):
             raise HTTPException(status_code=403, detail="Only owners/admins can remove members")
 
+        try:
+            target_uuid = uuid.UUID(body.target_user_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid user ID format")
+
         target = await conn.fetchrow(
             "SELECT id, team_id, team_role FROM users WHERE id = $1",
-            uuid.UUID(body.target_user_id),
+            target_uuid,
         )
         if not target or target["team_id"] != req["team_id"]:
             raise HTTPException(status_code=404, detail="User not on your team")
@@ -256,24 +266,60 @@ async def delete_team(request: Request):
 
     pool = get_pool()
     async with pool.acquire() as conn:
-        req = await conn.fetchrow(
-            "SELECT id, team_id, team_role FROM users WHERE workos_user_id = $1",
-            workos_user_id,
-        )
-        if not req or req["team_role"] != "owner":
-            raise HTTPException(status_code=403, detail="Only the owner can delete the team")
+        async with conn.transaction():
+            req = await conn.fetchrow(
+                "SELECT id, team_id, team_role, stripe_subscription_id FROM users WHERE workos_user_id = $1",
+                workos_user_id,
+            )
+            if not req or req["team_role"] != "owner":
+                raise HTTPException(status_code=403, detail="Only the owner can delete the team")
 
-        team_id = req["team_id"]
+            team_id = req["team_id"]
 
-        # Move all members to personal teams
-        members = await conn.fetch(
-            "SELECT id FROM users WHERE team_id = $1 AND id != $2",
-            team_id,
-            req["id"],
-        )
+            # L3: Cancel Stripe subscription if active.
+            stripe_sub_id = req["stripe_subscription_id"]
+            if stripe_sub_id:
+                try:
+                    import logging
 
-        for member in members:
-            personal_id = await conn.fetchval(
+                    import stripe
+
+                    from api.config import settings
+
+                    stripe.api_key = settings.stripe_secret_key
+                    stripe.Subscription.delete(stripe_sub_id)
+                except Exception as e:
+                    logging.getLogger(__name__).error(
+                        f"Failed to cancel Stripe subscription {stripe_sub_id}: {e}"
+                    )
+
+            # Downgrade owner to free plan before moving everyone to personal workspaces.
+            await conn.execute(
+                "UPDATE users SET plan = 'free', credits_monthly = 0, subscription_status = 'cancelled', stripe_subscription_id = NULL WHERE id = $1",
+                req["id"],
+            )
+
+            members = await conn.fetch(
+                "SELECT id FROM users WHERE team_id = $1 AND id != $2",
+                team_id,
+                req["id"],
+            )
+
+            for member in members:
+                personal_id = await conn.fetchval(
+                    """
+                    INSERT INTO teams (name, plan, shared_credits_remaining)
+                    VALUES ('Personal Workspace', 'free', 0)
+                    RETURNING id
+                    """,
+                )
+                await conn.execute(
+                    "UPDATE users SET team_id = $1, team_role = 'owner' WHERE id = $2",
+                    personal_id,
+                    member["id"],
+                )
+
+            owner_team_id = await conn.fetchval(
                 """
                 INSERT INTO teams (name, plan, shared_credits_remaining)
                 VALUES ('Personal Workspace', 'free', 0)
@@ -281,46 +327,32 @@ async def delete_team(request: Request):
                 """,
             )
             await conn.execute(
-                "UPDATE users SET team_id = $1, team_role = 'owner' WHERE id = $2",
-                personal_id,
-                member["id"],
+                "UPDATE users SET team_id = $1 WHERE id = $2",
+                owner_team_id,
+                req["id"],
             )
 
-        # Move owner to a new personal team
-        owner_team_id = await conn.fetchval(
-            """
-            INSERT INTO teams (name, plan, shared_credits_remaining)
-            VALUES ('Personal Workspace', 'free', 0)
-            RETURNING id
-            """,
-        )
-        await conn.execute(
-            "UPDATE users SET team_id = $1 WHERE id = $2",
-            owner_team_id,
-            req["id"],
-        )
+            await conn.execute(
+                "UPDATE team_invites SET status = 'cancelled' WHERE team_id = $1 AND status = 'pending'",
+                team_id,
+            )
 
-        # Cancel pending invites
-        await conn.execute(
-            "UPDATE team_invites SET status = 'cancelled' WHERE team_id = $1 AND status = 'pending'",
-            team_id,
-        )
-
-        # Delete the team
-        await conn.execute("DELETE FROM teams WHERE id = $1", team_id)
+            await conn.execute("DELETE FROM teams WHERE id = $1", team_id)
 
     return {"status": "deleted"}
 
 
+class RenameTeamRequest(BaseModel):
+    name: str
+
 @router.patch("/name")
-async def rename_team(request: Request):
+async def rename_team(request: Request, body: RenameTeamRequest):
     """Rename the team. Owner only."""
     workos_user_id = getattr(request.state, "user_id", None)
     if not workos_user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    body = await request.json()
-    new_name = body.get("name", "").strip()
+    new_name = body.name.strip()
     if not new_name or len(new_name) > 100:
         raise HTTPException(status_code=400, detail="Name must be 1-100 characters")
 

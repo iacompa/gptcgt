@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     cors_origins: str = "https://gptcgt.ai,https://www.gptcgt.ai,http://localhost:3000,https://gptcgt-git-main-michaelangelor20-8162s-projects.vercel.app,https://gptcgt-fv4ikb7um-michaelangelor20-8162s-projects.vercel.app"
     environment: str = "production"
 
+    # GitHub OAuth Settings
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    base_url: str = "https://gptcgt.ai"
+
+    # Credit Costs
+    credit_cost_scout: int = 1
+    credit_cost_standard: int = 5
+    credit_cost_ensemble: int = 25
+    credit_cost_architect: int = 100
+    credit_cost_battle: int = 25
+    credit_cost_sandbox: int = 1
+
 
 settings = Settings()
 
@@ -30,8 +43,7 @@ _is_testing = "PYTEST_CURRENT_TEST" in os.environ or "pytest" in os.environ.get(
 if settings.environment == "production" and not _is_testing:
     if not settings.jwt_secret or len(settings.jwt_secret) < 32:
         raise RuntimeError(
-            "FATAL: JWT_SECRET must be at least 32 characters in production. "
-            "Set the JWT_SECRET environment variable."
+            "FATAL: JWT_SECRET must be at least 32 characters in production. Set the JWT_SECRET environment variable."
         )
 
 # Fallback to registry if not loaded via env vars properly

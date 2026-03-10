@@ -7,6 +7,7 @@ from src.core.logger import get_logger
 
 log = get_logger(__name__)
 
+
 class EloTracker:
     """
     Tracks ELO ratings, match histories, and financial costs for LLM models
@@ -83,6 +84,7 @@ class EloTracker:
         loser_elo: float,
         winner_matches: int = 0,
         loser_matches: int = 0,
+        complexity: int = 5,
     ) -> tuple[float, float]:
         """
         Calculate new ELO ratings with dynamic K-factor.
@@ -91,7 +93,13 @@ class EloTracker:
         - Cold start (< 10 matches): K=40 (faster calibration)
         - Warm (10-30 matches): K=32
         - Veteran (30+ matches): K=16 (stable)
+
+        Complexity amplifier:
+        - Low complexity (1-3): K *= 0.7 (less rating change for easy tasks)
+        - Medium complexity (4-6): K *= 1.0 (baseline)
+        - High complexity (7-10): K *= 1.3 (more rating change for hard tasks)
         """
+
         def _k(matches: int) -> float:
             if matches < 10:
                 return 40.0
@@ -99,8 +107,16 @@ class EloTracker:
                 return 32.0
             return 16.0
 
-        k_winner = _k(winner_matches)
-        k_loser = _k(loser_matches)
+        # Complexity amplifier: hard tasks should shift ratings more
+        if complexity <= 3:
+            complexity_mult = 0.7
+        elif complexity <= 6:
+            complexity_mult = 1.0
+        else:
+            complexity_mult = 1.3
+
+        k_winner = _k(winner_matches) * complexity_mult
+        k_loser = _k(loser_matches) * complexity_mult
 
         # Expected win probability
         expected_winner = 1.0 / (1.0 + 10.0 ** ((loser_elo - winner_elo) / 400.0))
@@ -118,7 +134,7 @@ class EloTracker:
         loser_ids: List[str],
         complexity: int = 1,
         duration_sec: float = 0.0,
-        costs: Dict[str, float] = None
+        costs: Dict[str, float] = None,
     ) -> bool:
         """
         Records an arena match outcome and updates ELO ratings.
@@ -138,36 +154,51 @@ class EloTracker:
 
                 # 2. Record the match
                 winner_cost = costs.get(winner_id, 0.0)
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO matches (timestamp, winning_model, complexity, duration_sec, cost)
                     VALUES (?, ?, ?, ?, ?)
-                """, (time.time(), winner_id, complexity, duration_sec, winner_cost))
+                """,
+                    (time.time(), winner_id, complexity, duration_sec, winner_cost),
+                )
                 match_id = cursor.lastrowid
 
                 # 3. Record participants and total spend
                 # Winner
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO match_participants (match_id, model_id, is_winner, cost)
                     VALUES (?, ?, ?, ?)
-                """, (match_id, winner_id, True, winner_cost))
+                """,
+                    (match_id, winner_id, True, winner_cost),
+                )
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE models SET matches_won = matches_won + 1, total_spent = total_spent + ?
                     WHERE id = ?
-                """, (winner_cost, winner_id))
+                """,
+                    (winner_cost, winner_id),
+                )
 
                 # Losers
                 for loser_id in loser_ids:
                     loser_cost = costs.get(loser_id, 0.0)
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO match_participants (match_id, model_id, is_winner, cost)
                         VALUES (?, ?, ?, ?)
-                    """, (match_id, loser_id, False, loser_cost))
+                    """,
+                        (match_id, loser_id, False, loser_cost),
+                    )
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE models SET matches_lost = matches_lost + 1, total_spent = total_spent + ?
                         WHERE id = ?
-                    """, (loser_cost, loser_id))
+                    """,
+                        (loser_cost, loser_id),
+                    )
 
                 # 4. Calculate and update ELO
                 cursor.execute("SELECT elo_rating FROM models WHERE id = ?", (winner_id,))
@@ -193,13 +224,15 @@ class EloTracker:
 
                     # Calculate new ELOs with K-factor decay
                     new_winner_elo_from_this, new_loser_elo = self._calculate_elo(
-                        winner_elo, loser_elo,
+                        winner_elo,
+                        loser_elo,
                         winner_matches=winner_total,
                         loser_matches=loser_total,
+                        complexity=complexity,
                     )
 
                     # Accumulate delta for winner
-                    winner_elo_delta += (new_winner_elo_from_this - winner_elo)
+                    winner_elo_delta += new_winner_elo_from_this - winner_elo
 
                     # Update loser ELO immediately
                     cursor.execute("UPDATE models SET elo_rating = ? WHERE id = ?", (new_loser_elo, loser_id))
@@ -257,9 +290,7 @@ class EloTracker:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT * FROM models WHERE id = ?", (model_id,)
-                )
+                cursor.execute("SELECT * FROM models WHERE id = ?", (model_id,))
                 row = cursor.fetchone()
                 return dict(row) if row else None
         except sqlite3.Error as e:

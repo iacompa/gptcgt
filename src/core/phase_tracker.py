@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from src.core.workspace import Workspace
 
+from src.core.execution_state import is_excluded_path
 from src.core.logger import get_logger
 
 logger = get_logger("core.phase")
@@ -120,8 +121,8 @@ class PhaseTracker:
                 except ValueError:
                     continue
 
-                # Exclude our own dir
-                if rel_path.startswith(".gptcgt/") or rel_path.startswith(".git/"):
+                # Exclude artifacts and build dirs
+                if is_excluded_path(rel_path):
                     continue
 
                 try:
@@ -154,9 +155,7 @@ class PhaseTracker:
 
         return self.render_markdown()
 
-    def update_after_task(
-        self, task_title: str, files_changed: list[str], _task_outcome: str
-    ) -> None:
+    def update_after_task(self, task_title: str, files_changed: list[str], _task_outcome: str) -> None:
         """Update phase.md after a task completes."""
         self.ensure_loaded()
 
@@ -349,9 +348,7 @@ class PhaseTracker:
                         line_count = int(parts[4])
                     except ValueError:
                         line_count = 0
-                    self._file_map[path] = FileEntry(
-                        path=path, purpose=purpose, status=status, lines=line_count
-                    )
+                    self._file_map[path] = FileEntry(path=path, purpose=purpose, status=status, lines=line_count)
             elif current_section == "phases":
                 if line.startswith("### Phase "):
                     m = re.match(r"### Phase (\d+):\s*(.*?)\s*(⬚|🔄|✅|🚫|👁️)?$", line)
@@ -360,18 +357,14 @@ class PhaseTracker:
                         title = m.group(2).strip()
                         icon = m.group(3) if m.group(3) else "⬚"
                         status_val = PhaseStatus.from_icon(icon)
-                        current_phase = Phase(
-                            number=num, title=title, description="", status=status_val
-                        )
+                        current_phase = Phase(number=num, title=title, description="", status=status_val)
                         self._phases.append(current_phase)
                 elif line.startswith("- [") and current_phase:
                     m = re.match(r"- \[(.)\]\s*(.*)", line)
                     if m:
                         is_checked = m.group(1).lower() == "x"
                         name = m.group(2).strip()
-                        current_phase.tasks.append(
-                            {"name": name, "status": is_checked, "notes": ""}
-                        )
+                        current_phase.tasks.append({"name": name, "status": is_checked, "notes": ""})
                 elif current_phase and not line.startswith("###") and not line.startswith("-"):
                     if current_phase.description:
                         current_phase.description += "\n" + line
@@ -385,6 +378,4 @@ class PhaseTracker:
             ):
                 parts = [p.strip() for p in line.split("|")]
                 if len(parts) >= 5:
-                    self._changelog.append(
-                        {"date": parts[1], "change": parts[2], "files": parts[3], "phase": parts[4]}
-                    )
+                    self._changelog.append({"date": parts[1], "change": parts[2], "files": parts[3], "phase": parts[4]})

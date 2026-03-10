@@ -2,8 +2,8 @@
 System Prompt Builder.
 
 Assembles the system prompt injected into the LLM context.
-Aggregates the user's base identity rule, workspace status, phase.md context,
-and any active instructions.
+Aggregates the user's base identity rule, workspace status,
+execution state context, and any active instructions.
 """
 
 from __future__ import annotations
@@ -82,16 +82,35 @@ class SystemPromptBuilder:
                     prompt_parts.append("------------------------------")
                     budget_remaining -= alloc
 
-            phase_tracker = PhaseTracker(ws)
-            phase_tracker.ensure_loaded()
-            phase_path = ws.get_project_root() / ".gptcgt" / "phase.md"
-            if ws.safe_exists(phase_path) and budget_remaining > 0:
-                phase_content = ws.safe_read(phase_path)
-                if phase_content:
-                    alloc = min(len(phase_content), 3000, budget_remaining)
-                    prompt_parts.append("\n# Project Status (phase.md)")
-                    prompt_parts.append(phase_content[:alloc])
-                    budget_remaining -= alloc
+            # Prefer ExecutionState → ContextSlicer over raw phase.md
+            _injected_execution = False
+            try:
+                from src.core.execution_state import ContextSlicer, ExecutionState
+
+                exec_state = ExecutionState(ws.get_project_root())
+                if exec_state.load() and exec_state.items:
+                    slicer = ContextSlicer(exec_state)
+                    sliced = slicer.for_orchestrator(tier="standard")
+                    if sliced and budget_remaining > 0:
+                        alloc = min(len(sliced), 6000, budget_remaining)
+                        prompt_parts.append(f"\n{sliced[:alloc]}")
+                        budget_remaining -= alloc
+                        _injected_execution = True
+            except Exception:
+                pass  # ExecutionState not yet initialized
+
+            if not _injected_execution:
+                # Fallback: raw phase.md for backward compatibility
+                phase_tracker = PhaseTracker(ws)
+                phase_tracker.ensure_loaded()
+                phase_path = ws.get_project_root() / ".gptcgt" / "phase.md"
+                if ws.safe_exists(phase_path) and budget_remaining > 0:
+                    phase_content = ws.safe_read(phase_path)
+                    if phase_content:
+                        alloc = min(len(phase_content), 3000, budget_remaining)
+                        prompt_parts.append("\n# Project Status (phase.md)")
+                        prompt_parts.append(phase_content[:alloc])
+                        budget_remaining -= alloc
         except Exception:
             pass  # Workspace not initialized yet
 
@@ -112,6 +131,7 @@ class SystemPromptBuilder:
         # 4.7. Agent Blackboard (shared inter-agent state)
         try:
             from src.core.blackboard import AgentBlackboard
+
             bb = AgentBlackboard.get_instance()
             bb_context = bb.to_context_string()
             if bb_context and budget_remaining > 0:
@@ -131,6 +151,7 @@ class SystemPromptBuilder:
             memory_path = ws.get_project_root() / ".gptcgt" / "memory.json"
             if ws.safe_exists(memory_path):
                 import json
+
                 try:
                     memory_data = json.loads(ws.safe_read(memory_path))
                 except Exception:
@@ -141,12 +162,14 @@ class SystemPromptBuilder:
                     search_query = custom_instructions or "general programming task"
                     try:
                         from src.core.blackboard import AgentBlackboard
+
                         bb = AgentBlackboard.get_instance()
                         tb = bb.read("task_brief")
                         if tb and hasattr(tb, "user_request"):
                             search_query = tb.user_request
                     except Exception as e:
                         from src.core.logger import get_logger
+
                         get_logger("core.system_prompt").warning(f"Failed to read task brief for memory: {e}")
 
                     # Calculate query embedding via synchronous litellm
@@ -179,13 +202,14 @@ class SystemPromptBuilder:
                                 model=emb_model,
                                 input=[search_query],
                             )
-                            emb_query = emb_res.data[0]['embedding']
+                            emb_query = emb_res.data[0]["embedding"]
                         except Exception:
                             pass
 
                     # Retrieve top 3 lessons
                     top_lessons = []
                     if emb_query:
+
                         def _cosine_sim(v1, v2):
                             dot = sum(a * b for a, b in zip(v1, v2))
                             mag1 = sum(a * a for a in v1) ** 0.5
@@ -194,9 +218,9 @@ class SystemPromptBuilder:
 
                         scored_lessons = []
                         for m in memory_data:
-                            if m.get('type') == 'telemetry':
+                            if m.get("type") == "telemetry":
                                 continue
-                            lesson_emb = m.get('embedding')
+                            lesson_emb = m.get("embedding")
                             if not lesson_emb:
                                 continue
                             score = _cosine_sim(emb_query, lesson_emb)
@@ -207,10 +231,10 @@ class SystemPromptBuilder:
 
                         if not top_lessons:
                             # Fallback: Just take the 3 most recent non-telemetry if embedding loop yielded nothing
-                            top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]
+                            top_lessons = [m for m in memory_data if m.get("type") != "telemetry"][-3:]
                     else:
                         # Fallback: Just take the 3 most recent
-                        top_lessons = [m for m in memory_data if m.get('type') != 'telemetry'][-3:]
+                        top_lessons = [m for m in memory_data if m.get("type") != "telemetry"][-3:]
 
                     if top_lessons:
                         prompt_parts.append("\n<accumulated_learnings>")
@@ -226,16 +250,20 @@ class SystemPromptBuilder:
 
                         # Transient UI memory injection indicators
                         from src.core.events import AgentStatusUpdate
+
                         identity = model_name if model_name else role_type
                         try:
                             import textual.app as _tapp
+
                             current_app = _tapp.active_app.get()
-                            current_app.post_message(AgentStatusUpdate(
-                                agent_id="memory",
-                                model_name=identity,
-                                status="thinking",
-                                detail=f"Injected {len(top_lessons)} vector memories."
-                            ))
+                            current_app.post_message(
+                                AgentStatusUpdate(
+                                    agent_id="memory",
+                                    model_name=identity,
+                                    status="thinking",
+                                    detail=f"Injected {len(top_lessons)} vector memories.",
+                                )
+                            )
                         except Exception:
                             pass
         except Exception:

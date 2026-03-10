@@ -17,9 +17,7 @@ class CohereAgent(BaseAgent):
     async def chat_stream(self, messages: list[dict]) -> AsyncGenerator[AgentResponse, None]:
         api_key = self.config.api_key or KeyChainManager.get_key("COHERE_API_KEY")
         if not api_key:
-            yield AgentResponse(
-                error="COHERE_API_KEY not found in keychain.", is_streaming=False
-            )
+            yield AgentResponse(error="COHERE_API_KEY not found in keychain.", is_streaming=False)
             return
 
         async for chunk in LiteLLMClient.stream(
@@ -37,6 +35,7 @@ class CohereAgent(BaseAgent):
             yield chunk
 
     def count_tokens(self, text: str) -> int:
+        """Cohere uses a slightly larger token ratio (~1.1x cl100k_base)."""
         try:
             enc = tiktoken.get_encoding("cl100k_base")
             return int(len(enc.encode(text)) * 1.1)

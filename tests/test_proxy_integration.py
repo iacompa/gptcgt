@@ -94,7 +94,7 @@ class TestModeDetermination:
 
     def test_scout_models(self):
         """Small/cheap models should be classified as scout."""
-        from proxy.main import _determine_mode_from_model
+        from src.billing.credits import resolve_billing_mode
         scout_models = [
             "claude-3-haiku-20241022",
             "gemini-2.0-flash-lite",
@@ -102,50 +102,50 @@ class TestModeDetermination:
             "gemini-nano",
         ]
         for model in scout_models:
-            assert _determine_mode_from_model(model) == "scout", f"{model} should be scout"
+            assert resolve_billing_mode(model) == "scout", f"{model} should be scout"
 
     def test_standard_models(self):
         """Normal models should be classified as standard."""
-        from proxy.main import _determine_mode_from_model
+        from src.billing.credits import resolve_billing_mode
         standard_models = [
             "claude-3.5-sonnet",
             "gpt-4o",
             "deepseek-v3",
         ]
         for model in standard_models:
-            assert _determine_mode_from_model(model) == "standard", f"{model} should be standard"
+            assert resolve_billing_mode(model) == "standard", f"{model} should be standard"
 
-    def test_gemini_classified_as_scout(self):
-        """Gemini models contain 'mini' substring, so they are correctly classified as scout."""
-        from proxy.main import _determine_mode_from_model
-        # 'gemini' contains the substring 'mini' — this is intentional behaviour
-        assert _determine_mode_from_model("gemini-2.0-pro") == "scout"
+    def test_gemini_not_classified_as_scout(self):
+        """Gemini models contain 'mini' substring, but should NOT be classified as scout unless specified."""
+        from src.billing.credits import resolve_billing_mode
+        assert resolve_billing_mode("gemini-1.5-pro") == "standard"
+        assert resolve_billing_mode("gemini-2.0-pro") == "standard"
 
     def test_architect_models(self):
         """Reasoning/o-series models should be classified as architect."""
-        from proxy.main import _determine_mode_from_model
+        from src.billing.credits import resolve_billing_mode
         architect_models = [
             "o1-preview",
             "o3-preview",
             "claude-3-opus",
         ]
         for model in architect_models:
-            assert _determine_mode_from_model(model) == "architect", f"{model} should be architect"
+            assert resolve_billing_mode(model) == "architect", f"{model} should be architect"
 
     def test_o3_mini_classified_as_scout(self):
         """o3-mini contains 'mini' so it's classified as scout (checked before architect)."""
-        from proxy.main import _determine_mode_from_model
-        assert _determine_mode_from_model("o3-mini") == "scout"
+        from src.billing.credits import resolve_billing_mode
+        assert resolve_billing_mode("o3-mini") == "scout"
 
     def test_ensemble_mode(self):
         """Ensemble keyword in model name should map to ensemble."""
-        from proxy.main import _determine_mode_from_model
-        assert _determine_mode_from_model("ensemble-v1") == "ensemble"
+        from src.billing.credits import resolve_billing_mode
+        assert resolve_billing_mode("ensemble-v1") == "ensemble"
 
     def test_none_model_defaults_standard(self):
         """None model should default to standard."""
-        from proxy.main import _determine_mode_from_model
-        assert _determine_mode_from_model(None) == "standard"
+        from src.billing.credits import resolve_billing_mode
+        assert resolve_billing_mode(None) == "standard"
 
 
 # ─── Billing Pipeline Integration ────────────────────────────────────
@@ -159,7 +159,8 @@ class TestBillingPipelineIntegration:
     @pytest.mark.asyncio
     async def test_full_pipeline_blocked_by_filter(self, monkeypatch):
         """Request blocked by content filter should never reach billing."""
-        mock_credit_svc = AsyncMock()
+        mock_credit_svc = MagicMock()
+        mock_credit_svc.CREDIT_COSTS = {"standard": 5}
         monkeypatch.setattr("proxy.main.credit_service", mock_credit_svc)
 
         mock_filter = MagicMock()
@@ -186,25 +187,26 @@ class TestBillingPipelineIntegration:
     @pytest.mark.asyncio
     async def test_spending_cap_blocks_before_llm(self, monkeypatch):
         """Spending cap exceeded should block before any LLM call."""
-        mock_credit_svc = AsyncMock()
-        mock_credit_svc.check_credits.return_value = {
+        mock_credit_svc = MagicMock()
+        mock_credit_svc.CREDIT_COSTS = {"standard": 5}
+        mock_credit_svc.check_credits = AsyncMock(return_value={
             "can_proceed": True,
             "credits_cost": 50,
             "remaining": 500,
-        }
+        })
         monkeypatch.setattr("proxy.main.credit_service", mock_credit_svc)
 
         mock_filter = MagicMock()
         mock_filter.map_messages.return_value = (True, "")
         monkeypatch.setattr("proxy.main.content_filter", mock_filter)
 
-        mock_cap_svc = AsyncMock()
-        mock_cap_svc.check_before_task.return_value = {
+        mock_cap_svc = MagicMock()
+        mock_cap_svc.check_before_task = AsyncMock(return_value={
             "allowed": False,
             "reason": "spending_cap_exceeded",
             "cap_dollars": 100.0,
             "spent_dollars": 101.0,
-        }
+        })
         monkeypatch.setattr("proxy.main.spending_caps", mock_cap_svc)
         monkeypatch.setattr("proxy.main.get_pool", lambda: AsyncMock())
 
@@ -261,13 +263,12 @@ class TestCreditServiceIntegration:
         db_pool.fetchrow.return_value = {
             "spending_cap": 200.0,
             "credits_monthly": 5000,
-            "effective_credits": 2000,  # From COALESCE
-            "credits_remaining": 2000,
+            "credits_used_month": 3000,
         }
         status = await svc.get_cap_status(db_pool, "team_user_1")
         assert status["has_cap"] is True
-        # 5000 - 2000 = 3000 used; 3000 * 0.04 = $120
-        assert status["spent_dollars"] == 120.0
+        # usage_events recorded 3000 consumed credits; 3000 * 0.01 = $30
+        assert status["spent_dollars"] == 30.0
 
 
 # ─── Security Scanner Integration ───────────────────────────────────

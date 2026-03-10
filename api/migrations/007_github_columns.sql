@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_username TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS github_token BYTEA;

@@ -61,9 +61,7 @@ class KeyChainManager:
             except Exception as e:
                 logger.debug(f"Keyring write failed: {e}")
         # Env-var fallback: inform the user since we can't persist
-        logger.warning(
-            f"Cannot persist {provider} to keyring. Set it via environment variable instead."
-        )
+        logger.warning(f"Cannot persist {provider} to keyring. Set it via environment variable instead.")
 
     @classmethod
     def get_key(cls, provider: str) -> str | None:

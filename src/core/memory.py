@@ -102,6 +102,7 @@ class AgentMemory:
         lesson: str = "",
         files_touched: list[str] | None = None,
         cost_usd: float = 0.0,
+        checklist_item_id: str = "",
     ) -> None:
         """
         Record an interaction outcome for an agent.
@@ -113,6 +114,7 @@ class AgentMemory:
             lesson: What was learned (empty for successes with no lesson)
             files_touched: List of files the agent modified
             cost_usd: Cost in USD for this interaction
+            checklist_item_id: Optional execution-state checklist item ID
 
         """
         md_file = self._agent_file(agent_id)
@@ -123,6 +125,8 @@ class AgentMemory:
             f"### {now} — {outcome.upper()}",
             f"**Task:** {task_summary[:200]}",
         ]
+        if checklist_item_id:
+            entry_lines.append(f"**Item:** `{checklist_item_id[:12]}`")
         if lesson:
             entry_lines.append(f"**Lesson:** {lesson[:300]}")
         if files_touched:
@@ -149,7 +153,7 @@ class AgentMemory:
 
         # Keep only the last MAX_LESSONS entries
         if len(entries) > self.MAX_LESSONS:
-            entries = entries[-self.MAX_LESSONS:]
+            entries = entries[-self.MAX_LESSONS :]
 
         # Write header + entries
         header = f"# {agent_id.split('/')[0].title()} Agent Memory\n\n"
@@ -160,12 +164,19 @@ class AgentMemory:
         )
         logger.info(f"Recorded {outcome} for {agent_id} → {md_file.name}")
 
-    def get_context(self, agent_id: str, max_tokens: int = 1500) -> str:
+    def get_context(
+        self,
+        agent_id: str,
+        max_tokens: int = 1500,
+        checklist_item_id: str = "",
+    ) -> str:
         """
         Get recent agent memory formatted for prompt injection.
 
         Returns a compact string suitable for insertion into a system prompt.
         Prioritizes lessons (failures) over success telemetry.
+        If *checklist_item_id* is given, lessons linked to that item are
+        boosted to appear first.
         """
         md_file = self._agent_file(agent_id)
         if not md_file.exists():
@@ -180,6 +191,12 @@ class AgentMemory:
         lesson_entries = [e for e in entries if "**Lesson:**" in e]
         recent = lesson_entries[-5:] if lesson_entries else entries[-3:]
 
+        # Boost entries linked to the current checklist item
+        if checklist_item_id and recent:
+            linked = [e for e in recent if checklist_item_id[:12] in e]
+            others = [e for e in recent if checklist_item_id[:12] not in e]
+            recent = linked + others
+
         if not recent:
             return ""
 
@@ -187,7 +204,8 @@ class AgentMemory:
         for entry in recent:
             # Compact: strip markdown headers, keep just the content
             lines = [
-                line for line in entry.strip().split("\n")
+                line
+                for line in entry.strip().split("\n")
                 if line.strip() and not line.startswith("#")
             ]
             result += "\n".join(lines) + "\n"

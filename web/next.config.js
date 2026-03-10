@@ -8,6 +8,7 @@ const nextConfig = {
     typescript: {
         // F14: Do NOT ignore TS errors during builds
         ignoreBuildErrors: false,
+        tsconfigPath: "./tsconfig.next.json",
     },
     async headers() {
         return [

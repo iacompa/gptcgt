@@ -1,6 +1,7 @@
 export default function TermsPage() {
     return (
-        <div className="relative isolate px-6 py-24 sm:py-32 lg:px-8 max-w-4xl mx-auto">
+        <div className="page-shell py-8">
+            <div className="panel-dark mx-auto max-w-4xl px-6 py-10 sm:px-10">
             <div className="mx-auto max-w-3xl text-base leading-7 text-gray-300">
                 <p className="text-base font-semibold leading-7 text-indigo-400">gptcgt</p>
                 <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">Terms of Service</h1>
@@ -55,6 +56,7 @@ export default function TermsPage() {
                         We reserve the right to suspend or terminate your access to the Pro Tier or proxy services at any time, with or without cause, specifically in cases of abuse, excessive rate-limiting violations, or non-payment.
                     </p>
                 </div>
+            </div>
             </div>
         </div>
     );

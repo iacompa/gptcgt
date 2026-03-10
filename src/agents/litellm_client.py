@@ -80,9 +80,7 @@ class LiteLLMClient:
         if extra_headers:
             kwargs["extra_headers"] = extra_headers
 
-        logger.debug(
-            f"Calling litellm.acompletion for model {model} (messages: {len(request_messages)})"
-        )
+        logger.debug(f"Calling litellm.acompletion for model {model} (messages: {len(request_messages)})")
 
         import asyncio
 
@@ -112,19 +110,13 @@ class LiteLLMClient:
                                     "id": tc_chunk.id,
                                     "type": "function",
                                     "function": {
-                                        "name": tc_chunk.function.name
-                                        if tc_chunk.function.name
-                                        else "",
-                                        "arguments": tc_chunk.function.arguments
-                                        if tc_chunk.function.arguments
-                                        else "",
+                                        "name": tc_chunk.function.name if tc_chunk.function.name else "",
+                                        "arguments": tc_chunk.function.arguments if tc_chunk.function.arguments else "",
                                     },
                                 }
                             else:
                                 if tc_chunk.function.arguments:
-                                    tool_calls_buffer[idx]["function"]["arguments"] += (
-                                        tc_chunk.function.arguments
-                                    )
+                                    tool_calls_buffer[idx]["function"]["arguments"] += tc_chunk.function.arguments
 
                     if hasattr(chunk, "usage") and chunk.usage:
                         usage_data = {
@@ -143,9 +135,7 @@ class LiteLLMClient:
                     yield AgentResponse(
                         text=chunk_text,
                         is_streaming=is_streaming,
-                        tool_calls=list(tool_calls_buffer.values())
-                        if not is_streaming and tool_calls_buffer
-                        else [],
+                        tool_calls=list(tool_calls_buffer.values()) if not is_streaming and tool_calls_buffer else [],
                         usage=usage_data if not is_streaming else {},
                         finish_reason=finish_reason,
                     )
@@ -155,10 +145,11 @@ class LiteLLMClient:
                 if attempt == max_retries - 1:
                     logger.error(f"Rate limit exceeded (final attempt): {e}")
                     from src.agents.base import ProviderException
+
                     raise ProviderException(
                         error_type="rate_limit",
                         message=f"Rate limit exceeded after {max_retries} retries: {str(e)}",
-                        provider=model.split("/")[0] if "/" in model else "unknown"
+                        provider=model.split("/")[0] if "/" in model else "unknown",
                     )
 
                 wait_time = base_wait * (2**attempt)
@@ -169,24 +160,27 @@ class LiteLLMClient:
             except litellm.AuthenticationError as e:
                 logger.error(f"Authentication failed: {e}")
                 from src.agents.base import ProviderException
+
                 raise ProviderException(
                     error_type="auth_error",
                     message=f"Authentication failed. Check your API key. ({str(e)})",
-                    provider=model.split("/")[0] if "/" in model else "unknown"
+                    provider=model.split("/")[0] if "/" in model else "unknown",
                 )
             except litellm.ContextWindowExceededError as e:
                 logger.error(f"Context window exceeded: {e}")
                 from src.agents.base import ProviderException
+
                 raise ProviderException(
                     error_type="context_window_exceeded",
                     message=f"Context window exceeded. Please clear chat or trim files. ({str(e)})",
-                    provider=model.split("/")[0] if "/" in model else "unknown"
+                    provider=model.split("/")[0] if "/" in model else "unknown",
                 )
             except Exception as e:
                 logger.exception(f"Unexpected litellm error: {e}")
                 from src.agents.base import ProviderException
+
                 raise ProviderException(
                     error_type="unknown",
                     message=f"Model error: {str(e)}",
-                    provider=model.split("/")[0] if "/" in model else "unknown"
+                    provider=model.split("/")[0] if "/" in model else "unknown",
                 )

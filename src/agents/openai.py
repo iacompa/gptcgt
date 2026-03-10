@@ -17,6 +17,7 @@ class OpenAIAgent(BaseAgent):
     @property
     def capabilities(self):
         from src.agents.base import ProviderCapabilities
+
         caps = ProviderCapabilities(max_context=self.config.max_tokens or 128000)
         # o1 models do not support streaming or tools currently
         if self.config.model_id.startswith("openai/o1"):
@@ -42,9 +43,7 @@ class OpenAIAgent(BaseAgent):
         if self.config.extra_headers:
             kwargs["extra_headers"] = self.config.extra_headers
 
-        if self.config.model_id.startswith("openai/o3") or self.config.model_id.startswith(
-            "openai/o1"
-        ):
+        if self.config.model_id.startswith("openai/o3") or self.config.model_id.startswith("openai/o1"):
             if self.config.max_tokens:
                 kwargs["max_completion_tokens"] = self.config.max_tokens
             if "temperature" in kwargs:
