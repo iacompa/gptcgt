@@ -6,6 +6,7 @@ dist/
 build/
 *.egg-info/
 .gptcgt/
+.audit_home/
 .env
 .env.*
 !.env.example
@@ -18,6 +19,17 @@ node_modules/
 *.log
 *.tsbuildinfo
 .DS_Store
+reports/
+ruff_audit.txt
+comprehensive_audit_results.txt
+error.txt
+openapi.json
+*.patch
+build_scorecard.py
+dump_openapi.py
+fix_ruff.py
+run_audit_analysis.py
+run_comprehensive_audit.py
 web/.env.local
 web/.env.*
 !web/.env.local.example
