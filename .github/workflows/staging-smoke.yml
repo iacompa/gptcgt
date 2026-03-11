@@ -1,0 +1,125 @@
+name: Staging Smoke
+
+on:
+  workflow_call:
+    inputs:
+      expect_github_connected:
+        required: false
+        type: boolean
+        default: true
+      allow_github_disconnect:
+        required: false
+        type: boolean
+        default: false
+      skip_checkout:
+        required: false
+        type: boolean
+        default: false
+      run_webhook_smoke:
+        required: false
+        type: boolean
+        default: false
+      run_hub_smoke:
+        required: false
+        type: boolean
+        default: false
+      hub_timeout_seconds:
+        required: false
+        type: string
+        default: "240"
+  workflow_dispatch:
+    inputs:
+      expect_github_connected:
+        description: Require the staging smoke user to have GitHub connected
+        type: boolean
+        default: true
+      allow_github_disconnect:
+        description: Temporarily disconnect GitHub during the smoke run
+        type: boolean
+        default: false
+      skip_checkout:
+        description: Skip Stripe checkout session creation checks
+        type: boolean
+        default: false
+      run_webhook_smoke:
+        description: Run signed Stripe webhook smoke against staging
+        type: boolean
+        default: false
+      run_hub_smoke:
+        description: Run a real Hub task against the configured disposable repo
+        type: boolean
+        default: false
+      hub_timeout_seconds:
+        description: Hub smoke timeout in seconds
+        required: false
+        type: string
+        default: "240"
+
+jobs:
+  staging-smoke:
+    name: Staging External Smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SMOKE_API_URL: ${{ secrets.STAGING_SMOKE_API_URL }}
+      SMOKE_AUTH_TOKEN: ${{ secrets.STAGING_SMOKE_AUTH_TOKEN }}
+      SMOKE_EXPECT_GITHUB_CONNECTED: ${{ inputs.expect_github_connected }}
+      SMOKE_ALLOW_GITHUB_DISCONNECT: ${{ inputs.allow_github_disconnect }}
+      SMOKE_SKIP_CHECKOUT: ${{ inputs.skip_checkout }}
+      SMOKE_RUN_WEBHOOK_SMOKE: ${{ inputs.run_webhook_smoke }}
+      SMOKE_STRIPE_WEBHOOK_SECRET: ${{ secrets.STAGING_STRIPE_WEBHOOK_SECRET }}
+      SMOKE_RUN_HUB_SMOKE: ${{ inputs.run_hub_smoke }}
+      SMOKE_HUB_REPO_URL: ${{ secrets.STAGING_SMOKE_HUB_REPO_URL }}
+      SMOKE_HUB_PROMPT: ${{ secrets.STAGING_SMOKE_HUB_PROMPT }}
+      SMOKE_HUB_TIMEOUT_SECONDS: ${{ inputs.hub_timeout_seconds }}
+      SMOKE_CHECKOUT_PLAN: pro
+      SMOKE_CREDIT_PURCHASE_AMOUNT: 100
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Bootstrap backend env
+        run: bash scripts/bootstrap_python_env.sh .venv-smoke
+
+      - name: Validate required staging smoke secrets
+        run: |
+          test -n "$SMOKE_API_URL" || { echo "Missing secret: STAGING_SMOKE_API_URL"; exit 1; }
+          test -n "$SMOKE_AUTH_TOKEN" || { echo "Missing secret: STAGING_SMOKE_AUTH_TOKEN"; exit 1; }
+          if [ "$SMOKE_RUN_WEBHOOK_SMOKE" = "true" ] && [ -z "$SMOKE_STRIPE_WEBHOOK_SECRET" ]; then
+            echo "Missing secret: STAGING_STRIPE_WEBHOOK_SECRET"
+            exit 1
+          fi
+          if [ "$SMOKE_RUN_HUB_SMOKE" = "true" ] && { [ -z "$SMOKE_HUB_REPO_URL" ] || [ -z "$SMOKE_HUB_PROMPT" ]; }; then
+            echo "Missing secrets: STAGING_SMOKE_HUB_REPO_URL and/or STAGING_SMOKE_HUB_PROMPT"
+            exit 1
+          fi
+
+      - name: Run staging smoke checks
+        id: smoke
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          .venv-smoke/bin/python scripts/staging_smoke.py 2>&1 | tee /tmp/staging-smoke.log
+
+      - name: Publish staging smoke report
+        if: always()
+        env:
+          SMOKE_REPORT_SUITE: "Staging API Smoke"
+          SMOKE_REPORT_STATUS: ${{ steps.smoke.outcome }}
+          SMOKE_REPORT_TARGET_URL: ${{ secrets.STAGING_SMOKE_API_URL }}
+          SMOKE_REPORT_DETAILS: "checkout=${{ inputs.skip_checkout == false }}, webhook=${{ inputs.run_webhook_smoke }}, hub=${{ inputs.run_hub_smoke }}"
+          SMOKE_REPORT_LOG_PATH: /tmp/staging-smoke.log
+          SMOKE_REPORT_ALERT_WEBHOOK_URL: ${{ secrets.STAGING_SMOKE_ALERT_WEBHOOK_URL }}
+          SMOKE_REPORT_HEARTBEAT_URL: ${{ secrets.STAGING_API_SMOKE_HEARTBEAT_URL }}
+          SMOKE_REPORT_FAILURE_HEARTBEAT_URL: ${{ secrets.STAGING_API_SMOKE_FAILURE_HEARTBEAT_URL }}
+        run: python3 scripts/report_smoke_status.py
+
+      - name: Fail if staging smoke failed
+        if: steps.smoke.outcome != 'success'
+        run: exit 1

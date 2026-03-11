@@ -1,0 +1,103 @@
+name: Deploy And Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_checkout:
+        description: Skip Stripe checkout session creation during the staging API smoke
+        type: boolean
+        default: false
+      run_webhook_smoke:
+        description: Run signed Stripe webhook staging smoke
+        type: boolean
+        default: false
+      run_hub_smoke:
+        description: Run a real Hub task during staging smoke
+        type: boolean
+        default: false
+      expect_github_connected:
+        description: Require the staging smoke account to have GitHub connected
+        type: boolean
+        default: true
+      promote_to_production:
+        description: After staging deploy and smoke pass, wait for production approval and deploy production API
+        type: boolean
+        default: false
+      hub_timeout_seconds:
+        description: Hub smoke timeout in seconds
+        required: false
+        type: string
+        default: "240"
+
+jobs:
+  deploy-staging-api:
+    name: Deploy API to Staging
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: staging
+      url: ${{ secrets.STAGING_SMOKE_API_URL }}
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Validate deploy secrets
+        run: |
+          test -n "$FLY_API_TOKEN" || { echo "Missing secret: FLY_API_TOKEN"; exit 1; }
+          test -n "${{ secrets.STAGING_SMOKE_API_URL }}" || { echo "Missing secret: STAGING_SMOKE_API_URL"; exit 1; }
+
+      - name: Deploy staging API
+        run: bash scripts/deploy_fly.sh staging gptcgt-staging fly.staging.toml
+
+  staging-api-smoke:
+    name: Staging API Smoke
+    needs: deploy-staging-api
+    uses: ./.github/workflows/staging-smoke.yml
+    with:
+      expect_github_connected: ${{ inputs.expect_github_connected }}
+      allow_github_disconnect: false
+      skip_checkout: ${{ inputs.skip_checkout }}
+      run_webhook_smoke: ${{ inputs.run_webhook_smoke }}
+      run_hub_smoke: ${{ inputs.run_hub_smoke }}
+      hub_timeout_seconds: ${{ inputs.hub_timeout_seconds }}
+    secrets: inherit
+
+  staging-web-smoke:
+    name: Staging Web Smoke
+    needs: deploy-staging-api
+    uses: ./.github/workflows/staging-web-smoke.yml
+    with:
+      expect_github_connected: ${{ inputs.expect_github_connected }}
+    secrets: inherit
+
+  deploy-production-api:
+    name: Deploy API to Production
+    if: ${{ inputs.promote_to_production }}
+    needs:
+      - staging-api-smoke
+      - staging-web-smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: production
+      url: https://gptcgt-api.fly.dev/health
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Validate production deploy secret
+        run: |
+          test -n "$FLY_API_TOKEN" || { echo "Missing secret: FLY_API_TOKEN"; exit 1; }
+
+      - name: Deploy production API
+        run: bash scripts/deploy_fly.sh production gptcgt-api api/fly.toml
