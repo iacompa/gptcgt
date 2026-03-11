@@ -1,0 +1,77 @@
+name: Staging Web Smoke
+
+on:
+  workflow_call:
+    inputs:
+      expect_github_connected:
+        required: false
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      expect_github_connected:
+        description: Require the staging smoke user to have GitHub connected in the live dashboard
+        type: boolean
+        default: true
+
+jobs:
+  staging-web-smoke:
+    name: Staging Browser Smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: web
+    env:
+      STAGING_WEB_BASE_URL: ${{ secrets.STAGING_WEB_BASE_URL }}
+      STAGING_WEB_SESSION_COOKIE: ${{ secrets.STAGING_WEB_SESSION_COOKIE }}
+      STAGING_WEB_EXPECT_GITHUB_CONNECTED: ${{ inputs.expect_github_connected }}
+      STAGING_SMOKE_API_URL: ${{ secrets.STAGING_SMOKE_API_URL }}
+      STAGING_SMOKE_AUTH_TOKEN: ${{ secrets.STAGING_SMOKE_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "web/package-lock.json"
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate required staging web secrets
+        run: |
+          test -n "$STAGING_WEB_BASE_URL" || { echo "Missing secret: STAGING_WEB_BASE_URL"; exit 1; }
+          test -n "$STAGING_SMOKE_API_URL" || { echo "Missing secret: STAGING_SMOKE_API_URL"; exit 1; }
+          test -n "$STAGING_SMOKE_AUTH_TOKEN" || { echo "Missing secret: STAGING_SMOKE_AUTH_TOKEN"; exit 1; }
+          test -n "$STAGING_WEB_SESSION_COOKIE" || { echo "Missing secret: STAGING_WEB_SESSION_COOKIE"; exit 1; }
+
+      - name: Run staging browser smoke
+        id: smoke
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run test:e2e:staging 2>&1 | tee /tmp/staging-web-smoke.log
+
+      - name: Publish staging browser smoke report
+        if: always()
+        env:
+          SMOKE_REPORT_SUITE: "Staging Web Smoke"
+          SMOKE_REPORT_STATUS: ${{ steps.smoke.outcome }}
+          SMOKE_REPORT_TARGET_URL: ${{ secrets.STAGING_WEB_BASE_URL }}
+          SMOKE_REPORT_DETAILS: "expect_github_connected=${{ inputs.expect_github_connected }}"
+          SMOKE_REPORT_LOG_PATH: /tmp/staging-web-smoke.log
+          SMOKE_REPORT_ALERT_WEBHOOK_URL: ${{ secrets.STAGING_SMOKE_ALERT_WEBHOOK_URL }}
+          SMOKE_REPORT_HEARTBEAT_URL: ${{ secrets.STAGING_WEB_SMOKE_HEARTBEAT_URL }}
+          SMOKE_REPORT_FAILURE_HEARTBEAT_URL: ${{ secrets.STAGING_WEB_SMOKE_FAILURE_HEARTBEAT_URL }}
+        run: python3 ../scripts/report_smoke_status.py
+
+      - name: Fail if staging browser smoke failed
+        if: steps.smoke.outcome != 'success'
+        run: exit 1

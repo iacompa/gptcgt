@@ -37,6 +37,8 @@ Thank you for your interest in contributing to **gptcgt**! This guide will help 
   black .
   ruff check .
   ```
+- **Staging Smoke**: For post-deploy confidence against real services, run the manual staging smoke workflows documented in [docs/staging-smoke.md](docs/staging-smoke.md) and [docs/staging-web-smoke.md](docs/staging-web-smoke.md).
+- **Deploy Promotion**: Use the gated staging-to-production workflow described in [docs/deploy-pipeline.md](docs/deploy-pipeline.md) when you want staging deploy, automatic smoke validation, and a production approval barrier in one run.
 
 ## Submitting a Pull Request
 
