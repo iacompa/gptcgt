@@ -84,8 +84,15 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Bootstrap backend env
-        run: bash scripts/bootstrap_python_env.sh .venv-smoke
+      - name: Bootstrap smoke env
+        run: |
+          python -m venv .venv-smoke
+          .venv-smoke/bin/python -m pip install --upgrade pip
+          PACKAGES="httpx"
+          if [ "$SMOKE_RUN_WEBHOOK_SMOKE" = "true" ]; then
+            PACKAGES="$PACKAGES stripe"
+          fi
+          .venv-smoke/bin/python -m pip install $PACKAGES
 
       - name: Validate required staging smoke secrets
         run: |
