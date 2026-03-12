@@ -94,6 +94,11 @@ def _log(step: str, message: str) -> None:
     print(f"[staging-smoke] {step}: {message}")
 
 
+def _exc_detail(exc: BaseException) -> str:
+    detail = str(exc).strip()
+    return detail or repr(exc)
+
+
 def _stripe_signature(payload: bytes, secret: str) -> str:
     try:
         import stripe
@@ -124,13 +129,24 @@ async def _request_json(
     expected_status: int = 200,
     **kwargs: Any,
 ) -> Any:
-    response = await client.request(method, path, **kwargs)
+    _log("request", f"{method} {path}")
+    try:
+        response = await client.request(method, path, **kwargs)
+    except httpx.TimeoutException as exc:
+        raise SmokeFailure(f"{method} {path} timed out: {_exc_detail(exc)}") from exc
+    except httpx.HTTPError as exc:
+        raise SmokeFailure(f"{method} {path} transport failed: {_exc_detail(exc)}") from exc
+    except OSError as exc:
+        raise SmokeFailure(f"{method} {path} OS error: {_exc_detail(exc)}") from exc
     if response.status_code != expected_status:
         detail = response.text.strip() or f"unexpected status {response.status_code}"
         raise SmokeFailure(f"{method} {path} failed: {response.status_code} {detail}")
     if not response.text:
         return None
-    return response.json()
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise SmokeFailure(f"{method} {path} returned invalid JSON: {_exc_detail(exc)}") from exc
 
 
 async def _check_health(client: httpx.AsyncClient) -> None:
@@ -278,8 +294,17 @@ async def _check_hub(client: httpx.AsyncClient, config: SmokeConfig) -> None:
 
 async def _run() -> None:
     config = SmokeConfig.from_env()
+    _log(
+        "config",
+        (
+            f"api={config.api_url} "
+            f"checkout={config.run_checkout_smoke} "
+            f"webhook={config.run_webhook_smoke} "
+            f"hub={config.run_hub_smoke}"
+        ),
+    )
     headers = {"Authorization": f"Bearer {config.auth_token}"}
-    timeout = httpx.Timeout(connect=15.0, read=300.0, write=30.0, pool=30.0)
+    timeout = httpx.Timeout(connect=15.0, read=45.0, write=30.0, pool=30.0)
     async with httpx.AsyncClient(base_url=config.api_url, headers=headers, timeout=timeout, follow_redirects=False) as client:
         await _check_health(client)
         await _check_billing(client, config)
@@ -298,7 +323,7 @@ def main() -> int:
         _log("failure", "Interrupted")
         return 130
     except Exception as exc:  # pragma: no cover - last-resort crash path
-        _log("failure", f"Unexpected crash: {exc}")
+        _log("failure", f"Unexpected crash: {_exc_detail(exc)}")
         return 1
 
     _log("summary", "all requested staging smoke checks passed")
