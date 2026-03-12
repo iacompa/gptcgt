@@ -13,8 +13,6 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
-import stripe
-
 GITHUB_AUTH_PREFIX = "https://github.com/login/oauth/authorize"
 STRIPE_CHECKOUT_PREFIX = "https://checkout.stripe.com/"
 
@@ -97,6 +95,11 @@ def _log(step: str, message: str) -> None:
 
 
 def _stripe_signature(payload: bytes, secret: str) -> str:
+    try:
+        import stripe
+    except ImportError as exc:  # pragma: no cover - exercised in staging only
+        raise SmokeFailure("stripe is required when SMOKE_RUN_WEBHOOK_SMOKE is enabled") from exc
+
     timestamp = int(time.time())
     signed_payload = f"{timestamp}.{payload.decode('utf-8')}"
     signature = stripe.WebhookSignature._compute_signature(signed_payload, secret)
