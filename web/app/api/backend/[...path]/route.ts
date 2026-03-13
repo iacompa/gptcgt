@@ -23,19 +23,33 @@ function buildUpstreamUrl(path: string[], search: string): string {
     return `${baseUrl}/${normalizedPath}${search}`;
 }
 
+function extractSessionCookie(cookieHeader: string | null): string | null {
+    if (!cookieHeader) return null;
+
+    const sessionPair = cookieHeader
+        .split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith("gptcgt_session="));
+
+    return sessionPair || null;
+}
+
 function buildUpstreamHeaders(request: Request, accessToken?: string): Headers {
     const headers = new Headers();
+    const sessionCookie = extractSessionCookie(request.headers.get("cookie"));
 
     request.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+        if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase()) && key.toLowerCase() !== "cookie") {
             headers.set(key, value);
         }
     });
 
-    headers.delete("cookie");
-
     if (accessToken) {
         headers.set("authorization", `Bearer ${accessToken}`);
+    }
+
+    if (sessionCookie) {
+        headers.set("cookie", sessionCookie);
     }
 
     return headers;
