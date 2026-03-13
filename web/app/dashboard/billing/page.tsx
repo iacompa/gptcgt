@@ -8,10 +8,14 @@ import { useToast } from "@/components/toaster";
 export default function BillingPage() {
     const [status, setStatus] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [teamSeats, setTeamSeats] = useState(5);
     const [creditAmount, setCreditAmount] = useState(500);
     const [capInput, setCapInput] = useState("");
+    const [seedingCredits, setSeedingCredits] = useState(false);
     const { pushToast } = useToast();
+    const appBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
+    const isStaging = appBaseUrl !== "" && appBaseUrl !== "https://gptcgt.ai";
 
     const loadStatus = useCallback(async () => {
         try {
@@ -20,8 +24,11 @@ export default function BillingPage() {
             const nextStatus = data as any;
             setStatus(nextStatus);
             setCapInput(nextStatus?.spending_cap ? String(nextStatus.spending_cap) : "");
+            setLoadError(null);
         } catch (error: any) {
             console.error(error);
+            setStatus(null);
+            setLoadError(error.message || "Billing data is unavailable right now.");
             pushToast({
                 tone: "error",
                 title: "Could not load billing status",
@@ -101,6 +108,37 @@ export default function BillingPage() {
         }
     };
 
+    const handleSeedCredits = async () => {
+        setSeedingCredits(true);
+        try {
+            const response = await fetch("/api/backend/billing/test/seed", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ credit_amount: 5000 }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.detail || "Could not seed staging credits.");
+            }
+            await loadStatus();
+            pushToast({
+                tone: "success",
+                title: "Staging credits granted",
+                description: `Added ${Number(5000).toLocaleString()} credits for testing.`,
+            });
+        } catch (error: any) {
+            console.error(error);
+            pushToast({
+                tone: "error",
+                title: "Could not grant staging credits",
+                description: error.message || "Please try again.",
+            });
+        } finally {
+            setSeedingCredits(false);
+        }
+    };
+
     if (loading) {
         return <div className="flex h-64 items-center justify-center text-[var(--text-muted)]">Loading billing data...</div>;
     }
@@ -121,9 +159,11 @@ export default function BillingPage() {
                 <div className="metric-card">
                     <p className="metric-label">Plan</p>
                     <p className="mt-3 text-3xl font-semibold capitalize tracking-[-0.04em] text-slate-950">
-                        {status?.plan || "Free"}
+                        {status ? status.plan || "Free" : "Unavailable"}
                     </p>
-                    <p className="mt-1 text-sm text-[var(--text-muted)]">{status?.subscription_status || "inactive"}</p>
+                    <p className="mt-1 text-sm text-[var(--text-muted)]">
+                        {status ? status.subscription_status || "inactive" : "Billing status unavailable"}
+                    </p>
                 </div>
                 <div className="metric-card">
                     <p className="metric-label">Wallet balance</p>
@@ -131,19 +171,58 @@ export default function BillingPage() {
                         {status?.credits_remaining?.toLocaleString?.() ?? status?.credits_remaining ?? "—"}
                     </p>
                     <p className="mt-1 text-sm text-[var(--text-muted)]">
-                        of {status?.credits_monthly?.toLocaleString?.() ?? status?.credits_monthly ?? "—"} monthly credits
+                        {status
+                            ? `of ${
+                                  status?.credits_monthly?.toLocaleString?.() ?? status?.credits_monthly ?? 0
+                              } monthly credits`
+                            : "Billing status unavailable"}
                     </p>
                 </div>
                 <div className="metric-card">
                     <p className="metric-label">Renewal</p>
                     <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                        {status?.current_period_end ? new Date(status.current_period_end).toLocaleDateString() : "N/A"}
+                        {status?.current_period_end
+                            ? new Date(status.current_period_end).toLocaleDateString()
+                            : status
+                              ? "N/A"
+                              : "Unavailable"}
                     </p>
                     <p className="mt-1 text-sm text-[var(--text-muted)]">Current billing cycle end</p>
                 </div>
             </section>
 
-            {status?.billing_access ? (
+            {loadError && (
+                <section className="panel border border-amber-200 bg-amber-50/80 p-5 text-amber-950">
+                    <p className="eyebrow text-amber-800">Billing status unavailable</p>
+                    <p className="mt-2 text-sm">
+                        The billing API did not return a valid status, so the dashboard is not pretending you are on a real
+                        plan. {loadError}
+                    </p>
+                </section>
+            )}
+
+            {isStaging && (
+                <section className="panel p-6">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <p className="eyebrow">Staging helper</p>
+                            <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                                Grant test credits without touching Stripe
+                            </h2>
+                            <p className="mt-2 text-sm text-[var(--text-muted)]">
+                                This staging-only control seeds credits directly into your app wallet so managed model tests can
+                                proceed.
+                            </p>
+                        </div>
+                        <button type="button" onClick={handleSeedCredits} className="btn-secondary" disabled={seedingCredits}>
+                            {seedingCredits ? "Granting..." : "Grant 5,000 staging credits"}
+                        </button>
+                    </div>
+                </section>
+            )}
+
+            {status ? (
+                status.billing_access ? (
                 <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
                     <div className="panel p-6">
                         <div className="flex items-center gap-2">
@@ -249,7 +328,7 @@ export default function BillingPage() {
                         </div>
                     </div>
                 </section>
-            ) : (
+                ) : (
                 <section className="panel p-6">
                     <div className="flex items-center gap-2">
                         <Wallet className="h-5 w-5 text-[var(--accent)]" />
@@ -261,10 +340,22 @@ export default function BillingPage() {
                     <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-white/70 p-5">
                         <p className="metric-label">Allocated quota</p>
                         <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                            {status?.allocated_quota ? status.allocated_quota.toLocaleString() : "Unlimited"}
+                            {status.allocated_quota ? status.allocated_quota.toLocaleString() : "Unlimited"}
                         </p>
                         <p className="mt-1 text-sm text-[var(--text-muted)]">Using the shared team wallet</p>
                     </div>
+                </section>
+                )
+            ) : (
+                <section className="panel p-6">
+                    <div className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-[var(--accent)]" />
+                        <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Billing controls unavailable</h2>
+                    </div>
+                    <p className="mt-3 max-w-2xl text-sm text-[var(--text-muted)]">
+                        We could not load your billing state, so subscription and wallet controls are hidden until the backend
+                        responds correctly.
+                    </p>
                 </section>
             )}
         </div>

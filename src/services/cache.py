@@ -67,6 +67,17 @@ class CacheManager:
         # Memory fallback
         self._memory_cache[key] = (value, asyncio.get_event_loop().time() + ttl)
 
+    async def delete(self, key: str) -> None:
+        await self._init_redis()
+        if self._redis:
+            try:
+                await self._redis.delete(key)
+                return
+            except Exception:
+                pass
+
+        self._memory_cache.pop(key, None)
+
 
 cache_manager = CacheManager()
 
