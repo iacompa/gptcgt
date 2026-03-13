@@ -18,6 +18,25 @@ export default function KeysPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const { pushToast } = useToast();
 
+    const describeError = (error: any, fallback: string) => {
+        const detail =
+            error?.detail ||
+            error?.error?.detail ||
+            error?.error ||
+            error?.data?.detail ||
+            error?.response?.data?.detail;
+
+        if (typeof detail === "string" && detail.trim()) {
+            return detail;
+        }
+
+        if (typeof error?.message === "string" && error.message.trim()) {
+            return error.message;
+        }
+
+        return fallback;
+    };
+
     const loadKeys = useCallback(async () => {
         try {
             const { data, error } = await apiClient.GET("/api_keys/");
@@ -28,7 +47,7 @@ export default function KeysPage() {
             pushToast({
                 tone: "error",
                 title: "Could not load API keys",
-                description: error.message,
+                description: describeError(error, "Failed to load the encrypted key vault."),
             });
         } finally {
             setLoading(false);
@@ -63,7 +82,7 @@ export default function KeysPage() {
             pushToast({
                 tone: "error",
                 title: "Failed to store key",
-                description: error.message || "Please verify the provider and key format.",
+                description: describeError(error, "Please verify the provider and key format."),
             });
         } finally {
             setGenerating(false);
@@ -90,7 +109,7 @@ export default function KeysPage() {
             pushToast({
                 tone: "error",
                 title: "Failed to revoke key",
-                description: error.message,
+                description: describeError(error, "Failed to revoke the stored provider key."),
             });
         } finally {
             setIsDeleting(false);
