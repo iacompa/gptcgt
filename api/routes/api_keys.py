@@ -87,7 +87,7 @@ async def create_key(req: CreateKeyRequest, request: Request):
     # Insert
     row = await pool.fetchrow(
         """
-        INSERT INTO api_keys (owner_type, owner_id, provider, encrypted_key, key_hash, is_active, created_at)  # noqa: E501
+        INSERT INTO api_keys (owner_type, owner_id, provider, encrypted_key, key_hash, is_active, created_at)
         VALUES ('user', $1, $2, $3, $4, true, now())
         RETURNING id, created_at
         """,

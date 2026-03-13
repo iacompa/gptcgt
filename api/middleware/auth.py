@@ -122,9 +122,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     credits = row["credits"] if row else 0
                     overage = row["overage_enabled"] if row else False
                     if credits is not None and credits <= 0 and not overage:
+                        billing_url = f"{settings.base_url.rstrip('/')}/dashboard/billing"
                         msg = (
                             "⚠️ Credits exhausted. Visit your dashboard at "
-                            "https://gptcgt.ai/dashboard/billing "
+                            f"{billing_url} "
                             "to purchase more."
                         )
                         return self._json_response(402, msg)

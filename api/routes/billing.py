@@ -3,7 +3,10 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from api.config import settings
 from api.database import get_pool
+from src.billing.credits import CreditService
+from src.services.cache import cache_manager
 from src.billing.stripe_service import StripeService
 
 router = APIRouter(tags=["billing"])
@@ -18,6 +21,10 @@ class CheckoutRequest(BaseModel):
 
 class CreditPurchaseRequest(BaseModel):
     credit_amount: int  # Any amount between 100 and 50000
+
+
+class SeedCreditsRequest(BaseModel):
+    credit_amount: int = 5000
 
 
 class CheckoutResponse(BaseModel):
@@ -157,6 +164,25 @@ async def get_status(request: Request):
 
     await cache_manager.set(cache_key, response.model_dump(), ttl=30)
     return response
+
+
+@router.post("/test/seed")
+async def seed_test_credits(request: Request, body: SeedCreditsRequest):
+    if settings.base_url.rstrip("/") == "https://gptcgt.ai":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    if body.credit_amount < 100 or body.credit_amount > 50000:
+        raise HTTPException(status_code=400, detail="Credit amount must be between 100 and 50000.")
+
+    user_id, _ = await _get_billing_user(request)
+    pool = get_pool()
+    credit_service = CreditService()
+    result = await credit_service.purchase_credits(pool, user_id, body.credit_amount)
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    await cache_manager.delete(f"billing_status:{user_id}")
+    return {"status": "ok", "new_balance": result["new_balance"], "scope": result.get("scope", "user")}
 
 
 @router.post("/webhook")
