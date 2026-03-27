@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, KeyRound, Plus, ShieldCheck, Trash2 } from "lucide-react";
-import { apiClient } from "@/lib/api-client";
+import { fetchAPI } from "@/lib/api";
 import { useToast } from "@/components/toaster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
@@ -39,9 +39,8 @@ export default function KeysPage() {
 
     const loadKeys = useCallback(async () => {
         try {
-            const { data, error } = await apiClient.GET("/api_keys/");
-            if (error) throw error;
-            setKeys((data as any[]) || []);
+            const data = (await fetchAPI("/api_keys/")) as any[];
+            setKeys(data || []);
         } catch (error: any) {
             console.error(error);
             pushToast({
@@ -64,10 +63,10 @@ export default function KeysPage() {
 
         setGenerating(true);
         try {
-            const { data, error } = await apiClient.POST("/api_keys/", {
-                body: { provider: selectedProvider, key: apiKeyInput } as any,
+            const data = await fetchAPI("/api_keys/", {
+                method: "POST",
+                body: JSON.stringify({ provider: selectedProvider, key: apiKeyInput }),
             });
-            if (error) throw error;
             setNewKey({ ...(data as any), raw: apiKeyInput });
             setApiKeyInput("");
             setSelectedProvider("anthropic");
@@ -93,10 +92,9 @@ export default function KeysPage() {
         if (!keyToDelete) return;
         setIsDeleting(true);
         try {
-            const { error } = await apiClient.DELETE("/api_keys/{key_id}", {
-                params: { path: { key_id: keyToDelete } },
+            await fetchAPI(`/api_keys/${keyToDelete}`, {
+                method: "DELETE",
             });
-            if (error) throw error;
             await loadKeys();
             setKeyToDelete(null);
             pushToast({
