@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { API_URL } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -23,33 +23,29 @@ function buildUpstreamUrl(path: string[], search: string): string {
     return `${baseUrl}/${normalizedPath}${search}`;
 }
 
-function extractSessionCookie(cookieHeader: string | null): string | null {
-    if (!cookieHeader) return null;
-
-    const sessionPair = cookieHeader
-        .split(";")
-        .map((part) => part.trim())
-        .find((part) => part.startsWith("gptcgt_session="));
-
-    return sessionPair || null;
-}
-
-function buildUpstreamHeaders(request: Request, accessToken?: string): Headers {
+function buildUpstreamHeaders(
+    request: Request,
+    auth: { sessionToken?: string; cookieHeader?: string | null }
+): Headers {
     const headers = new Headers();
-    const sessionCookie = extractSessionCookie(request.headers.get("cookie"));
 
     request.headers.forEach((value, key) => {
-        if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase()) && key.toLowerCase() !== "cookie") {
+        const lower = key.toLowerCase();
+        if (
+            !HOP_BY_HOP_HEADERS.has(lower) &&
+            lower !== "cookie" &&
+            lower !== "authorization"
+        ) {
             headers.set(key, value);
         }
     });
 
-    if (accessToken) {
-        headers.set("authorization", `Bearer ${accessToken}`);
+    if (auth.sessionToken) {
+        headers.set("authorization", `Bearer ${auth.sessionToken}`);
     }
 
-    if (sessionCookie) {
-        headers.set("cookie", sessionCookie);
+    if (auth.cookieHeader) {
+        headers.set("cookie", auth.cookieHeader);
     }
 
     return headers;
@@ -71,10 +67,23 @@ async function proxyRequest(
     request: Request,
     { params }: { params: Promise<{ path: string[] }> }
 ): Promise<Response> {
-    const [{ path }, session] = await Promise.all([params, getSession()]);
+    const [{ path }, cookieStore] = await Promise.all([params, cookies()]);
     const requestUrl = new URL(request.url);
     const upstreamUrl = buildUpstreamUrl(path, requestUrl.search);
     const method = request.method.toUpperCase();
+    const rawCookieHeader = request.headers.get("cookie");
+    const serializedCookies =
+        cookieStore
+            .getAll()
+            .map(({ name, value }) => `${name}=${value}`)
+            .join("; ") || null;
+    const rawSessionCookie = rawCookieHeader
+        ?.split(";")
+        .map((part) => part.trim())
+        .find((part) => part.startsWith("gptcgt_session="));
+    const sessionToken =
+        cookieStore.get("gptcgt_session")?.value ||
+        (rawSessionCookie ? rawSessionCookie.slice("gptcgt_session=".length) : undefined);
 
     const body =
         method === "GET" || method === "HEAD"
@@ -83,7 +92,10 @@ async function proxyRequest(
 
     const upstream = await fetch(upstreamUrl, {
         method,
-        headers: buildUpstreamHeaders(request, session?.accessToken),
+        headers: buildUpstreamHeaders(request, {
+            sessionToken,
+            cookieHeader: rawCookieHeader || serializedCookies,
+        }),
         body,
         redirect: "manual",
         cache: "no-store",
