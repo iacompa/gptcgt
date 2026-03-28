@@ -18,6 +18,7 @@ import json as _json
 from src.billing.cost_breakdown import ModelUsage
 from src.core.chat_store import ChatStore, MessageRole
 from src.core.diff_engine import DiffExtractor
+from src.core.endpoints import resolve_terminal_proxy_url
 from src.core.logger import get_logger
 from src.core.model_registry import ModelRegistry, QualityTier
 
@@ -418,8 +419,23 @@ class ChatPipeline:
             return None, "Could not resolve a model specification."
         return model_def, None
 
-    async def _resolve_api_credentials(self, model_def, KeyChainManager, PROVIDER_KEY_MAP, error_callback):
+    async def _resolve_api_credentials(self, model_def, KeyChainManager, provider_key_map=None, error_callback=None):
         """Return (api_key, base_url). Returns (None, None) and calls error_callback on failure."""
+        if provider_key_map is None:
+            try:
+                from src.agents.factory import PROVIDER_KEY_MAP
+
+                provider_key_map = PROVIDER_KEY_MAP
+            except Exception:
+                provider_key_map = {}
+
+        async def _emit_error(message: str) -> None:
+            if error_callback is None:
+                return
+            result = error_callback(message)
+            if hasattr(result, "__await__"):
+                await result
+
         # Check auth manager for proxy routing
         auth_manager = None
         try:
@@ -434,12 +450,11 @@ class ChatPipeline:
         if auth_manager and auth_manager.use_managed_credits:
             access, _ = KeyChainManager.get_auth_tokens()
             if not access:
-                if error_callback:
-                    await error_callback("Authentication token missing for managed credits. Please sign in again.")
+                await _emit_error("Authentication token missing for managed credits. Please sign in again.")
                 return None, None
-            return access, "https://gptcgt-api.fly.dev/proxy/v1"
+            return access, resolve_terminal_proxy_url()
 
-        key_name = PROVIDER_KEY_MAP.get(model_def.provider.value)
+        key_name = provider_key_map.get(model_def.provider.value)
         api_key = KeyChainManager.get_key(key_name) if key_name else None
         # noqa: W293
         # Extract explicitly defined base_url for custom/local endpoints
@@ -452,14 +467,12 @@ class ChatPipeline:
             try:
                 res = urllib.parse.urlparse(base_url)
                 if res.scheme not in ("http", "https") or not res.netloc:
-                    if error_callback:
-                        await error_callback(
-                            f"Invalid custom base_url: '{base_url}'. Must include valid scheme (http/https) and host."
-                        )  # noqa: E501
+                    await _emit_error(
+                        f"Invalid custom base_url: '{base_url}'. Must include valid scheme (http/https) and host."
+                    )  # noqa: E501
                     return None, None
             except Exception:
-                if error_callback:
-                    await error_callback(f"Malformed custom base_url: '{base_url}'")
+                await _emit_error(f"Malformed custom base_url: '{base_url}'")
                 return None, None
 
         if key_name and not api_key:
@@ -471,15 +484,13 @@ class ChatPipeline:
                 if not getattr(model_def, "api_key_required", False):
                     return None, base_url
                 else:
-                    if error_callback:
-                        await error_callback(
-                            f"Missing API key for custom endpoint '{model_def.id}'. Either provide a key, or set 'api_key_required = false' in your config."
-                        )  # noqa: E501
+                    await _emit_error(
+                        f"Missing API key for custom endpoint '{model_def.id}'. Either provide a key, or set 'api_key_required = false' in your config."
+                    )  # noqa: E501
                     return None, None
             # noqa: W293
             # Normal provider failure
-            if error_callback:
-                await error_callback(f"Missing API key for {model_def.provider.value}.")
+            await _emit_error(f"Missing API key for {model_def.provider.value}.")
             return None, None
         # noqa: W293
         return api_key, base_url

@@ -1,8 +1,26 @@
 import os
+from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.services.registry import services
+from src.core.endpoints import resolve_web_origin_url
+
+
+def _default_cors_origins() -> str:
+    origin = resolve_web_origin_url().rstrip("/")
+    hostname = urlparse(origin).hostname or "gptcgt.ai"
+    return ",".join(
+        {
+            origin,
+            f"https://www.{hostname}",
+            "https://staging.gptcgt.ai",
+            "https://gptcgt-staging-web.vercel.app",
+            "http://localhost:3000",
+            "https://gptcgt-git-main-michaelangelor20-8162s-projects.vercel.app",
+            "https://gptcgt-fv4ikb7um-michaelangelor20-8162s-projects.vercel.app",
+        }
+    )
 
 
 class Settings(BaseSettings):
@@ -19,13 +37,13 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     encryption_key: str = ""
-    cors_origins: str = "https://gptcgt.ai,https://www.gptcgt.ai,https://staging.gptcgt.ai,https://gptcgt-staging-web.vercel.app,http://localhost:3000,https://gptcgt-git-main-michaelangelor20-8162s-projects.vercel.app,https://gptcgt-fv4ikb7um-michaelangelor20-8162s-projects.vercel.app"
+    cors_origins: str = _default_cors_origins()
     environment: str = "production"
 
     # GitHub OAuth Settings
     github_client_id: str = ""
     github_client_secret: str = ""
-    base_url: str = "https://gptcgt.ai"
+    base_url: str = resolve_web_origin_url()
 
     # Credit Costs
     credit_cost_scout: int = 1

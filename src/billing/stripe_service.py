@@ -28,6 +28,13 @@ class StripeService:
     def __init__(self):
         stripe.api_key = settings.stripe_secret_key
 
+    def _error(self, message: str, exc: Exception | None = None) -> dict:
+        if exc is not None:
+            logger.error("Stripe error: %s", message, exc_info=exc)
+        else:
+            logger.error("Stripe error: %s", message)
+        return {"error": message}
+
     async def create_checkout_session(
         self, db_pool, workos_user_id: str, email: str, plan: str, annual: bool = False, quantity: int = 1
     ) -> dict:
@@ -67,8 +74,7 @@ class StripeService:
             session = await asyncio.to_thread(stripe.checkout.Session.create, **session_params)
             return {"url": session.url}
         except Exception as e:
-            logger.error(f"Stripe checkout error: {e}")
-            raise
+            return self._error("Unable to create checkout session. Please try again later.", e)
 
     async def create_credit_purchase_session(self, db_pool, workos_user_id: str, amount: int, price_cents: int) -> dict:
         """Create a Checkout Session for one-off PAYG credits."""
@@ -78,7 +84,7 @@ class StripeService:
                 workos_user_id,
             )
             if not row:
-                raise ValueError("User not found")
+                return self._error("User not found")
 
             customer_id = row["stripe_customer_id"]
 
@@ -111,8 +117,7 @@ class StripeService:
             session = await asyncio.to_thread(stripe.checkout.Session.create, **session_params)
             return {"url": session.url}
         except Exception as e:
-            logger.error(f"Stripe credit checkout error: {e}")
-            raise
+            return self._error("Unable to create credit checkout session. Please try again later.", e)
 
     async def create_customer_portal(self, db_pool, workos_user_id: str) -> dict:
         """Create a customer portal session for managing billing."""
@@ -130,8 +135,7 @@ class StripeService:
             )
             return {"url": session.url}
         except Exception as e:
-            logger.error(f"Stripe portal error: {e}")
-            raise
+            return self._error("Unable to open billing portal. Please try again later.", e)
 
     async def handle_webhook(self, db_pool, payload: bytes, sig_header: str) -> dict:
         """Process incoming Stripe webhooks."""

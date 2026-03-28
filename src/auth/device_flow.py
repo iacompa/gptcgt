@@ -3,12 +3,14 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from src.core.endpoints import resolve_terminal_api_base_url
+
 
 class DeviceFlowClient:
     """Client for handling the OAuth device authorization flow."""
 
-    def __init__(self, base_url: str = "https://gptcgt-api.fly.dev"):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None):
+        self.base_url = resolve_terminal_api_base_url(base_url=base_url)
 
     async def start_flow(self, client_id: str) -> Dict[str, Any]:
         """

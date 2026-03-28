@@ -9,6 +9,7 @@ import tiktoken
 from src.agents.base import AgentResponse, BaseAgent
 from src.agents.litellm_client import LiteLLMClient
 from src.auth.keychain import KeyChainManager
+from src.core.endpoints import resolve_web_origin_url
 
 
 class OpenRouterAgent(BaseAgent):
@@ -21,7 +22,7 @@ class OpenRouterAgent(BaseAgent):
             return
 
         headers = {
-            "HTTP-Referer": "https://gptcgt.ai",
+            "HTTP-Referer": resolve_web_origin_url(),
             "X-Title": "gptcgt Terminal IDE",
         }
         if self.config.extra_headers:

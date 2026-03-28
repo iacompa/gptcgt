@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSessionToken } from '@/lib/auth';
-import { API_URL, BASE_URL, IS_PRODUCTION } from '@/lib/config';
+import { API_URL, AUTH_CALLBACK_ORIGIN, BASE_URL, IS_PRODUCTION } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     const provider = searchParams.get('provider') || 'google';
 
     const workosClientId = process.env.WORKOS_CLIENT_ID;
-    const redirectUri = `${BASE_URL}/api/auth/callback`;
+    const redirectUri = `${AUTH_CALLBACK_ORIGIN}/api/auth/callback`;
 
     if (!workosClientId) {
         // Fallback: redirect to email/password auth page

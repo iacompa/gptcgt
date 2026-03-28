@@ -10,6 +10,8 @@ from api.database import close_db_pool, init_db_pool
 from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.routes import api_keys, auth, billing, github, hub, models, proxy, team, team_invites, usage, users
+from src.services.registry import services
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")
@@ -77,4 +79,24 @@ app.include_router(hub.router, prefix="/hub")
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    required_missing = services.verify_required()
+    missing_billing = []
+    require_stripe = os.getenv("REQUIRE_STRIPE", "true").lower() != "false"
+    if require_stripe:
+        if not services.stripe.is_configured:
+            missing_billing.append("stripe")
+        elif not services.stripe.webhook_secret:
+            missing_billing.append("stripe_webhook_secret")
+
+    if missing_billing:
+        required_missing.extend([item for item in missing_billing if item not in required_missing])
+
+    status = "ok" if not required_missing else "degraded"
+
+    return {
+        "status": status,
+        "environment": settings.environment,
+        "required_services_missing": required_missing,
+        "requires_billing": require_stripe,
+        "services": services.health_check(),
+    }

@@ -14,6 +14,7 @@ import tempfile
 import tomli_w
 
 from src.core.logger import get_logger
+from src.core.endpoints import DEFAULT_SANDBOX_API_URL
 
 logger = get_logger("core.config")
 
@@ -76,7 +77,7 @@ class UserConfig:
     max_autonomous_budget: float = 20.0  # USD cap for entire autonomous session
 
     # API
-    api_base_url: str = "https://gptcgt.ai/api"  # Base URL for proxy API
+    api_base_url: str = DEFAULT_SANDBOX_API_URL  # Base URL for sandbox proxy API
 
     # Token Efficiency
     max_context_tokens_per_agent: int = 100_000  # Context budget per agent

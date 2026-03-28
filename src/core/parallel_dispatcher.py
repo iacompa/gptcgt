@@ -26,6 +26,7 @@ from typing import AsyncIterator
 from src.agents.base import AgentResponse, BaseAgent
 from src.agents.factory import PROVIDER_KEY_MAP, AgentFactory
 from src.auth.keychain import KeyChainManager
+from src.core.endpoints import resolve_terminal_proxy_url
 from src.core.diff_engine import DiffExtractor, PatchSet
 from src.core.logger import get_logger
 from src.core.model_registry import ModelDefinition, ModelRegistry
@@ -152,7 +153,7 @@ class ParallelDispatcher:
                 }
                 return
             global_api_key = access
-            global_base_url = "https://gptcgt-api.fly.dev/proxy/v1"
+            global_base_url = resolve_terminal_proxy_url()
             use_managed = True
 
         # Fetch active mode for proxy routing headers

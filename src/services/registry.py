@@ -3,6 +3,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List
 
+from src.core.endpoints import resolve_web_origin_url
+
+
+def _resolve_stripe_origin() -> str:
+    return resolve_web_origin_url().rstrip("/")
+
+
+def _build_web_path(*parts: str) -> str:
+    base = _resolve_stripe_origin()
+    return "".join([base] + list(parts))
 
 class ServiceStatus(Enum):
     PLANNED = "planned"
@@ -57,9 +67,16 @@ class StripeConfig(ServiceConfig):
     price_enterprise: str = field(default_factory=lambda: os.environ.get("STRIPE_PRICE_ENTERPRISE", ""))
 
     currency: str = "usd"
-    success_url: str = "https://gptcgt.ai/dashboard/billing?success=1"
-    cancel_url: str = "https://gptcgt.ai/dashboard/billing?cancelled=1"
-    portal_return_url: str = "https://gptcgt.ai/dashboard/billing"
+    _base_url: str = field(default_factory=_resolve_stripe_origin)
+    success_url: str = field(
+        default_factory=lambda: os.environ.get("STRIPE_SUCCESS_URL", _build_web_path("/dashboard/billing?success=1"))
+    )
+    cancel_url: str = field(
+        default_factory=lambda: os.environ.get("STRIPE_CANCEL_URL", _build_web_path("/dashboard/billing?cancelled=1"))
+    )
+    portal_return_url: str = field(
+        default_factory=lambda: os.environ.get("STRIPE_PORTAL_RETURN_URL", _build_web_path("/dashboard/billing"))
+    )
 
     @property
     def is_configured(self) -> bool:

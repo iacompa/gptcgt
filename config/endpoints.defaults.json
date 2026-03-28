@@ -1,0 +1,8 @@
+{
+  "DEFAULT_BACKEND_API_URL": "https://gptcgt-api.fly.dev",
+  "DEFAULT_API_URL": "http://127.0.0.1:8000",
+  "DEFAULT_SANDBOX_API_URL": "https://gptcgt.ai/api",
+  "DEFAULT_BASE_URL": "https://gptcgt.ai",
+  "DEFAULT_PROXY_PATH": "proxy/v1",
+  "DEFAULT_WEB_ORIGIN": "https://gptcgt.ai"
+}

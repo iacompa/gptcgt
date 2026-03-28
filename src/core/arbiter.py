@@ -527,8 +527,8 @@ class Arbiter:
         for s in non_eliminated:
             s.total_score = sum(s.stage_scores.get(stage, 0) * weight for stage, weight in weights.items())
 
-        # Sort by total score (best first)
-        scores.sort(key=lambda s: (not s.eliminated, s.total_score), reverse=True)
+        # Sort by total score (best first), keep eliminated solutions behind non-eliminated.
+        scores.sort(key=lambda s: (s.eliminated, -s.total_score, s.model_name.lower(), s.model_id))
 
         # Produce verdict
         total_ms = int((time.time() - eval_start) * 1000)

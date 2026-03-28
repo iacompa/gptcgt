@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from api.config import settings
 from api.database import get_pool
+from src.core.endpoints import resolve_web_origin_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["github"])
@@ -180,10 +181,8 @@ async def github_connect(request: Request):
 async def github_callback_get(request: Request, code: str = "", state: str = ""):
     """Browser callback from GitHub OAuth; stores the token and redirects back to Hub."""
     await _complete_github_callback(request, code, state)
-    redirect = RedirectResponse(
-        url=f"{getattr(settings, 'base_url', 'https://gptcgt.ai')}/dashboard/hub?github=connected",
-        status_code=303,
-    )
+    base_url = getattr(settings, "base_url", "").rstrip("/") or resolve_web_origin_url().rstrip("/")
+    redirect = RedirectResponse(url=f"{base_url}/dashboard/hub?github=connected", status_code=303)
     redirect.delete_cookie("gh_oauth_nonce")
     return redirect
 

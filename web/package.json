@@ -10,8 +10,10 @@
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
+        "lint:strict": "next lint --max-warnings=0",
         "test:e2e": "playwright test",
-        "test:e2e:staging": "playwright test -c playwright.staging.config.ts"
+        "test:e2e:staging": "playwright test -c playwright.staging.config.ts",
+        "test:contracts": "playwright test -c playwright.contract.config.ts"
     },
     "dependencies": {
         "@stripe/stripe-js": "^3.3.0",

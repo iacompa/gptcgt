@@ -36,6 +36,7 @@ run_comprehensive_audit.py
 web/.env.local
 web/.env.*
 !web/.env.local.example
+web/test-results/
 .github/workflows/
 
 # Virtual environment
