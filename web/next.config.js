@@ -1,4 +1,13 @@
-const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || "https://gptcgt-api.fly.dev";
+const {
+    resolveBackendApiUrl,
+    resolveProxyApiUrl,
+} = require("./lib/endpoints.config.js");
+
+const backendApiUrl = resolveBackendApiUrl(process.env);
+const publicApiUrl = backendApiUrl;
+const proxyApiUrl = resolveProxyApiUrl(process.env);
+
+const addDistinct = (...values) => [...new Set(values.filter(Boolean))].join(" ");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -25,7 +34,7 @@ const nextConfig = {
                             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                             "font-src 'self' https://fonts.gstatic.com",
                             "img-src 'self' data: blob: https:",
-                            `connect-src 'self' ${publicApiUrl} https://*.workos.com https://*.stripe.com`,
+                            `connect-src 'self' ${addDistinct(publicApiUrl, backendApiUrl, proxyApiUrl)} https://*.workos.com https://*.stripe.com`,
                             "frame-ancestors 'none'",
                             "base-uri 'self'",
                             "form-action 'self'",

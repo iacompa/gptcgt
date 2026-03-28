@@ -2,9 +2,11 @@ import logging
 import re
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from api.database import get_pool
+from api.services.provider_access import get_user_runtime_provider_profile
 from src.core.model_registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -34,28 +36,49 @@ def model_sort_key(model_id: str, label: str) -> tuple:
     return (provider, natural_sort_key(label))
 
 @router.get("", response_model=List[ModelResponse])
-async def get_available_models():
-    """Return a sorted list of all available models based on active API keys."""
+async def get_available_models(request: Request):
+    """Return models the current user can execute from this runtime."""
     registry = ModelRegistry()
     if not registry.get_all():
         registry.load()
 
-    from src.auth.keychain import KeyChainManager
-    if KeyChainManager.get_key("OPENROUTER_API_KEY"):
+    available_provider_names = set()
+    workos_user_id = getattr(request.state, "user_id", None)
+    if workos_user_id:
+        pool = get_pool()
+        plan = await pool.fetchval("SELECT plan FROM users WHERE workos_user_id = $1", workos_user_id)
+        runtime_profile = await get_user_runtime_provider_profile(pool, workos_user_id, plan)
+        available_provider_names.update(runtime_profile["proxy_providers"])
+
+    if "openrouter" in available_provider_names:
         has_or = any(m.id.startswith("openrouter/") for m in registry.get_all())
         if not has_or:
             try:
                 data = await registry.fetch_openrouter_models()
                 if data:
                     from src.core.model_registry import QualityTier
+
                     for m in data:
                         name = m.get("name", m.get("id"))
                         m_id = m.get("id")
-                        registry.register_custom_openrouter_model(m_id, name, QualityTier.STANDARD, openrouter_data=data)
+                        registry.register_custom_openrouter_model(
+                            m_id,
+                            name,
+                            QualityTier.STANDARD,
+                            openrouter_data=data,
+                        )
             except Exception as e:
                 logger.error(f"Failed to fetch openrouter models: {e}")
 
-    models = registry.get_available_models()
+    models = [
+        model
+        for model in registry.get_all()
+        if not model.deprecated
+        and (
+            model.provider.value in available_provider_names
+            or (model.provider.value == "custom" and not getattr(model, "api_key_required", True))
+        )
+    ]
 
     result = []
     for m in models:

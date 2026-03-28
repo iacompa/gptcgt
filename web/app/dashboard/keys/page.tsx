@@ -165,7 +165,7 @@ export default function KeysPage() {
                         <h2 className="text-xl font-semibold tracking-[-0.03em] text-slate-950">Add provider key</h2>
                     </div>
                     <p className="mt-3 text-sm text-[var(--text-muted)]">
-                        Paste a provider key from Anthropic, OpenAI, Google, xAI, or DeepSeek. The raw value is encrypted before it is stored.
+                        Paste a provider key from Anthropic, OpenAI, Google, xAI, OpenRouter, or DeepSeek. The raw value is encrypted before it is stored.
                     </p>
                     <form onSubmit={createKey} className="mt-5 space-y-4">
                         <div>
@@ -180,6 +180,7 @@ export default function KeysPage() {
                                 <option value="openai">OpenAI</option>
                                 <option value="google">Google AI</option>
                                 <option value="xai">xAI</option>
+                                <option value="openrouter">OpenRouter</option>
                                 <option value="deepseek">DeepSeek</option>
                             </select>
                         </div>
