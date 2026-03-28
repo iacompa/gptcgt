@@ -50,6 +50,8 @@ class SandboxResult:
 class TestResult:
     """Parsed test execution results."""
 
+    __test__ = False
+
     total: int = 0
     passed: int = 0
     failed: int = 0
@@ -67,12 +69,27 @@ class TestResult:
         return self.passed / max(self.total, 1) * 100
 
 
-@dataclass
+@dataclass(init=False)
 class LintResult:
     """Parsed lint results."""
 
+    __test__ = False
+
     warnings: list[dict] = field(default_factory=list)  # [{file, line, rule, message, severity}]
     errors: list[dict] = field(default_factory=list)
+    _new_violations_override: int | None = field(default=None, repr=False)
+
+    def __init__(
+        self,
+        warnings: list[dict] | None = None,
+        errors: list[dict] | None = None,
+        new_violations: int | None = None,
+    ) -> None:
+        self.warnings = list(warnings or [])
+        self.errors = list(errors or [])
+        # Backward compatibility for older tests/callers that constructed
+        # LintResult(new_violations=N) directly.
+        self._new_violations_override = new_violations
 
     @property
     def clean(self) -> bool:
@@ -80,12 +97,16 @@ class LintResult:
 
     @property
     def new_violations(self) -> int:
+        if self._new_violations_override is not None:
+            return self._new_violations_override
         return len(self.warnings) + len(self.errors)
 
 
 @dataclass
 class VerificationResult:
     """Aggregate result from all sandbox verification steps."""
+
+    __test__ = False
 
     agent_id: str
     model_name: str

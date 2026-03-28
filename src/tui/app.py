@@ -942,7 +942,7 @@ class GptcgtApp(App[None]):
         tb_keys = [k for k in valid_keys if placements.get(k) in ("top", "bottom")]
 
         for r in list(app_grid.query("PanelResizer")):
-            await r.remove()
+            r.remove()
 
         # Normalize horizontal widths so visible panels fill 100%
         visible_horiz = [k for k in horiz_keys if visible.get(k, True)]
