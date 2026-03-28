@@ -25,7 +25,7 @@ async def test_dispatch_errors_when_keyless_models_are_insufficient(monkeypatch)
     async for event in ParallelDispatcher().dispatch("hello", [], [_model("openai/gpt-4o-mini")], []):
         events.append(event)
 
-    assert events == [{"type": "error", "error": "Need at least 2 models with API keys for parallel mode"}]
+    assert events == [{"type": "error", "error": "Need at least 2 runnable models for parallel mode"}]
 
 
 @pytest.mark.asyncio

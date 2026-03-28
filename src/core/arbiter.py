@@ -211,292 +211,25 @@ class Arbiter:
         scores: list[ArbiterScore] = []
 
         for slot in dispatch.slots:
-            if slot.status != "completed" or not slot.patch_set:
-                # Agent failed or produced no code — skip
+            try:
+                score = await self._evaluate_single_slot(
+                    dispatch_id=dispatch.dispatch_id,
+                    slot=slot,
+                    project_root=project_root,
+                    language=language,
+                    test_command=test_command,
+                    on_progress=on_progress,
+                    arbiter_memory=arbiter_memory,
+                )
+            except Exception as exc:
+                logger.exception(f"Arbiter evaluation failed for {slot.agent_id} ({slot.model.id}): {exc}")
                 score = ArbiterScore(
                     agent_id=slot.agent_id,
                     model_name=slot.model.name,
                     model_id=slot.model.id,
                     eliminated=True,
-                    elimination_reason="Agent failed or produced no code changes",
+                    elimination_reason=f"Evaluation failed: {exc}",
                 )
-                scores.append(score)
-                continue
-
-            agent_start = time.time()
-            score = ArbiterScore(
-                agent_id=slot.agent_id,
-                model_name=slot.model.name,
-                model_id=slot.model.id,
-            )
-            score.patch_set = slot.patch_set
-
-            # ═══════════════════════════════════════════════════
-            # STAGE 1: Structural Validation (instant, local)
-            # ═══════════════════════════════════════════════════
-            if on_progress:
-                await on_progress("structural", slot.agent_id, "Validating syntax...")
-
-            structural_score, structural_reason = self._stage1_structural(slot.patch_set, project_root)
-            score.stage_scores["structural_validity"] = structural_score
-
-            if structural_score == 0:
-                score.eliminated = True
-                score.elimination_reason = structural_reason or "Code has syntax errors or diff doesn't apply cleanly"
-                score.total_score = 0
-                scores.append(score)
-                continue
-
-            # ═══════════════════════════════════════════════════
-            # AST-Aware Bypassing (Python)
-            # ═══════════════════════════════════════════════════
-            ast_changed = True
-            if language == "python" and slot.patch_set.patches:
-                try:
-                    import ast
-
-                    ast_changed_any = False
-                    for fp in slot.patch_set.patches:
-                        if not fp.file_path.endswith(".py") or fp.is_new_file:
-                            ast_changed_any = True
-                            break
-
-                        full_path = project_root / fp.file_path
-                        original_text = full_path.read_text(errors="replace")
-
-                        lines = original_text.splitlines()
-                        for hunk in sorted(fp.hunks, key=lambda h: h.start_line, reverse=True):
-                            lines[hunk.start_line - 1 : hunk.end_line] = hunk.modified_lines
-                        patched_text = "\n".join(lines)
-
-                        orig_ast = ast.dump(ast.parse(original_text))
-                        new_ast = ast.dump(ast.parse(patched_text))
-
-                        if orig_ast != new_ast:
-                            ast_changed_any = True
-                            break
-                    ast_changed = ast_changed_any
-                except Exception as e:
-                    logger.debug(f"AST comparison failed (falling back to testing): {e}")
-                    ast_changed = True
-
-            # ═══════════════════════════════════════════════════
-            # STAGES 2-4: Run in PARALLEL (lint, tests, security)
-            # ═══════════════════════════════════════════════════
-            if not ast_changed:
-                if on_progress:
-                    await on_progress(
-                        "verification",
-                        slot.agent_id,
-                        "AST unchanged. Running local lint + security (skipping tests).",
-                    )
-                # TRUTHFUL: No tests were run. Report 0/0.
-                # Must still run linter and security to catch whitespace errors and secrets in comments.
-                from src.tools.sandbox import TestResult, VerificationResult
-
-                verification_result = await self._sandbox._verify_local_only(
-                    slot.patch_set,
-                    project_root,
-                    language,
-                    VerificationResult(
-                        agent_id=slot.agent_id,
-                        model_name=slot.model_name,
-                        syntax_valid=True,
-                        test_result=TestResult(total=0, passed=0),  # Honest: no tests run
-                    ),
-                )
-
-                # IMPORTANT: Run security scan even on comment-only changes
-                security_findings = await self._security.scan_patch(slot.patch_set, language)
-
-                # LSP would be identical if AST is identical
-                if self._lsp:
-                    lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
-                else:
-                    lsp_task = None
-            else:
-                if on_progress:
-                    await on_progress("verification", slot.agent_id, "Running lint + tests + security scan...")
-
-                def handle_stdout(text: str):
-                    if on_progress:
-                        import asyncio
-
-                        asyncio.create_task(on_progress("verify_stream", slot.agent_id, text))
-
-                def handle_stderr(text: str):
-                    if on_progress:
-                        import asyncio
-
-                        asyncio.create_task(on_progress("verify_stream", slot.agent_id, f"ERR: {text}"))
-
-                # Stage 2+3: Sandbox verification (lint + tests)
-                sandbox_task = asyncio.create_task(
-                    self._sandbox.verify_patch(
-                        slot.patch_set,
-                        project_root,
-                        language,
-                        test_command,
-                        on_stdout=handle_stdout,
-                        on_stderr=handle_stderr,
-                    )
-                )
-
-                # Stage 4: Security scan
-                security_task = asyncio.create_task(self._security.scan_patch(slot.patch_set, language))
-
-                # LSP reference verification (bonus check, runs in parallel too)
-                lsp_task = None
-                if self._lsp:
-                    lsp_task = asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language))
-
-                # Await all parallel checks
-                verification_result, security_findings = await asyncio.gather(sandbox_task, security_task)
-
-            # Phase 19: Dynamically pardon false-positives using Arbiter Memory
-            if arbiter_memory and (verification_result.test_result or security_findings):
-                await self._apply_memory_pardons(verification_result, security_findings, arbiter_memory)
-
-            if lsp_task:
-                score.reference_verification = await lsp_task
-
-            score.verification = verification_result
-            score.security_findings = security_findings
-
-            # ═══════════════════════════════════════════════════
-            # Compute per-stage scores
-            # ═══════════════════════════════════════════════════
-
-            # Stage 2: Lint score
-            lint_score = 100.0
-            if verification_result.lint_result:
-                new_violations = verification_result.lint_result.new_violations
-                lint_score = max(0, 100 - (new_violations * 5))
-            score.stage_scores["lint_cleanliness"] = lint_score
-
-            # Stage 3: Test score
-            test_score = 0.0
-            if verification_result.test_result and verification_result.test_result.total > 0:
-                test_score = verification_result.test_result.pass_rate
-            # Wire TesterAgent: generate + run targeted tests from the diff
-            try:
-                from src.agents.tester_agent import TesterAgent
-
-                tester = TesterAgent()
-                diff_text = slot.response_text[:5000] if slot.response_text else ""
-                if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
-                    tester_result = await tester.generate_and_run_tests(
-                        diff_text=diff_text,
-                        language=language,
-                        project_root=str(project_root) if project_root else ".",
-                    )
-                    if tester_result.passed + tester_result.failed > 0:
-                        # Blend TesterAgent results with existing test score (60/40 weight)
-                        tester_score = tester_result.pass_rate
-                        test_score = (test_score * 0.6) + (tester_score * 0.4)
-                        logger.info(
-                            f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}"
-                        )  # noqa: E501
-            except Exception as e:
-                logger.debug(f"TesterAgent invocation skipped: {e}")
-            score.stage_scores["test_pass_rate"] = test_score
-
-            # Stage 4: Security score
-            security_score = 100.0
-            for finding in security_findings:
-                if finding.severity == "critical":
-                    security_score -= 50
-                elif finding.severity == "high":
-                    security_score -= 20
-                elif finding.severity == "medium":
-                    security_score -= 5
-                elif finding.severity == "low":
-                    security_score -= 1
-            security_score = max(0, security_score)
-            score.stage_scores["security_score"] = security_score
-
-            # ═══════════════════════════════════════════════════
-            # STAGE 5: Diff Minimality (instant, local)
-            # ═══════════════════════════════════════════════════
-            diff_stats = self._stage5_diff_stats(slot.patch_set)
-            score.diff_stats = diff_stats
-            # Minimality score is normalized AFTER all agents are evaluated (see below)
-
-            # ═══════════════════════════════════════════════════
-            # STAGE 6: Complexity Delta (instant, local)
-            # ═══════════════════════════════════════════════════
-            complexity = self._stage6_complexity(slot.patch_set, project_root)
-            score.complexity_stats = complexity
-
-            complexity_score = 100.0 - (complexity.complexity_delta * 10.0)
-            score.stage_scores["complexity_delta"] = max(0.0, min(100.0, complexity_score))
-
-            score.evaluation_ms = int((time.time() - agent_start) * 1000)
-
-            # ═══════════════════════════════════════════════════
-            # PROOF BUNDLE & CONFIDENCE CALIBRATION
-            # ═══════════════════════════════════════════════════
-            confidence = 0.5
-
-            # Linter check
-            linter_clean = bool(
-                verification_result.lint_result and getattr(verification_result.lint_result, "new_violations", 0) == 0
-            )  # noqa: E501
-            if linter_clean:
-                confidence += 0.2
-
-            # Test check
-            tests_passed = False
-            if verification_result.test_result:
-                if verification_result.test_result.total > 0:
-                    tests_passed = bool(getattr(verification_result.test_result, "all_passed", False))
-
-            if tests_passed:
-                confidence += 0.3
-            elif not ast_changed:
-                # If AST is provably unchanged, it's logically safe.
-                # Give equivalent confidence as passing tests, without fabricating a test pass.
-                confidence += 0.3
-
-            # Security check
-            security_clean = len(security_findings) == 0
-            if not security_clean:
-                confidence -= 0.5
-
-            confidence = max(0.0, min(1.0, confidence))
-
-            score.proof_bundle = ProofBundle(
-                linter_clean=linter_clean,
-                tests_passed=tests_passed,
-                security_clean=security_clean,
-                calibrated_confidence_score=confidence,
-            )
-
-            # Elimination based on Frontier Safety Rules
-            if confidence < 0.85:
-                score.eliminated = True
-                score.elimination_reason = (
-                    f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."  # noqa: E501
-                )
-                # Push failure to reflection engine implicitly for next iterations
-                try:
-                    import textual.app as _tapp
-
-                    from src.core.reflection_engine import ReflectionEngine
-
-                    _app = _tapp.active_app.get()
-                    engine = ReflectionEngine(_app)
-                    engine.reflect_on_friction(
-                        model_name=slot.model.name,
-                        trigger_event="arbiter_elimination",
-                        original_prompt="",
-                        agent_output=slot.response_text[:500] if slot.response_text else "",
-                        failure_reason=str(score.elimination_reason),
-                        task_id=dispatch.dispatch_id,
-                    )
-                except Exception:
-                    pass
-
             scores.append(score)
 
         # ═══════════════════════════════════════════════════
@@ -581,6 +314,234 @@ class Arbiter:
             await on_progress("verdict", "", verdict.comparison_summary)
 
         return verdict
+
+    async def _evaluate_single_slot(
+        self,
+        dispatch_id: str,
+        slot,
+        project_root: Path,
+        language: str,
+        test_command: str | None = None,
+        on_progress: callable | None = None,
+        arbiter_memory: str = "",
+    ) -> ArbiterScore:
+        if slot.status != "completed" or not slot.patch_set:
+            return ArbiterScore(
+                agent_id=slot.agent_id,
+                model_name=slot.model.name,
+                model_id=slot.model.id,
+                eliminated=True,
+                elimination_reason="Agent failed or produced no code changes",
+            )
+
+        agent_start = time.time()
+        score = ArbiterScore(
+            agent_id=slot.agent_id,
+            model_name=slot.model.name,
+            model_id=slot.model.id,
+            patch_set=slot.patch_set,
+        )
+
+        if on_progress:
+            await on_progress("structural", slot.agent_id, "Validating syntax...")
+
+        structural_score, structural_reason = self._stage1_structural(slot.patch_set, project_root)
+        score.stage_scores["structural_validity"] = structural_score
+
+        if structural_score == 0:
+            score.eliminated = True
+            score.elimination_reason = structural_reason or "Code has syntax errors or diff doesn't apply cleanly"
+            score.total_score = 0
+            return score
+
+        ast_changed = True
+        if language == "python" and slot.patch_set.patches:
+            try:
+                import ast
+
+                ast_changed_any = False
+                for fp in slot.patch_set.patches:
+                    if not fp.file_path.endswith(".py") or fp.is_new_file:
+                        ast_changed_any = True
+                        break
+
+                    full_path = project_root / fp.file_path
+                    original_text = full_path.read_text(errors="replace")
+
+                    lines = original_text.splitlines()
+                    for hunk in sorted(fp.hunks, key=lambda h: h.start_line, reverse=True):
+                        lines[hunk.start_line - 1 : hunk.end_line] = hunk.modified_lines
+                    patched_text = "\n".join(lines)
+
+                    orig_ast = ast.dump(ast.parse(original_text))
+                    new_ast = ast.dump(ast.parse(patched_text))
+
+                    if orig_ast != new_ast:
+                        ast_changed_any = True
+                        break
+                ast_changed = ast_changed_any
+            except Exception as e:
+                logger.debug(f"AST comparison failed (falling back to testing): {e}")
+                ast_changed = True
+
+        if not ast_changed:
+            if on_progress:
+                await on_progress(
+                    "verification",
+                    slot.agent_id,
+                    "AST unchanged. Running local lint + security (skipping tests).",
+                )
+            from src.tools.sandbox import TestResult, VerificationResult
+
+            verification_result = await self._sandbox._verify_local_only(
+                slot.patch_set,
+                project_root,
+                language,
+                VerificationResult(
+                    agent_id=slot.agent_id,
+                    model_name=slot.model.name,
+                    syntax_valid=True,
+                    test_result=TestResult(total=0, passed=0),
+                ),
+            )
+            security_findings = await self._security.scan_patch(slot.patch_set, language)
+            lsp_task = (
+                asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language)) if self._lsp else None
+            )
+        else:
+            if on_progress:
+                await on_progress("verification", slot.agent_id, "Running lint + tests + security scan...")
+
+            def handle_stdout(text: str):
+                if on_progress:
+                    asyncio.create_task(on_progress("verify_stream", slot.agent_id, text))
+
+            def handle_stderr(text: str):
+                if on_progress:
+                    asyncio.create_task(on_progress("verify_stream", slot.agent_id, f"ERR: {text}"))
+
+            sandbox_task = asyncio.create_task(
+                self._sandbox.verify_patch(
+                    slot.patch_set,
+                    project_root,
+                    language,
+                    test_command,
+                    on_stdout=handle_stdout,
+                    on_stderr=handle_stderr,
+                )
+            )
+            security_task = asyncio.create_task(self._security.scan_patch(slot.patch_set, language))
+            lsp_task = (
+                asyncio.create_task(self._lsp.verify_patch_references(slot.patch_set, language)) if self._lsp else None
+            )
+            verification_result, security_findings = await asyncio.gather(sandbox_task, security_task)
+
+        if arbiter_memory and (verification_result.test_result or security_findings):
+            await self._apply_memory_pardons(verification_result, security_findings, arbiter_memory)
+
+        if lsp_task:
+            score.reference_verification = await lsp_task
+
+        score.verification = verification_result
+        score.security_findings = security_findings
+
+        lint_score = 100.0
+        if verification_result.lint_result:
+            new_violations = verification_result.lint_result.new_violations
+            lint_score = max(0, 100 - (new_violations * 5))
+        score.stage_scores["lint_cleanliness"] = lint_score
+
+        test_score = 0.0
+        if verification_result.test_result and verification_result.test_result.total > 0:
+            test_score = verification_result.test_result.pass_rate
+        try:
+            from src.agents.tester_agent import TesterAgent
+
+            tester = TesterAgent()
+            diff_text = slot.response_text[:5000] if slot.response_text else ""
+            if diff_text and slot.patch_set and slot.patch_set.file_count > 0:
+                tester_result = await tester.generate_and_run_tests(
+                    diff_text=diff_text,
+                    language=language,
+                    project_root=str(project_root) if project_root else ".",
+                )
+                if tester_result.passed + tester_result.failed > 0:
+                    tester_score = tester_result.pass_rate
+                    test_score = (test_score * 0.6) + (tester_score * 0.4)
+                    logger.info(
+                        f"TesterAgent: {tester_result.passed}P/{tester_result.failed}F → blended score {test_score:.1f}"
+                    )
+        except Exception as e:
+            logger.debug(f"TesterAgent invocation skipped: {e}")
+        score.stage_scores["test_pass_rate"] = test_score
+
+        security_score = 100.0
+        for finding in security_findings:
+            if finding.severity == "critical":
+                security_score -= 50
+            elif finding.severity == "high":
+                security_score -= 20
+            elif finding.severity == "medium":
+                security_score -= 5
+            elif finding.severity == "low":
+                security_score -= 1
+        score.stage_scores["security_score"] = max(0, security_score)
+
+        score.diff_stats = self._stage5_diff_stats(slot.patch_set)
+        score.complexity_stats = self._stage6_complexity(slot.patch_set, project_root)
+        complexity_score = 100.0 - (score.complexity_stats.complexity_delta * 10.0)
+        score.stage_scores["complexity_delta"] = max(0.0, min(100.0, complexity_score))
+        score.evaluation_ms = int((time.time() - agent_start) * 1000)
+
+        confidence = 0.5
+        linter_clean = bool(
+            verification_result.lint_result and getattr(verification_result.lint_result, "new_violations", 0) == 0
+        )
+        if linter_clean:
+            confidence += 0.2
+
+        tests_passed = False
+        if verification_result.test_result and verification_result.test_result.total > 0:
+            tests_passed = bool(getattr(verification_result.test_result, "all_passed", False))
+        if tests_passed or not ast_changed:
+            confidence += 0.3
+
+        security_clean = len(security_findings) == 0
+        if not security_clean:
+            confidence -= 0.5
+
+        confidence = max(0.0, min(1.0, confidence))
+        score.proof_bundle = ProofBundle(
+            linter_clean=linter_clean,
+            tests_passed=tests_passed,
+            security_clean=security_clean,
+            calibrated_confidence_score=confidence,
+        )
+
+        if confidence < 0.85:
+            score.eliminated = True
+            score.elimination_reason = (
+                f"Low confidence ({confidence:.2f}): Failed strict verification proofs (tests/lint/security)."
+            )
+            try:
+                import textual.app as _tapp
+
+                from src.core.reflection_engine import ReflectionEngine
+
+                _app = _tapp.active_app.get()
+                engine = ReflectionEngine(_app)
+                engine.reflect_on_friction(
+                    model_name=slot.model.name,
+                    trigger_event="arbiter_elimination",
+                    original_prompt="",
+                    agent_output=slot.response_text[:500] if slot.response_text else "",
+                    failure_reason=str(score.elimination_reason),
+                    task_id=dispatch_id,
+                )
+            except Exception:
+                pass
+
+        return score
 
     # ═════════════════════════════════════════════════════════
     # STAGE IMPLEMENTATIONS
