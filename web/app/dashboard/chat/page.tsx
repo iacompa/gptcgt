@@ -321,6 +321,7 @@ export default function ChatPage() {
                 <div className="panel p-5">
                     <p className="metric-label">Model selection</p>
                     <select
+                        data-testid="chat-model-select"
                         value={selectedModel}
                         onChange={(event) => setSelectedModel(event.target.value)}
                         className="select-field mt-3"
@@ -378,7 +379,11 @@ export default function ChatPage() {
                     <div className="badge badge-accent">{selectedModel}</div>
                 </div>
 
-                <div ref={scrollRef} className="panel flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+                <div
+                    ref={scrollRef}
+                    data-testid="chat-message-list"
+                    className="panel flex-1 space-y-4 overflow-y-auto p-4 sm:p-5"
+                >
                     {messages.length === 0 ? (
                         <div className="flex h-full min-h-[320px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--border-strong)] bg-white/45 px-6 text-center">
                             <Bot className="h-10 w-10 text-[var(--accent)]" />
@@ -447,6 +452,7 @@ export default function ChatPage() {
                 <form onSubmit={handleSubmit} className="panel p-4">
                     <textarea
                         ref={textareaRef}
+                        data-testid="chat-composer"
                         value={input}
                         onChange={(event) => setInput(event.target.value)}
                         onKeyDown={handleKeyDown}

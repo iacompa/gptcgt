@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from api.config import settings
 from api.database import get_pool
 from src.billing.credits import CreditService
-from src.services.cache import cache_manager
 from src.billing.stripe_service import StripeService
 from src.core.endpoints import DEFAULT_WEB_ORIGIN
+from src.services.cache import cache_manager
 
 router = APIRouter(tags=["billing"])
 stripe_service = StripeService()
@@ -175,7 +175,10 @@ async def seed_test_credits(request: Request, body: SeedCreditsRequest):
     if body.credit_amount < 100 or body.credit_amount > 50000:
         raise HTTPException(status_code=400, detail="Credit amount must be between 100 and 50000.")
 
-    user_id, _ = await _get_billing_user(request)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     pool = get_pool()
     credit_service = CreditService()
     result = await credit_service.purchase_credits(pool, user_id, body.credit_amount)

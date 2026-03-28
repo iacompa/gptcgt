@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,7 +12,6 @@ from api.middleware.auth import AuthMiddleware
 from api.middleware.rate_limit import RateLimitMiddleware
 from api.routes import api_keys, auth, billing, github, hub, models, proxy, team, team_invites, usage, users
 from src.services.registry import services
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api")

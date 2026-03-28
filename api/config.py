@@ -3,8 +3,8 @@ from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.services.registry import services
 from src.core.endpoints import resolve_web_origin_url
+from src.services.registry import services
 
 
 def _default_cors_origins() -> str:

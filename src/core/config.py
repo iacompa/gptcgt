@@ -13,8 +13,8 @@ import tempfile
 
 import tomli_w
 
-from src.core.logger import get_logger
 from src.core.endpoints import DEFAULT_SANDBOX_API_URL
+from src.core.logger import get_logger
 
 logger = get_logger("core.config")
 

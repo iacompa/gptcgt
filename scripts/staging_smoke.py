@@ -13,6 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
+
 GITHUB_AUTH_PREFIX = "https://github.com/login/oauth/authorize"
 STRIPE_CHECKOUT_PREFIX = "https://checkout.stripe.com/"
 

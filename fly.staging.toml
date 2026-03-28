@@ -6,13 +6,13 @@ primary_region = "ewr"
 
 [env]
   ENVIRONMENT = "staging"
-  PORT = "8080"
+  PORT = "8000"
   WORKOS_CLIENT_ID = "client_staging"
   WORKOS_ISSUER = "gptcgt-staging"
   WORKOS_AUDIENCE = "gptcgt-api-staging"
 
 [http_service]
-  internal_port = 8080
+  internal_port = 8000
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true

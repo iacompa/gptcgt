@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "endpoints.defaults.json"
 
 

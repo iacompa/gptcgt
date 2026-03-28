@@ -17,7 +17,6 @@ import {
     Star,
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { PUBLIC_API_URL } from "@/lib/config";
 import { useToast } from "@/components/toaster";
 
 interface Repo {
@@ -263,9 +262,7 @@ export default function HubPage() {
 
     const listenToLogs = (runId: string) => {
         eventSourceRef.current?.close();
-        const eventSource = new EventSource(`${PUBLIC_API_URL}/hub/${runId}/logs`, {
-            withCredentials: true,
-        });
+        const eventSource = new EventSource(`/api/backend/hub/${runId}/logs`);
         eventSourceRef.current = eventSource;
 
         eventSource.addEventListener("status", (event) => {
@@ -341,6 +338,42 @@ export default function HubPage() {
                 tone: "error",
                 title: "GitHub connect failed",
                 description: error.message || "The backend did not return an OAuth URL.",
+            });
+        }
+    };
+
+    const handleDisconnect = async () => {
+        try {
+            const response = await fetch("/api/backend/github/disconnect", {
+                method: "POST",
+                credentials: "include",
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.detail || payload.error || "The backend could not clear the GitHub integration.");
+            }
+
+            eventSourceRef.current?.close();
+            eventSourceRef.current = null;
+            setConnected(false);
+            setGhUsername("");
+            setRepos([]);
+            setSelectedRepo(null);
+            setTree([]);
+            setFileContent(null);
+            setSelectedFile(null);
+            setRunLogs([]);
+            setActiveRunId(null);
+            pushToast({
+                tone: "success",
+                title: "GitHub disconnected",
+                description: "Repo browsing is disabled until a new GitHub connection is created.",
+            });
+        } catch (error: any) {
+            pushToast({
+                tone: "error",
+                title: "GitHub disconnect failed",
+                description: error.message || "The backend could not clear the GitHub integration.",
             });
         }
     };
@@ -510,7 +543,7 @@ export default function HubPage() {
                     <p className="mx-auto mt-4 max-w-xl copy-lg">
                         Browse repositories, inspect files, queue agent runs, and watch logs stream without leaving the workspace.
                     </p>
-                    <button type="button" onClick={handleConnect} className="btn-primary mt-8">
+                    <button type="button" onClick={handleConnect} className="btn-primary mt-8" data-testid="hub-connect">
                         <Github className="h-4 w-4" />
                         Connect with GitHub
                     </button>
@@ -532,10 +565,16 @@ export default function HubPage() {
                             Connected as <span className="font-medium text-slate-950">@{ghUsername}</span>.
                         </p>
                     </div>
-                    <button type="button" onClick={loadRepos} className="btn-secondary">
-                        <RefreshCw className="h-4 w-4" />
-                        Refresh repositories
-                    </button>
+                    <div className="flex gap-3">
+                        <button type="button" onClick={loadRepos} className="btn-secondary">
+                            <RefreshCw className="h-4 w-4" />
+                            Refresh repositories
+                        </button>
+                        <button type="button" onClick={handleDisconnect} className="btn-secondary" data-testid="hub-disconnect">
+                            <Github className="h-4 w-4" />
+                            Disconnect GitHub
+                        </button>
+                    </div>
                 </div>
             </section>
 
@@ -544,6 +583,7 @@ export default function HubPage() {
                     <div className="flex items-center gap-2 rounded-2xl border border-[var(--border)] bg-white/75 px-3 py-2">
                         <Search className="h-4 w-4 text-[var(--text-soft)]" />
                         <input
+                            data-testid="hub-repo-search"
                             value={repoSearch}
                             onChange={(event) => setRepoSearch(event.target.value)}
                             placeholder="Search repositories..."

@@ -3,7 +3,6 @@
  * All environment variables should be accessed through this module
  * to avoid inconsistent fallback logic across files.
  */
-/* eslint-disable @typescript-eslint/no-var-requires */
 
 const endpoints = require("./endpoints.config.js");
 
