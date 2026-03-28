@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CreditCard, ShieldAlert, Wallet } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/components/toaster";
+import { BASE_URL, DEFAULT_WEB_ORIGIN } from "@/lib/config";
 
 export default function BillingPage() {
     const [status, setStatus] = useState<any>(null);
@@ -14,8 +15,7 @@ export default function BillingPage() {
     const [capInput, setCapInput] = useState("");
     const [seedingCredits, setSeedingCredits] = useState(false);
     const { pushToast } = useToast();
-    const appBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
-    const isStaging = appBaseUrl !== "" && appBaseUrl !== "https://gptcgt.ai";
+    const isStaging = BASE_URL !== DEFAULT_WEB_ORIGIN;
 
     const loadStatus = useCallback(async () => {
         try {

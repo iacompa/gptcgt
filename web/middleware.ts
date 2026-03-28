@@ -4,6 +4,8 @@ import { jwtVerify } from 'jose';
 
 export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get('gptcgt_session');
+    const jwtIssuer = process.env.WORKOS_ISSUER || 'gptcgt';
+    const jwtAudience = process.env.WORKOS_AUDIENCE || 'gptcgt-api';
 
     // Protect all /dashboard routes
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
@@ -15,8 +17,8 @@ export async function middleware(request: NextRequest) {
                 if (secret.length >= 32) {
                     await jwtVerify(sessionCookie.value, secret, {
                         algorithms: ['HS256'],
-                        issuer: 'gptcgt',
-                        audience: 'gptcgt-api'
+                        issuer: jwtIssuer,
+                        audience: jwtAudience,
                     });
                     isValid = true;
                 }

@@ -1,10 +1,11 @@
 const {
     resolveBackendApiUrl,
+    resolvePublicApiUrl,
     resolveProxyApiUrl,
 } = require("./lib/endpoints.config.js");
 
 const backendApiUrl = resolveBackendApiUrl(process.env);
-const publicApiUrl = backendApiUrl;
+const publicApiUrl = resolvePublicApiUrl(process.env);
 const proxyApiUrl = resolveProxyApiUrl(process.env);
 
 const addDistinct = (...values) => [...new Set(values.filter(Boolean))].join(" ");

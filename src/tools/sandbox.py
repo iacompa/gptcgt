@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Callable
 
 from src.core.diff_engine import PatchSet
+from src.core.endpoints import resolve_sandbox_execute_url
 from src.core.logger import get_logger
 
 logger = get_logger("tools.sandbox")
@@ -330,9 +331,9 @@ class E2BSandbox:
         payload = {"files": files_to_upload, "language": language, "command": test_cmd}
 
         config = ConfigManager.get_instance()
-        base_url = config.user.api_base_url or "https://gptcgt.ai/api"
+        base_url = resolve_sandbox_execute_url(explicit=config.user.api_base_url)
         # The proxy exposes /v1/sandbox/execute
-        url = f"{base_url}/v1/sandbox/execute"
+        url = base_url
 
         if on_stdout:
             on_stdout(f"🚀 Sending {len(files_to_upload)} files to Zero-Retention Sandbox Proxy...\n")

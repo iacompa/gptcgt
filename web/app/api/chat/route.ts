@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { API_URL } from '@/lib/config';
+import { CHAT_COMPLETIONS_URL } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const proxyRes = await fetch(`${API_URL}/proxy/v1/chat/completions`, {
+        const proxyRes = await fetch(CHAT_COMPLETIONS_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

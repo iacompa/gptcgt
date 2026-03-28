@@ -8,6 +8,7 @@ from api.database import get_pool
 from src.billing.credits import CreditService
 from src.services.cache import cache_manager
 from src.billing.stripe_service import StripeService
+from src.core.endpoints import DEFAULT_WEB_ORIGIN
 
 router = APIRouter(tags=["billing"])
 stripe_service = StripeService()
@@ -168,7 +169,7 @@ async def get_status(request: Request):
 
 @router.post("/test/seed")
 async def seed_test_credits(request: Request, body: SeedCreditsRequest):
-    if settings.base_url.rstrip("/") == "https://gptcgt.ai":
+    if settings.base_url.rstrip("/") == DEFAULT_WEB_ORIGIN:
         raise HTTPException(status_code=404, detail="Not found")
 
     if body.credit_amount < 100 or body.credit_amount > 50000:

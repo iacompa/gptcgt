@@ -7,6 +7,7 @@ import httpx
 
 from src.auth.device_flow import DeviceFlowClient
 from src.auth.keychain import KeyChainManager
+from src.core.endpoints import resolve_terminal_api_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,10 @@ class AuthManager:
     This gives a fast startup while still catching expired/revoked tokens.
     """
 
-    def __init__(self, base_url: str = "https://gptcgt-api.fly.dev", client_id: str = "client_default"):
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None, client_id: str = "client_default"):
+        self.base_url = resolve_terminal_api_base_url(base_url=base_url)
         self._client_id = client_id
-        self._device_client = DeviceFlowClient(base_url)
+        self._device_client = DeviceFlowClient(self.base_url)
         self._profile: Dict[str, Any] | None = None
         self._is_authenticated = False
 
