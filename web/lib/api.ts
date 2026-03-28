@@ -3,10 +3,9 @@
 // Client-side fetch wrapper for the FastAPI backend.
 // Uses httpOnly cookie for authentication — no localStorage token storage.
 
-import { PUBLIC_API_URL } from "@/lib/config";
-
 export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
-    const url = `${PUBLIC_API_URL}${endpoint}`;
+    const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `/api/backend${normalizedEndpoint}`;
 
     const headers = new Headers(options.headers || {});
     headers.set("Content-Type", "application/json");
@@ -18,7 +17,7 @@ export async function fetchAPI(endpoint: string, options: RequestInit = {}) {
     const response = await fetch(url, {
         ...options,
         headers,
-        credentials: "include",  // Send httpOnly cookie automatically
+        credentials: "include",
     });
 
     if (!response.ok) {

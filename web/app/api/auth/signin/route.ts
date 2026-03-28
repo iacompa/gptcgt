@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
-import { createSessionToken } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { createSessionToken, SESSION_MAX_AGE_SECONDS } from '@/lib/auth';
 import { API_URL, AUTH_CALLBACK_ORIGIN, BASE_URL, IS_PRODUCTION } from '@/lib/config';
+import { getRequestOrigin } from '@/lib/request';
+import { sameOriginRedirect } from '@/lib/redirect';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
             secure: IS_PRODUCTION,
             sameSite: 'strict',
             path: '/',
-            maxAge: 60 * 60 * 24, // 24 hours
+            maxAge: SESSION_MAX_AGE_SECONDS,
         });
 
         return response;
@@ -84,18 +86,18 @@ export async function POST(request: Request) {
 }
 
 // WorkOS SSO redirect — one-click Google/GitHub login
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const provider = searchParams.get('provider') || 'google';
+    const requestOrigin = getRequestOrigin(request);
 
     const workosClientId = process.env.WORKOS_CLIENT_ID;
-    const redirectUri = `${AUTH_CALLBACK_ORIGIN}/api/auth/callback`;
+    const redirectOrigin = requestOrigin || AUTH_CALLBACK_ORIGIN || BASE_URL || new URL(request.url).origin;
+    const redirectUri = `${redirectOrigin}/api/auth/callback`;
 
     if (!workosClientId) {
         // Fallback: redirect to email/password auth page
-        return NextResponse.redirect(
-            new URL('/auth', BASE_URL)
-        );
+        return sameOriginRedirect(request, '/auth');
     }
 
     const providerMap: Record<string, string> = {

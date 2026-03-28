@@ -9,5 +9,8 @@
   "exclude": [
     "node_modules",
     ".next/cache"
-  ]
+  ],
+  "compilerOptions": {
+    "target": "ES2017"
+  }
 }

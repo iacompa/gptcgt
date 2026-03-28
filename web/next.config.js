@@ -1,5 +1,7 @@
 const {
     resolveBackendApiUrl,
+    resolveBaseUrl,
+    resolveAuthCallbackOrigin,
     resolvePublicApiUrl,
     resolveProxyApiUrl,
 } = require("./lib/endpoints.config.js");
@@ -7,6 +9,14 @@ const {
 const backendApiUrl = resolveBackendApiUrl(process.env);
 const publicApiUrl = resolvePublicApiUrl(process.env);
 const proxyApiUrl = resolveProxyApiUrl(process.env);
+const baseUrl = resolveBaseUrl(process.env);
+const authCallbackOrigin = resolveAuthCallbackOrigin(process.env);
+const loopbackOrigins = [
+    "http://localhost:*",
+    "http://127.0.0.1:*",
+    "https://localhost:*",
+    "https://127.0.0.1:*",
+];
 
 const addDistinct = (...values) => [...new Set(values.filter(Boolean))].join(" ");
 
@@ -35,7 +45,7 @@ const nextConfig = {
                             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                             "font-src 'self' https://fonts.gstatic.com",
                             "img-src 'self' data: blob: https:",
-                            `connect-src 'self' ${addDistinct(publicApiUrl, backendApiUrl, proxyApiUrl)} https://*.workos.com https://*.stripe.com`,
+                            `connect-src 'self' ${addDistinct(publicApiUrl, backendApiUrl, proxyApiUrl, baseUrl, authCallbackOrigin, ...loopbackOrigins)} https://*.workos.com https://*.stripe.com`,
                             "frame-ancestors 'none'",
                             "base-uri 'self'",
                             "form-action 'self'",

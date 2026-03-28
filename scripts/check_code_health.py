@@ -10,7 +10,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_DIRS = {".git", ".venv-audit", ".venv", ".next", ".ruff_cache", "__pycache__", ".pytest_cache", "node_modules"}
 

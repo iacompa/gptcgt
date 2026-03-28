@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getRequestOrigin } from '@/lib/request';
 
 export async function middleware(request: NextRequest) {
     const sessionCookie = request.cookies.get('gptcgt_session');
@@ -29,12 +30,15 @@ export async function middleware(request: NextRequest) {
 
         if (!isValid) {
             // Redirect unauthenticated users to the auth page
-            const url = request.nextUrl.clone();
-            url.pathname = '/auth';
-            url.searchParams.set('redirect_url', request.nextUrl.pathname);
-            const response = NextResponse.redirect(url);
-            response.cookies.delete('gptcgt_session');
-            return response;
+            const redirectPath = `/auth?redirect_url=${encodeURIComponent(request.nextUrl.pathname)}`;
+            const redirectOrigin = getRequestOrigin(request) || new URL(request.url).origin;
+            return new Response(null, {
+                status: 307,
+                headers: {
+                    Location: new URL(redirectPath, redirectOrigin).toString(),
+                    "Set-Cookie": "gptcgt_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
+                },
+            });
         }
     }
 

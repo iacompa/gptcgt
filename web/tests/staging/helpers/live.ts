@@ -3,22 +3,12 @@ import type { BrowserContext } from "@playwright/test";
 function resolveSessionCookie(): string {
     const value =
         process.env.STAGING_WEB_SESSION_COOKIE ||
-        process.env.STAGING_SMOKE_AUTH_TOKEN ||
-        process.env.SMOKE_AUTH_TOKEN ||
         "";
     return value.trim();
 }
 
 export function stagingWebBaseURL(): string {
     return (process.env.STAGING_WEB_BASE_URL || "").trim();
-}
-
-export function stagingApiURL(): string {
-    return (process.env.STAGING_SMOKE_API_URL || process.env.SMOKE_API_URL || "").trim();
-}
-
-export function stagingAuthToken(): string {
-    return (process.env.STAGING_SMOKE_AUTH_TOKEN || process.env.SMOKE_AUTH_TOKEN || "").trim();
 }
 
 export function expectGithubConnected(): boolean {
@@ -39,7 +29,7 @@ export async function installStagingSession(context: BrowserContext, baseURL: st
             value: cookieValue,
             url: baseURL,
             httpOnly: true,
-            sameSite: "Lax",
+            sameSite: "Strict",
         },
     ]);
 }

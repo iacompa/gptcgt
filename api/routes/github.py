@@ -377,3 +377,25 @@ async def github_status(request: Request):
         "connected": True,
         "username": row["github_username"],
     }
+
+
+@router.post("/disconnect")
+async def github_disconnect(request: Request):
+    """Remove the stored GitHub integration for the authenticated user."""
+    workos_user_id = getattr(request.state, "user_id", None)
+    if not workos_user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    pool = get_pool()
+    result = await pool.execute(
+        """
+        UPDATE users
+        SET github_token = NULL, github_username = NULL
+        WHERE workos_user_id = $1
+        """,
+        workos_user_id,
+    )
+    if result == "UPDATE 0":
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"status": "disconnected"}

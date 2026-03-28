@@ -10,6 +10,8 @@ export interface Session {
     accessToken: string;
 }
 
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
 function getJwtIssuer(): string {
     return process.env.WORKOS_ISSUER || "gptcgt";
 }
@@ -78,6 +80,6 @@ export function createSessionToken(subject: string, email: string, name?: string
             aud: getJwtAudience(),
         },
         secret,
-        { expiresIn: "7d", algorithm: "HS256" }
+        { expiresIn: SESSION_MAX_AGE_SECONDS, algorithm: "HS256" }
     );
 }
