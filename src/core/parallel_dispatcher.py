@@ -97,6 +97,10 @@ class ParallelDispatcher:
     def __init__(self) -> None:
         self._diff_extractor = DiffExtractor()
 
+    DISPATCH_TIMEOUT_SECONDS = 300.0
+    AGENT_TIMEOUT_SECONDS = 120.0
+    AGENT_STREAM_TIMEOUT_SECONDS = 45.0
+
     async def dispatch(
         self,
         task_str: str,
@@ -188,10 +192,10 @@ class ParallelDispatcher:
             slots.append(AgentSlot(agent_id=agent_id, model=model, agent=agent))
 
         if len(slots) < 2:
-            # Need at least 2 agents for parallel dispatch
+            # Need at least 2 runnable agents for parallel dispatch
             yield {
                 "type": "error",
-                "error": "Need at least 2 models with API keys for parallel mode",
+                "error": "Need at least 2 runnable models for parallel mode",
             }
             return
 
@@ -244,12 +248,13 @@ class ParallelDispatcher:
         completed_count = 0
         while completed_count < len(slots):
             try:
-                event = await asyncio.wait_for(queue.get(), timeout=300)  # 5 min max
+                event = await asyncio.wait_for(queue.get(), timeout=self.DISPATCH_TIMEOUT_SECONDS)
             except asyncio.TimeoutError:
-                logger.error("Parallel dispatch timed out after 5 minutes")
+                logger.error(f"Parallel dispatch timed out after {self.DISPATCH_TIMEOUT_SECONDS}s")
                 # Cancel remaining agents
                 for task in agent_tasks:
                     task.cancel()
+                await asyncio.gather(*agent_tasks, return_exceptions=True)
                 yield {"type": "error", "error": "Parallel dispatch timed out"}
                 return
 
@@ -262,8 +267,6 @@ class ParallelDispatcher:
         dispatch.completed_at = time.time()
 
         yield {"type": "all_complete", "dispatch": dispatch}
-
-    AGENT_TIMEOUT_SECONDS = 120  # Per-agent wall-clock ceiling
 
     async def _run_single_agent_with_timeout(
         self,
@@ -280,7 +283,7 @@ class ParallelDispatcher:
             )
         except asyncio.TimeoutError:
             slot.status = "failed"
-            slot.error = f"Agent timed out after {self.AGENT_TIMEOUT_SECONDS}s"
+            slot.error = f"Agent timed out after {self._format_timeout(self.AGENT_TIMEOUT_SECONDS)}"
             slot.end_time = time.time()
             logger.warning(f"Agent {slot.agent_id} ({slot.model.name}) timed out")
             await queue.put(
@@ -291,6 +294,10 @@ class ParallelDispatcher:
                     "error": slot.error,
                 }
             )
+        except asyncio.CancelledError:
+            slot.status = "cancelled"
+            slot.end_time = time.time()
+            raise
 
     async def _run_single_agent(
         self,
@@ -321,11 +328,14 @@ class ParallelDispatcher:
                 agen = slot.agent.chat_stream(messages)
                 while True:
                     try:
-                        chunk = await asyncio.wait_for(anext(agen), timeout=45.0)
+                        chunk = await asyncio.wait_for(anext(agen), timeout=self.AGENT_STREAM_TIMEOUT_SECONDS)
                     except StopAsyncIteration:
                         break
                     except asyncio.TimeoutError:
-                        error_msg = f"Agent watchdog triggered: No response for 45s from {slot.model.name}"
+                        error_msg = (
+                            "Agent watchdog triggered: No response for "
+                            f"{self._format_timeout(self.AGENT_STREAM_TIMEOUT_SECONDS)} from {slot.model.name}"
+                        )
                         logger.error(error_msg)
                         slot.status = "failed"
                         slot.error = error_msg
@@ -471,14 +481,7 @@ class ParallelDispatcher:
         except asyncio.CancelledError:
             slot.status = "cancelled"
             slot.end_time = time.time()
-            await queue.put(
-                {
-                    "type": "agent_error",
-                    "agent_id": slot.agent_id,
-                    "model_name": slot.model.name,
-                    "error": "Cancelled",
-                }
-            )
+            raise
         except Exception as e:
             slot.status = "failed"
             slot.error = str(e)
@@ -492,3 +495,7 @@ class ParallelDispatcher:
                     "error": str(e),
                 }
             )
+
+    @staticmethod
+    def _format_timeout(timeout_seconds: float) -> str:
+        return f"{timeout_seconds:g}s"

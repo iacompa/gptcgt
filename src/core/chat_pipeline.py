@@ -13,8 +13,11 @@ process_message() has been refactored into sub-methods for maintainability:
 
 from __future__ import annotations
 
+import asyncio
 import json as _json
 
+from src.agents import factory as agent_factory_module
+from src.agents.factory import AgentFactory
 from src.billing.cost_breakdown import ModelUsage
 from src.core.chat_store import ChatStore, MessageRole
 from src.core.diff_engine import DiffExtractor
@@ -76,7 +79,6 @@ class ChatPipeline:
         reflection_hint: str | None = None,
     ) -> None:
         # --- Lazy imports: loaded once per call, zero cost at app startup ---
-        from src.agents.factory import PROVIDER_KEY_MAP, AgentFactory  # noqa: F401
         from src.auth.keychain import KeyChainManager
         from src.core.context_manager import ContextManager  # noqa: F401
         from src.core.system_prompt import SystemPromptBuilder
@@ -110,7 +112,7 @@ class ChatPipeline:
             return
 
         api_key, base_url = await self._resolve_api_credentials(
-            model_def, KeyChainManager, PROVIDER_KEY_MAP, error_callback
+            model_def, KeyChainManager, agent_factory_module.PROVIDER_KEY_MAP, error_callback
         )
         if api_key is None and base_url is None:
             # _resolve_api_credentials already called error_callback
@@ -237,52 +239,28 @@ class ChatPipeline:
                         cancel_event=cancel_event,
                     )
                     break  # Success
+                except asyncio.CancelledError:
+                    logger.info("Chat pipeline request cancelled during streaming")
+                    if cancel_event is not None:
+                        raise
+                    if error_callback:
+                        await error_callback("Request was cancelled.")
+                    return
                 except Exception as stream_err:
-                    from src.agents.base import ProviderException
+                    classification = self._classify_stream_error(stream_err)
+                    error_text = self._stringify_stream_error(stream_err)
 
-                    # noqa: W293
-                    is_transient = False
-                    is_auth = False
-                    # noqa: W293
-                    if isinstance(stream_err, ProviderException):
-                        if stream_err.error_type in ("rate_limit", "timeout", "unknown"):
-                            is_transient = True
-                        elif stream_err.error_type == "auth_error":
-                            is_auth = True
-                    else:
-                        err_str = str(stream_err).lower()
-                        is_transient = any(
-                            kw in err_str
-                            for kw in (
-                                "rate limit",
-                                "rate_limit",
-                                "ratelimit",
-                                "429",
-                                "timeout",
-                                "timed out",
-                                "connection",
-                                "temporary",
-                                "503",
-                                "502",
-                                "overloaded",
-                            )
-                        )
-                        is_auth = any(
-                            kw in err_str
-                            for kw in (
-                                "auth",
-                                "401",
-                                "403",
-                                "invalid api key",
-                                "invalid_api_key",
-                                "unauthorized",
-                            )
-                        )
-
-                    if is_auth or not is_transient or attempt == MAX_FAILOVER_ATTEMPTS:
-                        raise stream_err
+                    if classification["is_auth_error"] or not classification["is_retryable"]:
+                        if error_callback:
+                            await error_callback(f"Model {current_model.id} failed: {error_text}")
+                        return
 
                     failed_models.add(current_model.id)
+                    if attempt == MAX_FAILOVER_ATTEMPTS:
+                        if error_callback:
+                            await error_callback(f"Model {current_model.id} failed: {error_text}")
+                        return
+
                     fallback = registry.get_fallback_model(
                         current_model.id,
                         self.default_tier,
@@ -290,7 +268,11 @@ class ChatPipeline:
                         excluded=failed_models,
                     )
                     if not fallback:
-                        raise
+                        if error_callback:
+                            await error_callback(
+                                f"No fallback model available after error from {current_model.id}: {error_text}"
+                            )
+                        return
 
                     logger.warning(
                         f"Failover: {current_model.name} failed ({stream_err}), retrying with {fallback.name}"
@@ -311,10 +293,10 @@ class ChatPipeline:
 
                     current_model = fallback
                     fb_key, fb_url = await self._resolve_api_credentials(
-                        current_model, KeyChainManager, PROVIDER_KEY_MAP, error_callback
+                        current_model, KeyChainManager, agent_factory_module.PROVIDER_KEY_MAP, error_callback
                     )
                     if fb_key is None and fb_url is None:
-                        raise
+                        return
                     agent = AgentFactory.create_agent(
                         current_model,
                         api_key=fb_key,
@@ -325,6 +307,12 @@ class ChatPipeline:
                     agent.config.temperature = 0.2
 
             await self._handle_post_stream(full_response, current_model, user_text, total_usage, registry)
+        except asyncio.CancelledError:
+            logger.info("Chat pipeline request cancelled")
+            if cancel_event is not None:
+                raise
+            if error_callback:
+                await error_callback("Request was cancelled.")
         except Exception as e:
             from src.agents.base import ProviderException
 
@@ -347,6 +335,83 @@ class ChatPipeline:
                 logger.error(f"Pipeline error: {e}")
                 if error_callback:
                     await error_callback(str(e))
+
+    @staticmethod
+    def _stringify_stream_error(error: Exception) -> str:
+        if hasattr(error, "message") and getattr(error, "message"):
+            return str(getattr(error, "message"))
+        return str(error)
+
+    @staticmethod
+    def _classify_stream_error(error: Exception) -> dict[str, bool]:
+        from src.agents.base import ProviderException
+
+        auth_error_types = {
+            "auth_error",
+            "invalid_api_key",
+            "invalid_token",
+            "permission_denied",
+            "unauthorized",
+        }
+        retryable_error_types = {
+            "rate_limit",
+            "timeout",
+            "unknown",
+            "connection_error",
+            "temporary_unavailable",
+            "server_error",
+        }
+
+        status_code = getattr(error, "status_code", None)
+        if status_code in {401, 403}:
+            return {"is_auth_error": True, "is_retryable": False}
+        if status_code in {404}:
+            return {"is_auth_error": False, "is_retryable": False}
+        if status_code in {408, 409, 425, 429, 500, 502, 503, 504}:
+            return {"is_auth_error": False, "is_retryable": True}
+
+        if isinstance(error, ProviderException):
+            if error.error_type in auth_error_types:
+                return {"is_auth_error": True, "is_retryable": False}
+            if error.error_type in retryable_error_types:
+                return {"is_auth_error": False, "is_retryable": True}
+
+        error_text = ChatPipeline._stringify_stream_error(error).lower()
+        is_auth_error = any(
+            marker in error_text
+            for marker in (
+                "auth",
+                "401",
+                "403",
+                "invalid api key",
+                "invalid_api_key",
+                "invalid credentials",
+                "unauthorized",
+                "forbidden",
+            )
+        )
+        if is_auth_error:
+            return {"is_auth_error": True, "is_retryable": False}
+
+        is_retryable = any(
+            marker in error_text
+            for marker in (
+                "rate limit",
+                "rate_limit",
+                "ratelimit",
+                "429",
+                "timeout",
+                "timed out",
+                "connection",
+                "temporary",
+                "overloaded",
+                "502",
+                "503",
+                "504",
+                "gateway timeout",
+            )
+        )
+        return {"is_auth_error": False, "is_retryable": is_retryable}
 
     # ------------------------------------------------------------------ #
     #  Private sub-methods                                                 #

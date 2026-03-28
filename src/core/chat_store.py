@@ -145,21 +145,25 @@ class ChatStore:
         for file_path in self.sessions_dir.glob("*.json"):
             if file_path.name == "current.json":
                 continue
-            messages = self._load_from_disk(file_path)
-            preview = ""
-            for msg in messages:
-                if msg.role == MessageRole.USER:
-                    preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
-                    break
+            try:
+                messages = self._load_from_disk(file_path)
+                preview = ""
+                for msg in messages:
+                    if msg.role == MessageRole.USER:
+                        preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+                        break
 
-            sessions.append(
-                {
-                    "id": file_path.stem,
-                    "date": file_path.stat().st_mtime,
-                    "message_count": len(messages),
-                    "preview": preview,
-                }
-            )
+                sessions.append(
+                    {
+                        "id": file_path.stem,
+                        "date": file_path.stat().st_mtime,
+                        "message_count": len(messages),
+                        "preview": preview,
+                    }
+                )
+            except FileNotFoundError:
+                # Session files can disappear between the directory scan and stat/load.
+                continue
 
         sessions.sort(key=lambda x: x["date"], reverse=True)
         return sessions
@@ -232,7 +236,7 @@ class ChatStore:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return [ChatMessage.from_dict(d) for d in data]
-        except (json.JSONDecodeError, KeyError):
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
             return []
 
     def _update_current_symlink(self, target: Path) -> None:
