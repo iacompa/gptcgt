@@ -27,8 +27,6 @@ jobs:
       STAGING_WEB_BASE_URL: ${{ secrets.STAGING_WEB_BASE_URL }}
       STAGING_WEB_SESSION_COOKIE: ${{ secrets.STAGING_WEB_SESSION_COOKIE }}
       STAGING_WEB_EXPECT_GITHUB_CONNECTED: ${{ inputs.expect_github_connected }}
-      STAGING_SMOKE_API_URL: ${{ secrets.STAGING_SMOKE_API_URL }}
-      STAGING_SMOKE_AUTH_TOKEN: ${{ secrets.STAGING_SMOKE_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,8 +46,6 @@ jobs:
       - name: Validate required staging web secrets
         run: |
           test -n "$STAGING_WEB_BASE_URL" || { echo "Missing secret: STAGING_WEB_BASE_URL"; exit 1; }
-          test -n "$STAGING_SMOKE_API_URL" || { echo "Missing secret: STAGING_SMOKE_API_URL"; exit 1; }
-          test -n "$STAGING_SMOKE_AUTH_TOKEN" || { echo "Missing secret: STAGING_SMOKE_AUTH_TOKEN"; exit 1; }
           test -n "$STAGING_WEB_SESSION_COOKIE" || { echo "Missing secret: STAGING_WEB_SESSION_COOKIE"; exit 1; }
 
       - name: Run staging browser smoke
