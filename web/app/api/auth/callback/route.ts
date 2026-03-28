@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createSessionToken } from '@/lib/auth';
-import { API_URL, BASE_URL, IS_PRODUCTION } from '@/lib/config';
+import { API_URL, IS_PRODUCTION } from '@/lib/config';
+import { getRequestOrigin } from '@/lib/request';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,20 +17,25 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const state = searchParams.get('state');
+    const baseOrigin = getRequestOrigin(request);
 
     if (error) {
-        return NextResponse.redirect(`${BASE_URL}/auth?error=${encodeURIComponent(error)}`);
+        return NextResponse.redirect(`${baseOrigin}/auth?error=${encodeURIComponent(error)}`);
     }
 
     if (!code) {
-        return NextResponse.redirect(`${BASE_URL}/auth?error=missing_code`);
+        return NextResponse.redirect(`${baseOrigin}/auth?error=missing_code`);
     }
 
-    const storedState = request.cookies.get('oauth_state')?.value;
+const storedState = request.cookies.get('oauth_state')?.value;
+
+function isDeviceState(state: string): boolean {
+    return state.split('.').length === 3;
+}
 
     // Terminal login uses the same WorkOS callback route, but the browser never had
     // the web OAuth state cookie because the flow originated from the TUI.
-    if (state && !storedState) {
+    if (state && !storedState && isDeviceState(state)) {
         try {
             const deviceUrl = new URL(`${API_URL}/auth/device/callback`);
             deviceUrl.searchParams.set('code', code);
@@ -42,14 +48,16 @@ export async function GET(request: NextRequest) {
             });
         } catch (err: any) {
             console.error('Device callback proxy error:', err?.message);
-            return NextResponse.redirect(`${BASE_URL}/auth?error=device_callback_failed`);
+            return NextResponse.redirect(`${baseOrigin}/auth?error=device_callback_failed`);
         }
     }
 
     // P1-01: Validate OAuth state to prevent CSRF
     if (!state || !storedState || state !== storedState) {
         console.error('SSO callback CSRF state mismatch:', { state, storedState });
-        return NextResponse.redirect(`${BASE_URL}/auth?error=invalid_state`);
+        const response = NextResponse.redirect(`${baseOrigin}/auth?error=invalid_state`);
+        response.cookies.delete('oauth_state');
+        return response;
     }
 
     try {
@@ -63,7 +71,7 @@ export async function GET(request: NextRequest) {
         if (!backendRes.ok) {
             const err = await backendRes.json().catch(() => ({}));
             console.error('SSO callback backend error:', err);
-            return NextResponse.redirect(`${BASE_URL}/auth?error=sso_failed`);
+            return NextResponse.redirect(`${baseOrigin}/auth?error=sso_failed`);
         }
 
         const data = await backendRes.json();
@@ -71,7 +79,7 @@ export async function GET(request: NextRequest) {
         const name = data.name || data.profile?.name || email?.split('@')[0];
 
         if (!email) {
-            return NextResponse.redirect(`${BASE_URL}/auth?error=no_email`);
+            return NextResponse.redirect(`${baseOrigin}/auth?error=no_email`);
         }
 
         // Create session token (subject should be stable user id when available)
@@ -79,7 +87,7 @@ export async function GET(request: NextRequest) {
         const token = createSessionToken(subject, email, name);
 
         // Redirect to dashboard with httpOnly session cookie
-        const response = NextResponse.redirect(`${BASE_URL}/dashboard`);
+        const response = NextResponse.redirect(`${baseOrigin}/dashboard`);
         response.cookies.delete('oauth_state'); // Clear CSRF state
         response.cookies.set('gptcgt_session', token, {
             httpOnly: true,
@@ -92,6 +100,6 @@ export async function GET(request: NextRequest) {
         return response;
     } catch (err: any) {
         console.error('SSO callback error:', err?.message);
-        return NextResponse.redirect(`${BASE_URL}/auth?error=callback_failed`);
+        return NextResponse.redirect(`${baseOrigin}/auth?error=callback_failed`);
     }
 }
