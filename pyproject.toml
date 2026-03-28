@@ -73,6 +73,15 @@ packages = ["src"]
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+extend-exclude = [
+    ".venv",
+    ".venv-*",
+    "test-env",
+    "node_modules",
+    "web/.next",
+    "**/* 2.py",
+    "**/* 3.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "D"]
@@ -84,3 +93,12 @@ target-version = ["py311"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    ".venv-*",
+    "test-env",
+    "node_modules",
+    "web/.next",
+]
