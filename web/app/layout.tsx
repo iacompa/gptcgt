@@ -37,7 +37,14 @@ export default async function RootLayout({
                                             href="/"
                                             className="flex items-center gap-3 rounded-full border border-[color:var(--border)] bg-white/75 px-3 py-2 shadow-sm transition hover:bg-white"
                                         >
-                                            <Image src="/logo.svg" alt="gptcgt logo" width={30} height={30} className="rounded-lg" />
+                                            <Image
+                                                src="/gcgt-icon-2a.png"
+                                                alt=""
+                                                width={34}
+                                                height={34}
+                                                className="rounded-xl shadow-sm"
+                                                priority
+                                            />
                                             <div>
                                                 <p className="text-sm font-semibold tracking-[-0.02em] text-slate-950">gptcgt</p>
                                                 <p className="mono text-[10px] uppercase tracking-[0.24em] text-[var(--text-soft)]">
