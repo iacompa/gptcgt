@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Footer() {
     const currentYear = new Date().getFullYear();
@@ -7,8 +8,17 @@ export function Footer() {
             <div className="page-shell">
                 <div className="panel flex flex-col gap-6 px-6 py-8 lg:flex-row lg:items-end lg:justify-between lg:px-8">
                     <div>
-                        <p className="eyebrow">gptcgt</p>
-                        <p className="mt-3 max-w-xl text-lg font-medium tracking-[-0.03em] text-slate-950">
+                        <div className="flex items-center gap-3">
+                            <Image
+                                src="/gcgt-icon-2a.png"
+                                alt=""
+                                width={38}
+                                height={38}
+                                className="rounded-xl shadow-sm"
+                            />
+                            <p className="eyebrow">gptcgt</p>
+                        </div>
+                        <p className="mt-4 max-w-xl text-lg font-medium tracking-[-0.03em] text-slate-950">
                             A calmer control surface for multi-model coding, proof-backed automation, and transparent cost decisions.
                         </p>
                         <p className="mt-3 copy-sm">© {currentYear} IA Compa LLC. All rights reserved.</p>
